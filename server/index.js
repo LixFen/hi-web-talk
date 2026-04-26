@@ -1091,6 +1091,8 @@ function validateEnvironment() {
 
 await ensureDataLayout();
 
+let httpServer = null;
+
 app.use((error, _request, response, _next) => {
   console.error("Unhandled error:", error);
   response.status(500).json({
