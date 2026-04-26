@@ -1,4 +1,5 @@
 ﻿import "dotenv/config";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
@@ -1012,16 +1013,33 @@ if (isProduction) {
     lastModified: true,
   }));
 
-  app.get("*", (_request, response) => {
-    response.sendFile(path.join(distDir, "index.html"));
+  app.get("*", (_request, response, next) => {
+    response.sendFile(path.join(distDir, "index.html"), (err) => {
+      if (err) {
+        next(err);
+      }
+    });
   });
 }
 
 function validateEnvironment() {
   const errors = [];
 
-  if (isProduction && JWT_SECRET === "hi-web-talk-jwt-secret-change-in-production") {
-    errors.push("JWT_SECRET 未更改，生产环境必须设置唯一密钥。");
+  if (isProduction) {
+    const distDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
+    const indexPath = path.join(distDir, "index.html");
+
+    try {
+      if (!fs.existsSync(indexPath)) {
+        errors.push(`前端构建产物不存在 (${indexPath})，请先执行 npm run build。`);
+      }
+    } catch (distError) {
+      errors.push(`无法读取 dist 目录 (${distDir}): ${distError.message}`);
+    }
+
+    if (JWT_SECRET === "hi-web-talk-jwt-secret-change-in-production") {
+      errors.push("JWT_SECRET 未更改，生产环境必须设置唯一密钥。");
+    }
   }
 
   if (process.env.JWT_SECRET) {
@@ -1056,7 +1074,14 @@ function validateEnvironment() {
 
 await ensureDataLayout();
 
-let httpServer = null;
+app.use((error, _request, response, _next) => {
+  console.error("Unhandled error:", error);
+  response.status(500).json({
+    error: isProduction
+      ? "服务器内部错误，请稍后再试。"
+      : error instanceof Error ? error.message : "服务器内部错误。",
+  });
+});
 
 function startServer(listenPort, attempt = 0) {
   return new Promise((resolve, reject) => {

@@ -239,10 +239,13 @@ elif [ "$deploy_mode" = "2" ]; then
     echo -e "${GREEN}  编译依赖已就绪${NC}"
 
     echo "  安装项目依赖..."
-    npm ci --omit=dev
+    npm ci
 
     echo "  构建前端..."
     npm run build
+
+    echo "  清理开发依赖（节省空间）..."
+    npm prune --omit=dev || true
 
     echo "  启动 PM2..."
     if ! command -v pm2 &>/dev/null; then
