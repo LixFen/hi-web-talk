@@ -1,13 +1,10 @@
-.kilo
-.vscode
-.idea
-logs
 node_modules
 dist
 release
 data
-docs
 *.log
+logs
 .env
 .DS_Store
-AGENTS.md
+.vscode
+.idea

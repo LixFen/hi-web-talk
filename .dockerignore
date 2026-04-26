@@ -1,13 +1,12 @@
 node_modules
 dist
+release
 data
 .git
 .env
 .DS_Store
 *.log
-.github
+logs
 .vscode
-.kilo
-docs
-AGENTS.md
-README.md
+.idea
+deploy.sh
