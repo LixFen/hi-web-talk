@@ -1,0 +1,24 @@
+services:
+  hi-web-talk:
+    build: .
+    container_name: hi-web-talk
+    restart: unless-stopped
+    ports:
+      - "${OPENAI_PORT:-8787}:8787"
+    environment:
+      - NODE_ENV=production
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173}
+      - STREAM_VERBOSE=${STREAM_VERBOSE:-false}
+      - MODEL_CONFIG_MASTER_KEY=${MODEL_CONFIG_MASTER_KEY:-}
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8787/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

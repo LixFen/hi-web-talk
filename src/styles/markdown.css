@@ -1,0 +1,42 @@
+.markdown-body pre code.hljs {
+  border-radius: 0.5rem;
+  padding: 0.9rem 1rem;
+}
+
+.markdown-body :not(pre) > code.hljs,
+.markdown-body :not(pre) > code {
+  border-radius: 0.35rem;
+  padding: 0.12rem 0.35rem;
+}
+
+.markdown-body pre code.hljs {
+  background: #f4f4f4;
+}
+
+.markdown-body :not(pre) > code.hljs,
+.markdown-body :not(pre) > code {
+  background: rgba(15, 23, 42, 0.06);
+  color: #1e293b;
+}
+
+:root[data-theme="dark"] .markdown-body pre code.hljs {
+  background: #171717;
+}
+
+:root[data-theme="dark"] .markdown-body :not(pre) > code.hljs,
+:root[data-theme="dark"] .markdown-body :not(pre) > code {
+  background: rgba(148, 163, 184, 0.16);
+  color: #e2e8f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .markdown-body pre code.hljs {
+    background: #171717;
+  }
+
+  :root:not([data-theme="light"]) .markdown-body :not(pre) > code.hljs,
+  :root:not([data-theme="light"]) .markdown-body :not(pre) > code {
+    background: rgba(148, 163, 184, 0.16);
+    color: #e2e8f0;
+  }
+}

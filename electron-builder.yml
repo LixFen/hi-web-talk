@@ -1,0 +1,40 @@
+appId: com.hiwebtalk.desktop
+productName: Hi Web Talk
+copyright: Copyright © 2026
+
+files:
+  - electron/**/*
+  - dist/**/*
+
+directories:
+  output: release
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: electron/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: electron/icon.ico
+  uninstallerIcon: electron/icon.ico
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  icon: electron/icon.icns
+  category: public.app-category.productivity
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  icon: electron/icon.png
+  category: Network

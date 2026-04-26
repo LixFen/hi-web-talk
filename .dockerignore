@@ -1,0 +1,13 @@
+node_modules
+dist
+data
+.git
+.env
+.DS_Store
+*.log
+.github
+.vscode
+.kilo
+docs
+AGENTS.md
+README.md
