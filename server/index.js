@@ -63,7 +63,24 @@ const app = express();
 const port = Number(process.env.OPENAI_PORT || 8787);
 const maxPortAttempts = Number(process.env.OPENAI_PORT_ATTEMPTS || 10);
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+        imgSrc: ["'self'", "data:", "https:"],
+        fontSrc: ["'self'", "https:", "data:"],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+      },
+    },
+  }),
+);
 
 const corsOriginRaw = process.env.CORS_ORIGIN || "http://localhost:5173";
 
