@@ -37,11 +37,12 @@ generate_deploy() {
   git checkout "$MASTER"
   git checkout -B deploy
 
-  # 删除 Electron/CI/文档相关文件
-  log_info "删除 Electron/CI/文档"
+  # 删除 Electron/CI/文档/开发工具相关文件
+  log_info "删除 Electron/CI/文档/开发工具"
   rm -rf electron/
   rm -f electron-builder.yml
   rm -rf .github/
+  rm -rf scripts/
   rm -f .tmp-reply-body.json README.md README.tmp
 
   # 修改 .dockerignore: 追加 deploy.sh
@@ -95,7 +96,7 @@ generate_electron() {
   log_info "删除所有非 Electron 文件"
   shopt -s dotglob
   for item in *; do
-    [ "$item" = "." ] || [ "$item" = ".." ] || [ "$item" = ".git" ] && continue
+    [ "$item" = "." ] || [ "$item" = ".." ] || [ "$item" = ".git" ] || [ "$item" = "node_modules" ] && continue
     should_keep=false
     for k in $KEEP; do
       if [ "$item" = "$k" ]; then should_keep=true; break; fi
