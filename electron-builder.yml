@@ -4,23 +4,23 @@ copyright: Copyright © 2026
 
 files:
   - electron/**/*
-  - dist/**/*
+  - package.json
 
 directories:
   output: release
+
+extraMetadata:
+  main: electron/main.js
 
 win:
   target:
     - target: nsis
       arch:
         - x64
-  icon: electron/icon.ico
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  installerIcon: electron/icon.ico
-  uninstallerIcon: electron/icon.ico
 
 mac:
   target:
@@ -28,7 +28,6 @@ mac:
       arch:
         - x64
         - arm64
-  icon: electron/icon.icns
   category: public.app-category.productivity
 
 linux:
@@ -36,5 +35,4 @@ linux:
     - target: AppImage
       arch:
         - x64
-  icon: electron/icon.png
   category: Network

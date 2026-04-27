@@ -1,5 +1,11 @@
-import { contextBridge } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("electronAPI", {
-  getServerUrl: () => process.env.HI_WEB_TALK_SERVER || "http://localhost:8787",
+  getServerUrl: () => ipcRenderer.invoke("get-server-url"),
+  changeServer: () => ipcRenderer.invoke("change-server"),
+  retry: () => ipcRenderer.invoke("get-server-url").then((url) => {
+    if (url) {
+      window.location.href = url;
+    }
+  }),
 });
