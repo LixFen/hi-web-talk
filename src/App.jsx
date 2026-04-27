@@ -409,8 +409,8 @@ export default function App() {
   );
 
   const shouldHideComposer = useMemo(
-    () => currentViewMode !== "chat" || isAnySettingsPanelOpen,
-    [currentViewMode, isAnySettingsPanelOpen],
+    () => currentViewMode !== "chat" || isAnySettingsPanelOpen || isSidebarDrawerOpen,
+    [currentViewMode, isAnySettingsPanelOpen, isSidebarDrawerOpen],
   );
 
   useEffect(() => {
