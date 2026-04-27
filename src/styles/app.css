@@ -1848,6 +1848,18 @@
   .sidebar-drawer {
     width: min(24rem, 100vw);
   }
+
+  .composer-area {
+    padding: 0 0.75rem 0.5rem;
+  }
+
+  .composer-container {
+    padding: 0.25rem 0.25rem 0.5rem;
+  }
+
+  .chat-footer-text {
+    display: none;
+  }
 }
 
 .history-item-row {
