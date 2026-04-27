@@ -70,6 +70,7 @@ body {
   background-color: var(--bg-main);
   color: var(--text-primary);
   line-height: 1.6;
+  overscroll-behavior: none;
 }
 
 button {
