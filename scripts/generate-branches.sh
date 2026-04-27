@@ -37,12 +37,11 @@ generate_deploy() {
   git checkout "$MASTER"
   git checkout -B deploy
 
-  # 删除 Electron/CI/文档/开发工具相关文件
+  # 删除 Electron/CI/文档/开发工具
   log_info "删除 Electron/CI/文档/开发工具"
   rm -rf electron/
   rm -f electron-builder.yml
   rm -rf .github/
-  rm -rf scripts/
   rm -f .tmp-reply-body.json README.md README.tmp
 
   # 修改 .dockerignore: 追加 deploy.sh
@@ -68,15 +67,12 @@ generate_deploy() {
     require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
   "
 
-  # 从 .env.example 移除 Electron 配置段
-  log_info ".env.example: 移除 Electron 配置段"
-  node -e "
-    const fs = require('fs');
-    let content = fs.readFileSync('.env.example', 'utf8');
-    content = content.replace(/\n# ===== Electron.+\n(?:# .+\n)*HI_WEB_TALK_SERVER=.+\n?/s, '\n');
-    content = content.replace(/\n{2,}$/s, '\n');
-    fs.writeFileSync('.env.example', content);
-  "
+  # 覆盖 .env.example 为 deploy 版本（无 Electron 配置段）
+  log_info ".env.example: 使用 deploy 模板"
+  cp templates/deploy/.env.example .env.example
+
+  # 删除开发工具目录
+  rm -rf scripts/ templates/
 
   git add -A
   git commit -m "deploy: 从 master-branch 生成 — 移除 Electron/CI/文档" --allow-empty
@@ -88,6 +84,11 @@ generate_electron() {
 
   git checkout "$MASTER"
   git checkout -B electron
+
+  # 先从模板覆盖专属文件（必须在删除循环前，因为 templates/ 后续会被删掉）
+  log_info "应用 electron 模板文件"
+  cp templates/electron/.env.example .env.example
+  cp templates/electron/package.json package.json
 
   # 只保留 Electron 相关的 5 个文件/目录
   # electron-builder.yml, electron/, package.json, .env.example, .gitignore
@@ -106,41 +107,6 @@ generate_electron() {
     fi
   done
   shopt -u dotglob
-
-  # 重写 .env.example 为 Electron 专用
-  log_info ".env.example: 重写为 Electron 配置"
-  cat > .env.example <<'ENVEOF'
-# ===== Electron 桌面客户端配置 =====
-# 复制此文件为 .env 并修改
-
-# 部署的 Hi Web Talk 服务器地址
-# 本地测试: http://localhost:8787
-# 远程部署: http://你的公网IP:8787
-HI_WEB_TALK_SERVER=http://localhost:8787
-ENVEOF
-
-  # 重写 package.json 为 Electron 专用
-  log_info "package.json: 重写为 Electron 配置"
-  cat > package.json <<'PKGEOF'
-{
-  "name": "hi-web-talk",
-  "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "main": "electron/main.js",
-  "scripts": {
-    "dev": "electron .",
-    "build": "electron-builder",
-    "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux"
-  },
-  "devDependencies": {
-    "electron": "^34.3.0",
-    "electron-builder": "^25.1.8"
-  }
-}
-PKGEOF
 
   git add -A
   git commit -m "electron: 从 master-branch 生成 — 纯桌面客户端壳" --allow-empty
