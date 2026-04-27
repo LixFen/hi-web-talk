@@ -1315,17 +1315,19 @@
   .chat-footer-bar {
     flex-direction: column;
     align-items: flex-start;
+    gap: 0.5rem;
   }
 
   .chat-footer-controls {
-    width: auto;
+    width: 100%;
     max-width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
   }
 
   .composer-model-selector {
-    flex: none;
-    width: min(18rem, 100%);
-    max-width: min(18rem, 100%);
+    flex-shrink: 0;
+    max-width: min(11rem, 52vw);
   }
 
   .chat-footer-bar .chat-footer-text {
@@ -1802,16 +1804,44 @@
 
 @media (max-width: 720px) {
   .topbar {
-    align-items: flex-start;
-    gap: 0.75rem;
+    align-items: center;
+    gap: 0.5rem;
     height: auto;
-    padding: 0.9rem 1rem;
+    min-height: 3.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .topbar-menu-btn {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .topbar-title {
+    font-size: 0.85rem;
   }
 
   .topbar-actions {
-    width: 100%;
-    justify-content: space-between;
-    flex-wrap: wrap;
+    width: auto;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+
+  .topbar-subtitle {
+    display: none;
+  }
+
+  .view-mode-switcher {
+    width: auto;
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+
+  .view-mode-btn {
+    flex: none;
+    text-align: center;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.7rem;
   }
 
   .settings-modal-backdrop {
@@ -1827,6 +1857,10 @@
 
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .composer-model-selector {
+    max-width: min(14rem, 45vw);
   }
 }
 
@@ -2420,19 +2454,6 @@
 
   .graph-detail-panel {
     max-height: 44vh;
-  }
-}
-
-@media (max-width: 720px) {
-  .view-mode-switcher {
-    width: auto;
-    max-width: 100%;
-    justify-content: flex-start;
-  }
-
-  .view-mode-btn {
-    flex: none;
-    text-align: center;
   }
 
   .chain-card-view,

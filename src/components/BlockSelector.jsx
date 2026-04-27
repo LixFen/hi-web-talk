@@ -7,19 +7,17 @@ export default function BlockSelector({
   onSelectBlock,
   disabled = false,
 }) {
+  const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const listRef = useRef(null);
   const trackRef = useRef(null);
   const indicatorRef = useRef(null);
-  const anchorRef = useRef(null);
-  const panelRef = useRef(null);
+  const containerRef = useRef(null);
   const prevFocusedSHA1Ref = useRef("");
+  const isTouchDevice = useRef(false);
 
   const displayBlocks = useMemo(() => {
-    const filtered = blocks.filter((b) => {
-      if (b.role === "user") return false;
-      return true;
-    });
+    const filtered = blocks.filter((b) => b.role !== "user");
 
     if (!activeBlockSHA1) {
       return filtered.sort((a, b) => (a.graphInfo?.depth ?? 0) - (b.graphInfo?.depth ?? 0));
@@ -38,11 +36,11 @@ export default function BlockSelector({
   }, [blocks, activeBlockSHA1]);
 
   useEffect(() => {
-    if (isHovered && focusedBlockSHA1 && listRef.current) {
+    if ((isHovered || isOpen) && focusedBlockSHA1 && listRef.current) {
       const focusedEl = listRef.current.querySelector(`[data-sha="${focusedBlockSHA1}"]`);
       focusedEl?.scrollIntoView({ block: "nearest" });
     }
-  }, [isHovered, focusedBlockSHA1]);
+  }, [isHovered, isOpen, focusedBlockSHA1]);
 
   const updateIndicatorPosition = useCallback(() => {
     if (!trackRef.current || !indicatorRef.current || displayBlocks.length === 0) return;
@@ -68,10 +66,52 @@ export default function BlockSelector({
     return () => window.removeEventListener("resize", updateIndicatorPosition);
   }, [updateIndicatorPosition]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside, { passive: true });
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isOpen]);
+
   const handleSelect = (sha1) => {
     onSelectBlock?.(sha1);
+    setIsOpen(false);
   };
 
+  const handleToggle = () => {
+    isTouchDevice.current = true;
+    setIsOpen((prev) => !prev);
+  };
+
+  const handleMouseEnter = () => {
+    if (isTouchDevice.current) return;
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+  };
+
+  const showPanel = isHovered || isOpen;
   const focusedBlock = displayBlocks.find((b) => b.sha1 === focusedBlockSHA1);
   const focusedLabel = focusedBlock
     ? (focusedBlock.summaryInfo?.summary || focusedBlock.prompt?.slice(0, 20) || "")
@@ -79,23 +119,35 @@ export default function BlockSelector({
 
   return (
     <div
-      className={`block-selector ${isHovered ? "expanded" : "collapsed"} ${disabled ? "disabled" : ""}`.trim()}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => {
-        setIsHovered(false);
-      }}
+      className={`block-selector ${showPanel ? "expanded" : "collapsed"} ${disabled ? "disabled" : ""}`.trim()}
+      ref={containerRef}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div className="block-selector-inner">
         <div className="block-selector-track" ref={trackRef}>
           <div className="block-selector-indicator" ref={indicatorRef} />
         </div>
 
-        <div className="block-selector-anchor" ref={anchorRef}>
-          {!isHovered && (
+        <div className="block-selector-anchor">
+          {!showPanel && (
             <button
               className="block-selector-label-btn"
-              onClick={() => focusedBlockSHA1 && handleSelect(focusedBlockSHA1)}
+              onClick={handleToggle}
               disabled={!focusedBlockSHA1}
+              aria-haspopup="listbox"
+              aria-expanded={showPanel}
+            >
+              <span className="block-selector-line" />
+              {focusedLabel && <span className="block-selector-text">{focusedLabel}</span>}
+            </button>
+          )}
+          {isOpen && (
+            <button
+              className="block-selector-label-btn"
+              onClick={handleToggle}
+              aria-haspopup="listbox"
+              aria-expanded={showPanel}
             >
               <span className="block-selector-line" />
               {focusedLabel && <span className="block-selector-text">{focusedLabel}</span>}
@@ -103,9 +155,9 @@ export default function BlockSelector({
           )}
         </div>
 
-        {isHovered && (
-          <div className="block-selector-panel" ref={panelRef}>
-            <div className="block-selector-list" ref={listRef}>
+        {showPanel && (
+          <div className="block-selector-panel">
+            <div className="block-selector-list" ref={listRef} role="listbox">
               {displayBlocks.length === 0 ? (
                 <div className="block-selector-empty">暂无对话块</div>
               ) : (
@@ -117,6 +169,8 @@ export default function BlockSelector({
                       key={block.sha1}
                       className={`block-selector-item ${isActive ? "active" : ""} ${isFocused ? "focused" : ""}`.trim()}
                       data-sha={block.sha1}
+                      role="option"
+                      aria-selected={isFocused}
                       onClick={() => handleSelect(block.sha1)}
                     >
                       <span className="block-selector-item-label">
