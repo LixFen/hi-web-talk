@@ -143,6 +143,7 @@ const ChatView = memo(function ChatView({
   messages = [],
   navigationRequest = null,
   isLoading,
+  hideChatBottomDock = false,
   onActivateBlock,
   onFocusBlock,
   ...props
@@ -175,6 +176,7 @@ const ChatView = memo(function ChatView({
     bottomDockMode === "smart" || bottomDockMode === "branch-only";
   const showBranches =
     !isReplyPending &&
+    !hideChatBottomDock &&
     bottomDockMode !== "hidden" &&
     hasBranchPreviews &&
     canShowBranchPreview;

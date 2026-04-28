@@ -322,6 +322,7 @@ export default function App() {
     activeChainBlockSHA1s: [],
   };
   const bottomDockMode = appSettings.bottomDockMode || "smart";
+  const hideChatBottomDock = isSidebarDrawerOpen && layoutMode === "mobile";
   const showChatFocusOutline = appSettings.showChatFocusOutline !== false;
   const hideWideScreenSideBranches = appSettings.hideWideScreenSideBranches === true;
   const showChatAdaptationButtons = appSettings.showChatAdaptationButtons !== false;
@@ -1173,6 +1174,7 @@ export default function App() {
           messages={displayMessages}
           navigationRequest={chatNavigationRequest}
           isLoading={isLoading}
+          hideChatBottomDock={hideChatBottomDock}
           adaptationDefinitions={adaptationDefinitions}
           adaptationButtonVisibility={chatAdaptationButtonVisibility}
           onActivateBlock={handleActivateBlock}
@@ -1320,7 +1322,7 @@ export default function App() {
           {error ? <p className="inline-error">{error}</p> : null}
         </div>
 
-        {!(isSidebarDrawerOpen && layoutMode === "mobile") && (
+        {!isSidebarDrawerOpen && (
         <div className="main-panel-composer">
         <ChatComposer
           isLoading={isLoading || isBootstrapping || !selectedModel}
