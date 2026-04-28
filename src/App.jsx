@@ -1320,6 +1320,7 @@ export default function App() {
           {error ? <p className="inline-error">{error}</p> : null}
         </div>
 
+        {!isSidebarDrawerOpen && (
         <div className="main-panel-composer">
         <ChatComposer
           isLoading={isLoading || isBootstrapping || !selectedModel}
@@ -1338,6 +1339,7 @@ export default function App() {
           onSelectBlock={handleSelectBlock}
         />
         </div>
+        )}
       </main>
 
       <ModelSettingsPanel
