@@ -128,6 +128,7 @@ export default function App() {
   const isAdmin = currentUser?.role === "admin";
   const chatNavigationRequestIdRef = useRef(0);
   const activeSessionHashRef = useRef("");
+  const viewSwitchVersionRef = useRef(0);
   const streamAbortControllerRef = useRef(null);
   const streamBufferRef = useRef("");
   const streamFlushRafRef = useRef(0);
@@ -624,7 +625,7 @@ export default function App() {
     }
   };
 
-  const handleChangeViewMode = async (nextMode) => {
+  const handleChangeViewMode = (nextMode) => {
     if (!nextMode || nextMode === currentViewMode) {
       return;
     }
@@ -637,20 +638,25 @@ export default function App() {
       return;
     }
 
-    try {
-      const detail = await updateSessionViewState(activeConversation.sessionHash, nextMode);
-      applySessionDetail(detail, {
-        reason: "switch-to-chat",
-        behavior: "auto",
+    const version = ++viewSwitchVersionRef.current;
+
+    updateSessionViewState(activeConversation.sessionHash, nextMode)
+      .then((detail) => {
+        if (version !== viewSwitchVersionRef.current) return;
+        applySessionDetail(detail, {
+          reason: "switch-to-chat",
+          behavior: "auto",
+        });
+      })
+      .catch((requestError) => {
+        if (version !== viewSwitchVersionRef.current) return;
+        setViewMode(previousMode);
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "切换视图失败，请稍后再试。",
+        );
       });
-    } catch (requestError) {
-      setViewMode(previousMode);
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "切换视图失败，请稍后再试。",
-      );
-    }
   };
 
   const handleActivateBlock = async (blockSHA1) => {
