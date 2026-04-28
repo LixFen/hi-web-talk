@@ -1320,7 +1320,7 @@ export default function App() {
           {error ? <p className="inline-error">{error}</p> : null}
         </div>
 
-        {!isSidebarDrawerOpen && (
+        {!(isSidebarDrawerOpen && layoutMode === "mobile") && (
         <div className="main-panel-composer">
         <ChatComposer
           isLoading={isLoading || isBootstrapping || !selectedModel}
