@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import ChainCardView from "./components/ChainCardView";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import ChatComposer from "./components/ChatComposer";
 import ChatHero from "./components/ChatHero";
 import ChatView from "./components/ChatView";
-import GraphView from "./components/GraphView";
+
+const ChainCardView = lazy(() => import("./components/ChainCardView"));
+const GraphView = lazy(() => import("./components/GraphView"));
 import AppearanceSettingsPanel from "./components/AppearanceSettingsPanel";
 import InteractionSettingsPanel from "./components/InteractionSettingsPanel";
 import LoginView from "./components/LoginView";
@@ -107,6 +108,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState("chat");
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSwitchingView, setIsSwitchingView] = useState(false);
   const [isModelPanelOpen, setIsModelPanelOpen] = useState(false);
   const [isAppearancePanelOpen, setIsAppearancePanelOpen] = useState(false);
   const [isInteractionPanelOpen, setIsInteractionPanelOpen] = useState(false);
@@ -454,7 +456,32 @@ export default function App() {
     const isSameSession =
       activeSessionHashRef.current && activeSessionHashRef.current === nextSessionHash;
 
-    setActiveSessionDetail(detail);
+    setActiveSessionDetail((prev) => {
+      if (!prev) {
+        return detail;
+      }
+
+      const merged = { ...prev };
+
+      for (const key of Object.keys(detail)) {
+        const val = detail[key];
+
+        if (
+          val &&
+          typeof val === "object" &&
+          !Array.isArray(val) &&
+          prev[key] &&
+          typeof prev[key] === "object" &&
+          !Array.isArray(prev[key])
+        ) {
+          merged[key] = { ...prev[key], ...val };
+        } else {
+          merged[key] = val;
+        }
+      }
+
+      return merged;
+    });
     setFocusedBlockSHA1State((currentFocusedBlockSHA1) =>
       isSameSession && currentFocusedBlockSHA1
         ? currentFocusedBlockSHA1
@@ -633,8 +660,10 @@ export default function App() {
     const previousMode = currentViewMode;
     setViewMode(nextMode);
     setError("");
+    setIsSwitchingView(true);
 
     if (!activeConversation?.sessionHash) {
+      setIsSwitchingView(false);
       return;
     }
 
@@ -656,6 +685,11 @@ export default function App() {
             ? requestError.message
             : "切换视图失败，请稍后再试。",
         );
+      })
+      .finally(() => {
+        if (version === viewSwitchVersionRef.current) {
+          setIsSwitchingView(false);
+        }
       });
   };
 
@@ -1196,35 +1230,39 @@ export default function App() {
 
     if (currentViewMode === "chain") {
       return (
-        <ChainCardView
-          blocks={activeChainBlocks}
+        <Suspense fallback={<div className="empty-state"><h2 className="hero-title">加载中...</h2></div>}>
+          <ChainCardView
+            blocks={activeChainBlocks}
+            isLoading={isLoading}
+            adaptationDefinitions={adaptationDefinitions}
+            onActivateBlock={handleActivateBlock}
+            onFocusBlock={handleFocusBlock}
+            focusedBlockSHA1={focusedBlockSHA1}
+            onBranchFromBlock={handleBranchFromBlock}
+            onRegenerate={handleRegenerate}
+            onToggleAdaptation={handleToggleAdaptation}
+            onRunAdaptation={handleRunAdaptation}
+          />
+        </Suspense>
+      );
+    }
+
+    return (
+      <Suspense fallback={<div className="empty-state"><h2 className="hero-title">加载中...</h2></div>}>
+        <GraphView
+          blocks={graph.blocks}
+          graph={graph}
+          focusedBlockSHA1={focusedBlockSHA1}
           isLoading={isLoading}
           adaptationDefinitions={adaptationDefinitions}
           onActivateBlock={handleActivateBlock}
           onFocusBlock={handleFocusBlock}
-          focusedBlockSHA1={focusedBlockSHA1}
           onBranchFromBlock={handleBranchFromBlock}
           onRegenerate={handleRegenerate}
           onToggleAdaptation={handleToggleAdaptation}
           onRunAdaptation={handleRunAdaptation}
         />
-      );
-    }
-
-    return (
-      <GraphView
-        blocks={graph.blocks}
-        graph={graph}
-        focusedBlockSHA1={focusedBlockSHA1}
-        isLoading={isLoading}
-        adaptationDefinitions={adaptationDefinitions}
-        onActivateBlock={handleActivateBlock}
-        onFocusBlock={handleFocusBlock}
-        onBranchFromBlock={handleBranchFromBlock}
-        onRegenerate={handleRegenerate}
-        onToggleAdaptation={handleToggleAdaptation}
-        onRunAdaptation={handleRunAdaptation}
-      />
+      </Suspense>
     );
   }
 
@@ -1294,7 +1332,7 @@ export default function App() {
           <div className="topbar-title-group">
             <div className="topbar-title">{activeConversation?.title || "新对话"}</div>
             <div className="topbar-subtitle">
-              {graph.blocks.length > 0
+              {(graph.blocks?.length ?? 0) > 0
                 ? `${graph.blocks.length} 个块 · 当前链 ${Math.max(activeChainBlocks.length - 1, 0)} 轮对话`
                 : "多视图对话工作台"}
             </div>
@@ -1317,8 +1355,14 @@ export default function App() {
           </div>
         </header>
 
-        <div className="main-panel-content">
+        <div className={`main-panel-content ${isSwitchingView ? "switching-view" : ""}`.trim()}>
           {renderWorkspace()}
+
+          {isSwitchingView ? (
+            <div className="view-switching-overlay" aria-hidden="true">
+              <span className="view-switching-spinner" />
+            </div>
+          ) : null}
 
           {enabledModels.length === 0 ? (
             <p className="inline-warning">

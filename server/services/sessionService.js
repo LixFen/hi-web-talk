@@ -30,6 +30,7 @@ import {
 import { ensureConfigFiles, getAppSettings } from "./modelConfigService.js";
 import { deleteErrorLogsForBlocks } from "./errorLogService.js";
 import { deleteSummariesForBlocks, listSummaries } from "./summaryService.js";
+import { sessionDetailCache } from "../lib/cache.js";
 
 function getSessionDir(sessionHash) {
   return path.join(SESSIONS_DIR, sessionHash);
@@ -341,6 +342,7 @@ export async function updateSession(sessionHash, partialSession) {
   };
 
   await upsertSessionRecord(nextSession);
+  sessionDetailCache.clearSession(sessionHash);
   return nextSession;
 }
 
@@ -396,6 +398,7 @@ export async function deleteSession(sessionHash) {
   deleteSessionRecord(sessionHash);
   deleteBlockRecords(sessionHash);
   await fs.rm(targetDir, { recursive: true, force: false });
+  sessionDetailCache.clearSession(sessionHash);
 
   return {
     deletedSessionHash: sessionHash,
@@ -451,7 +454,7 @@ export async function setActiveBlock(sessionHash, blockSHA1) {
   return getSessionDetail(sessionHash);
 }
 
-export async function updateSessionViewState(sessionHash, partialViewState) {
+export async function updateSessionViewState(sessionHash, partialViewState, viewMode = "chat") {
   const session = await getSessionOrThrow(sessionHash);
   const nextViewState = {
     ...(session.viewState ?? {}),
@@ -473,10 +476,10 @@ export async function updateSessionViewState(sessionHash, partialViewState) {
     viewState: nextViewState,
   });
 
-  return getSessionDetail(sessionHash);
+  return getSessionDetail(sessionHash, null, viewMode);
 }
 
-export async function getSessionDetail(sessionHash, cachedData = null) {
+export async function getSessionDetail(sessionHash, cachedData = null, viewMode = "chat") {
   const currentSession = await getSessionOrThrow(sessionHash);
   const [allBlocks, summaryRecords, adaptationMap] = cachedData
     ? await Promise.all([
@@ -496,6 +499,14 @@ export async function getSessionDetail(sessionHash, cachedData = null) {
     allBlocks,
     resolvedActiveBlockSHA1,
   );
+
+  const cacheKey = `${sessionHash}:${resolvedActiveBlockSHA1}:${viewMode}`;
+  const cachedDetail = sessionDetailCache.get(cacheKey);
+
+  if (cachedDetail) {
+    return cachedDetail;
+  }
+
   const needsRepair =
     (resolvedActiveBlockSHA1 && resolvedActiveBlockSHA1 !== currentSession.activeBlockSHA1) ||
     resolvedFocusedBlockSHA1 !== currentSession.viewState?.focusedBlockSHA1;
@@ -523,18 +534,43 @@ export async function getSessionDetail(sessionHash, cachedData = null) {
   );
   const blockViewMap = new Map(blockViewModels.map((block) => [block.sha1, block]));
 
-  return {
-    session,
-    messages: buildChainChatMessages(chainBlocks, blockViewMap),
-    activeChain: chainBlocks.map((block) => blockViewMap.get(block.sha1) ?? block),
-    graph: {
-      blocks: blockViewModels,
-      activeChainBlockSHA1s: [...activeChainSHA1Set],
-      activeBlockSHA1: resolvedActiveBlockSHA1,
-      focusedBlockSHA1: resolvedFocusedBlockSHA1,
-      rootBlockSHA1: session.rootBlockSHA1,
-    },
+  const baseGraph = {
+    activeChainBlockSHA1s: [...activeChainSHA1Set],
+    activeBlockSHA1: resolvedActiveBlockSHA1,
+    focusedBlockSHA1: resolvedFocusedBlockSHA1,
+    rootBlockSHA1: session.rootBlockSHA1,
   };
+
+  let result;
+
+  if (viewMode === "chain") {
+    result = {
+      session,
+      activeChain: chainBlocks.map((block) => blockViewMap.get(block.sha1) ?? block),
+      graph: baseGraph,
+    };
+  } else if (viewMode === "graph") {
+    result = {
+      session,
+      graph: {
+        ...baseGraph,
+        blocks: blockViewModels,
+      },
+    };
+  } else {
+    result = {
+      session,
+      messages: buildChainChatMessages(chainBlocks, blockViewMap),
+      activeChain: chainBlocks.map((block) => blockViewMap.get(block.sha1) ?? block),
+      graph: {
+        ...baseGraph,
+        blocks: blockViewModels,
+      },
+    };
+  }
+
+  sessionDetailCache.set(cacheKey, result);
+  return result;
 }
 
 export function getSuggestedSessionTitle(prompt, currentTitle) {

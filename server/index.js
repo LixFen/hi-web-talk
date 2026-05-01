@@ -357,7 +357,11 @@ app.patch("/api/sessions/:sessionHash/view-state", authenticateToken, requireSes
       partialViewState.focusedBlockSHA1 = request.body?.focusedBlockSHA1;
     }
 
-    const detail = await updateSessionViewState(request.params.sessionHash, partialViewState);
+    const detail = await updateSessionViewState(
+      request.params.sessionHash,
+      partialViewState,
+      partialViewState.mode,
+    );
     response.json(detail);
   } catch (error) {
     response.status(error?.status || 404).json({
