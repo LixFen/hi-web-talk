@@ -2478,6 +2478,7 @@
 .app-shell.hide-chat-focus-outline .message-row.focused .message-bubble,
 .app-shell.hide-chat-focus-outline .message-bubble.focused {
   box-shadow: none;
+  border-color: var(--border-light);
 }
 
 .login-shell {
