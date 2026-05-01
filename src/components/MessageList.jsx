@@ -14,6 +14,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeHighlight from "rehype-highlight";
 import { normalizeMarkdownMath } from "../lib/markdown";
+import { getAttachmentUrl } from "../lib/chatApi";
 import ContextMenu from "./ContextMenu";
 
 const markdownRemarkPlugins = [remarkMath, remarkGfm];
@@ -700,7 +701,42 @@ const MemoMessageRow = React.memo(({
           ) : null}
         </div>
       ) : (
-        <div className="message-bubble">{msg.text}</div>
+        <div className="message-bubble">
+          {Array.isArray(msg.content) ? (
+            <div className="message-content-blocks">
+              {msg.content.map((block, index) => {
+                if (block.type === "text") {
+                  return <div key={index} className="message-text-block">{block.text}</div>;
+                }
+                if (block.type === "image_attachment") {
+                  return (
+                    <img
+                      key={index}
+                      src={getAttachmentUrl(block.attachmentId)}
+                      alt={block.fileName || "图片"}
+                      className="message-image-block"
+                      loading="lazy"
+                    />
+                  );
+                }
+                if (block.type === "image_url") {
+                  return (
+                    <img
+                      key={index}
+                      src={block.image_url?.url || ""}
+                      alt="图片"
+                      className="message-image-block"
+                      loading="lazy"
+                    />
+                  );
+                }
+                return null;
+              })}
+            </div>
+          ) : (
+            msg.text
+          )}
+        </div>
       )}
     </div>
   );

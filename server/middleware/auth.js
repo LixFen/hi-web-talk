@@ -2,6 +2,16 @@ import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../constants.js";
 import { readSessionRecord } from "../lib/database.js";
 
+function verifyToken(token, request, response, next) {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    request.user = { id: decoded.userId, username: decoded.username, role: decoded.role || "user" };
+    next();
+  } catch (error) {
+    response.status(401).json({ error: "登录已过期，请重新登录。" });
+  }
+}
+
 export function authenticateToken(request, response, next) {
   const authHeader = request.headers.authorization;
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -11,13 +21,39 @@ export function authenticateToken(request, response, next) {
     return;
   }
 
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    request.user = { id: decoded.userId, username: decoded.username, role: decoded.role || "user" };
-    next();
-  } catch (error) {
-    response.status(401).json({ error: "登录已过期，请重新登录。" });
+  verifyToken(token, request, response, next);
+}
+
+export function authenticateTokenOrQuery(request, response, next) {
+  const authHeader = request.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : (request.query?.access_token || null);
+
+  if (!token) {
+    response.status(401).json({ error: "请先登录。" });
+    return;
   }
+
+  verifyToken(token, request, response, next);
+}
+
+export function authenticateCookieOrBearer(request, response, next) {
+  const cookieToken = request.cookies?.auth_token;
+  if (cookieToken) {
+    return verifyToken(cookieToken, request, response, next);
+  }
+
+  const authHeader = request.headers.authorization;
+  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (bearerToken) {
+    return verifyToken(bearerToken, request, response, next);
+  }
+
+  const queryToken = request.query?.access_token || null;
+  if (queryToken) {
+    return verifyToken(queryToken, request, response, next);
+  }
+
+  response.status(401).json({ error: "请先登录。" });
 }
 
 export function requireSessionOwnership(sessionHashParam = "sessionHash") {

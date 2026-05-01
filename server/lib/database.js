@@ -111,6 +111,19 @@ function createDatabaseSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_adaptations_session_block
       ON adaptations(sessionHash, blockSHA1, key);
+
+    CREATE TABLE IF NOT EXISTS attachments (
+      attachmentId TEXT PRIMARY KEY,
+      sessionHash TEXT NOT NULL,
+      blockSHA1 TEXT,
+      fileName TEXT NOT NULL,
+      mimeType TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      createdAt TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_attachments_session
+      ON attachments(sessionHash, createdAt);
   `);
 }
 
@@ -265,6 +278,30 @@ export function deleteSessionRecord(sessionHash) {
   `).run(new Date().toISOString(), sessionHash);
 }
 
+function parseMaybeContent(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  if (typeof value !== "string") {
+    return String(value);
+  }
+
+  if (!value.startsWith("[") && !value.startsWith("{")) {
+    return value;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+    return value;
+  } catch {
+    return value;
+  }
+}
+
 export function blockRowToRecord(row) {
   if (!row) {
     return null;
@@ -276,14 +313,26 @@ export function blockRowToRecord(row) {
     blockType: row.blockType,
     createdAt: row.createdAt,
     modelAlias: row.modelAlias,
-    prompt: row.prompt,
-    response: row.response,
+    prompt: parseMaybeContent(row.prompt),
+    response: parseMaybeContent(row.response),
     tokenUsage: JSON.parse(row.tokenUsage),
     contextLength: Number(row.contextLength ?? 0),
     parentBlockSHA1: row.parentBlockSHA1 ?? null,
     flags: JSON.parse(row.flags),
     meta: JSON.parse(row.meta),
   };
+}
+
+function serializeMaybeContent(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  if (Array.isArray(value)) {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
 }
 
 export function recordToBlockRow(block, sessionHash) {
@@ -293,8 +342,8 @@ export function recordToBlockRow(block, sessionHash) {
     blockType: block.blockType,
     createdAt: block.createdAt,
     modelAlias: block.modelAlias,
-    prompt: block.prompt,
-    response: block.response,
+    prompt: serializeMaybeContent(block.prompt),
+    response: serializeMaybeContent(block.response),
     tokenUsage: JSON.stringify(block.tokenUsage ?? {}),
     contextLength: Number(block.contextLength ?? 0),
     parentBlockSHA1: block.parentBlockSHA1 ?? null,

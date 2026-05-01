@@ -30,6 +30,7 @@ import {
 import { ensureConfigFiles, getAppSettings } from "./modelConfigService.js";
 import { deleteErrorLogsForBlocks } from "./errorLogService.js";
 import { deleteSummariesForBlocks, listSummaries } from "./summaryService.js";
+import { deleteAttachmentsForBlocks } from "./attachmentService.js";
 import { sessionDetailCache } from "../lib/cache.js";
 
 function getSessionDir(sessionHash) {
@@ -422,6 +423,7 @@ export async function deleteBlockTree(sessionHash, blockSHA1) {
     deleteSummariesForBlocks(sessionHash, deletedBlockSHA1s),
     deleteAdaptationsForBlocks(sessionHash, deletedBlockSHA1s),
     deleteErrorLogsForBlocks(sessionHash, deletedBlockSHA1s),
+    deleteAttachmentsForBlocks(sessionHash, deletedBlockSHA1s),
   ]);
 
   await updateSession(sessionHash, {

@@ -302,6 +302,22 @@ export function regenerateBlock({ sessionHash, blockSHA1, modelAlias }) {
   });
 }
 
+export function uploadAttachment({ sessionHash, fileName, mimeType, base64Data }) {
+  return requestJson("/api/attachments", {
+    method: "POST",
+    body: JSON.stringify({
+      sessionHash,
+      fileName,
+      mimeType,
+      base64Data,
+    }),
+  });
+}
+
+export function getAttachmentUrl(attachmentId) {
+  return `/api/attachments/${attachmentId}`;
+}
+
 export function branchFromBlock({ sessionHash, blockSHA1 }) {
   return requestJson(`/api/blocks/${blockSHA1}/branch`, {
     method: "POST",
@@ -367,6 +383,12 @@ export function registerUser(username, password) {
   return requestJson("/api/auth/register", {
     method: "POST",
     body: JSON.stringify({ username, password }),
+  });
+}
+
+export function logoutUser() {
+  return requestJson("/api/auth/logout", {
+    method: "POST",
   });
 }
 

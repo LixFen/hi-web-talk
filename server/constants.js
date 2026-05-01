@@ -25,6 +25,8 @@ export const MODEL_PROVIDER_DEFINITIONS = [
     },
     supportsStreaming: true,
     supportsReasoningEffort: true,
+    supportsSystemRole: true,
+    supportsMultimodal: true,
   },
   {
     key: "openai-chat-completions",
@@ -38,6 +40,38 @@ export const MODEL_PROVIDER_DEFINITIONS = [
     defaultRequestOptions: {},
     supportsStreaming: true,
     supportsReasoningEffort: false,
+    supportsSystemRole: true,
+    supportsMultimodal: false,
+  },
+  {
+    key: "anthropic-messages",
+    label: "Claude Messages",
+    description:
+      "\u9002\u7528\u4e8e Anthropic Claude Messages API\u3002",
+    requestStyle: "messages",
+    defaultBaseURL: "",
+    defaultEnvKeyName: "ANTHROPIC_API_KEY",
+    defaultSystemPromptRole: "system",
+    defaultRequestOptions: {},
+    supportsStreaming: true,
+    supportsReasoningEffort: false,
+    supportsSystemRole: false,
+    supportsMultimodal: true,
+  },
+  {
+    key: "google-generative-ai",
+    label: "Google Gemini",
+    description:
+      "\u9002\u7528\u4e8e Google Gemini API\u3002",
+    requestStyle: "generateContent",
+    defaultBaseURL: "",
+    defaultEnvKeyName: "GOOGLE_API_KEY",
+    defaultSystemPromptRole: "system",
+    defaultRequestOptions: {},
+    supportsStreaming: true,
+    supportsReasoningEffort: false,
+    supportsSystemRole: false,
+    supportsMultimodal: true,
   },
 ];
 

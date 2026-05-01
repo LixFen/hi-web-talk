@@ -5,6 +5,7 @@ import {
   readSessionBlockRecord,
   upsertBlockRecord,
 } from "../lib/database.js";
+import { deleteAttachmentsForBlocks } from "./attachmentService.js";
 
 function getDefaultFlags(flags = {}) {
   return {
@@ -195,6 +196,7 @@ export async function deleteBlockSubtree(sessionHash, blockSHA1) {
     .map((block) => block.sha1);
 
   deleteBlockRecords(sessionHash, deletedBlockSHA1s);
+  await deleteAttachmentsForBlocks(sessionHash, deletedBlockSHA1s);
 
   return deletedBlockSHA1s;
 }

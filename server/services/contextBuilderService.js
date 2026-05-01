@@ -5,8 +5,66 @@ import {
 } from "./blockGraphService.js";
 import { listSummaries } from "./summaryService.js";
 
+function getContentLength(content) {
+  if (typeof content === "string") {
+    return content.length;
+  }
+
+  if (Array.isArray(content)) {
+    return content.reduce((total, block) => {
+      if (block.type === "text") {
+        return total + (block.text?.length ?? 0);
+      }
+      return total;
+    }, 0);
+  }
+
+  return String(content).length;
+}
+
 function getContextLength(messages) {
-  return messages.reduce((total, message) => total + message.content.length, 0);
+  return messages.reduce((total, message) => total + getContentLength(message.content), 0);
+}
+
+function downgradeContentToText(content) {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (!Array.isArray(content)) {
+    return String(content ?? "");
+  }
+
+  const textParts = [];
+
+  for (const block of content) {
+    if (!block || typeof block !== "object") {
+      continue;
+    }
+
+    if (block.type === "text") {
+      textParts.push(block.text ?? "");
+    } else if (block.type === "image_url") {
+      textParts.push("[图片]");
+    } else if (block.type === "image_attachment") {
+      textParts.push(`[图片: ${block.fileName ?? "附件"}]`);
+    } else {
+      textParts.push(`[${block.type ?? "未知内容"}]`);
+    }
+  }
+
+  return textParts.join("\n");
+}
+
+export function downgradeMessagesForModel(messages, supportsMultimodal) {
+  if (supportsMultimodal !== false) {
+    return messages;
+  }
+
+  return messages.map((message) => ({
+    ...message,
+    content: downgradeContentToText(message.content),
+  }));
 }
 
 export async function buildContextForActiveBlock(sessionHash, activeBlockSHA1) {

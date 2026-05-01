@@ -2,13 +2,14 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { DEFAULT_SYSTEM_PROMPT, JWT_SECRET, JWT_EXPIRES_IN } from "./constants.js";
 import { getDatabase } from "./lib/database.js";
-import { authenticateToken, requireSessionOwnership } from "./middleware/auth.js";
+import { authenticateToken, authenticateTokenOrQuery, authenticateCookieOrBearer, requireSessionOwnership } from "./middleware/auth.js";
 import { loginUser, registerUser, getUserById } from "./services/userService.js";
 import { readSessionRecord } from "./lib/database.js";
 import {
@@ -21,12 +22,14 @@ import {
   createDialogueBlock,
   readBlock,
 } from "./services/blockGraphService.js";
-import { buildContextForActiveBlock } from "./services/contextBuilderService.js";
+import { buildContextForActiveBlock, downgradeMessagesForModel } from "./services/contextBuilderService.js";
 import {
   appendErrorLog,
   listErrorLogs,
 } from "./services/errorLogService.js";
 import { callProviderModel, streamProviderModel } from "./services/llmProviderService.js";
+import { saveAttachment, readAttachment, updateAttachmentBlockSHA1 } from "./services/attachmentService.js";
+import { resolveAttachmentMessages } from "./services/providerAdapters/attachmentResolver.js";
 import {
   createModel,
   deleteModel,
@@ -69,6 +72,8 @@ app.use(
   }),
 );
 
+app.use(cookieParser());
+
 const corsOriginRaw = process.env.CORS_ORIGIN || "http://localhost:5173";
 
 const corsOrigin = corsOriginRaw.split(",").map((origin) => origin.trim()).filter(Boolean);
@@ -95,13 +100,28 @@ const apiLimiter = rateLimit({
   message: { error: "请求过于频繁，请稍后再试。" },
 });
 
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "登录请求过于频繁，请稍后再试。" },
+});
+
 app.use("/api", apiLimiter);
 app.use(express.json({ limit: "1mb" }));
 
-app.post("/api/auth/register", async (request, response) => {
+app.post("/api/auth/register", authLimiter, async (request, response) => {
   try {
     const { username, password } = request.body ?? {};
     const result = await registerUser(username, password);
+    response.cookie("auth_token", result.token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/",
+    });
     response.status(201).json(result);
   } catch (error) {
     response.status(error?.status || 500).json({
@@ -110,10 +130,17 @@ app.post("/api/auth/register", async (request, response) => {
   }
 });
 
-app.post("/api/auth/login", async (request, response) => {
+app.post("/api/auth/login", authLimiter, async (request, response) => {
   try {
     const { username, password } = request.body ?? {};
     const result = await loginUser(username, password);
+    response.cookie("auth_token", result.token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/",
+    });
     response.json(result);
   } catch (error) {
     response.status(error?.status || 500).json({
@@ -137,6 +164,11 @@ app.get("/api/auth/me", authenticateToken, async (request, response) => {
   }
 });
 
+app.post("/api/auth/logout", (request, response) => {
+  response.clearCookie("auth_token", { path: "/" });
+  response.json({ ok: true });
+});
+
 function parseModelPayload(body = {}) {
   return {
     alias: body.alias,
@@ -150,11 +182,57 @@ function parseModelPayload(body = {}) {
     modelName: body.modelName,
     enabled: body.enabled,
     supportsStreaming: body.supportsStreaming,
+    supportsSystemRole: body.supportsSystemRole,
+    supportsMultimodal: body.supportsMultimodal,
     systemPromptRole: body.systemPromptRole,
     requestOptions: body.requestOptions,
     isPreset: body.isPreset,
     meta: body.meta,
   };
+}
+
+function isValidPrompt(prompt) {
+  if (typeof prompt === "string") {
+    return prompt.trim().length > 0;
+  }
+
+  if (Array.isArray(prompt)) {
+    return prompt.length > 0 && prompt.some((block) => {
+      if (block.type === "text") {
+        return (block.text ?? "").trim().length > 0;
+      }
+      return block.type === "image_url" || block.type === "image_attachment";
+    });
+  }
+
+  return false;
+}
+
+function normalizePrompt(prompt) {
+  if (typeof prompt === "string") {
+    return prompt.trim();
+  }
+
+  if (Array.isArray(prompt)) {
+    return prompt.map((block) => {
+      if (typeof block === "string") {
+        return { type: "text", text: block.trim() };
+      }
+      return block;
+    }).filter((block) => block != null);
+  }
+
+  return String(prompt ?? "").trim();
+}
+
+function extractAttachmentIds(prompt) {
+  if (!Array.isArray(prompt)) {
+    return [];
+  }
+
+  return prompt
+    .filter((block) => block && block.type === "image_attachment" && block.attachmentId)
+    .map((block) => block.attachmentId);
 }
 
 async function tryAppendErrorLog(payload) {
@@ -284,6 +362,82 @@ app.delete("/api/models/:alias", authenticateToken, async (request, response) =>
   } catch (error) {
     response.status(error?.status || 500).json({
       error: error instanceof Error ? error.message : "删除模型失败。",
+    });
+  }
+});
+
+app.post("/api/attachments", authenticateToken, async (request, response) => {
+  try {
+    const { sessionHash, fileName, mimeType, base64Data } = request.body ?? {};
+
+    if (!sessionHash || !base64Data || !mimeType) {
+      response.status(400).json({ error: "缺少必要参数。" });
+      return;
+    }
+
+    const session = readSessionRecord(sessionHash);
+
+    if (!session) {
+      response.status(404).json({ error: "会话不存在。" });
+      return;
+    }
+
+    if (session.userId != null && session.userId !== request.user.id) {
+      response.status(403).json({ error: "无权访问该会话。" });
+      return;
+    }
+
+    const buffer = Buffer.from(base64Data, "base64");
+    const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
+    const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+    if (buffer.length > MAX_ATTACHMENT_SIZE) {
+      response.status(413).json({ error: "附件大小超过 5MB 限制。" });
+      return;
+    }
+
+    if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
+      response.status(415).json({ error: "不支持的文件类型，仅允许 jpeg、png、webp、gif。" });
+      return;
+    }
+
+    const attachment = await saveAttachment(sessionHash, null, fileName || "attachment", mimeType, buffer);
+
+    response.status(201).json({
+      attachmentId: attachment.attachmentId,
+      fileName: attachment.fileName,
+      mimeType: attachment.mimeType,
+      size: attachment.size,
+    });
+  } catch (error) {
+    response.status(500).json({
+      error: error instanceof Error ? error.message : "上传附件失败。",
+    });
+  }
+});
+
+app.get("/api/attachments/:attachmentId", authenticateCookieOrBearer, async (request, response) => {
+  try {
+    const attachment = await readAttachment(request.params.attachmentId);
+
+    if (!attachment) {
+      response.status(404).json({ error: "附件不存在。" });
+      return;
+    }
+
+    const session = readSessionRecord(attachment.sessionHash);
+
+    if (session && session.userId != null && session.userId !== request.user.id) {
+      response.status(403).json({ error: "无权访问该附件。" });
+      return;
+    }
+
+    response.setHeader("Content-Type", attachment.mimeType);
+    response.setHeader("Content-Length", attachment.buffer.length);
+    response.send(attachment.buffer);
+  } catch (error) {
+    response.status(500).json({
+      error: error instanceof Error ? error.message : "读取附件失败。",
     });
   }
 });
@@ -601,7 +755,7 @@ app.post("/api/blocks/:blockSHA1/branch", authenticateToken, async (request, res
 app.post("/api/blocks/reply", authenticateToken, async (request, response) => {
   const { sessionHash, prompt, modelAlias } = request.body ?? {};
 
-  if (!sessionHash || !prompt?.trim()) {
+  if (!sessionHash || !isValidPrompt(prompt)) {
     response.status(400).json({ error: "sessionHash 和 prompt 不能为空。" });
     return;
   }
@@ -618,6 +772,8 @@ app.post("/api/blocks/reply", authenticateToken, async (request, response) => {
     return;
   }
 
+  const normalizedPrompt = normalizePrompt(prompt);
+
   try {
     const selectedModel = await getModelByAlias(modelAlias, request.user.id, request.user.role);
     if (!selectedModel || selectedModel.enabled === false) {
@@ -626,12 +782,18 @@ app.post("/api/blocks/reply", authenticateToken, async (request, response) => {
     }
 
     const context = await buildContextForActiveBlock(sessionHash, session.activeBlockSHA1);
-    const providerMessages = [
+    let providerMessages = [
       ...(context.messages.length > 0
         ? context.messages
         : [{ role: "system", content: DEFAULT_SYSTEM_PROMPT }]),
-      { role: "user", content: prompt.trim() },
+      { role: "user", content: normalizedPrompt },
     ];
+
+    if (selectedModel.supportsMultimodal !== false) {
+      providerMessages = await resolveAttachmentMessages(providerMessages);
+    }
+
+    providerMessages = downgradeMessagesForModel(providerMessages, selectedModel.supportsMultimodal);
 
     const result = await callProviderModel({
       modelConfig: selectedModel,
@@ -640,7 +802,7 @@ app.post("/api/blocks/reply", authenticateToken, async (request, response) => {
 
     const block = await createDialogueBlock(sessionHash, {
       modelAlias: selectedModel.alias,
-      prompt: prompt.trim(),
+      prompt: normalizedPrompt,
       response: result.reply,
       parentBlockSHA1: session.activeBlockSHA1,
       contextLength: context.contextLength,
@@ -652,8 +814,16 @@ app.post("/api/blocks/reply", authenticateToken, async (request, response) => {
       },
     });
 
+    const attachmentIds = extractAttachmentIds(normalizedPrompt);
+    if (attachmentIds.length > 0) {
+      await Promise.all(attachmentIds.map((id) => updateAttachmentBlockSHA1(sessionHash, id, block.sha1)));
+    }
+
     await updateSession(sessionHash, {
-      title: getSuggestedSessionTitle(prompt, session.title),
+      title: getSuggestedSessionTitle(
+        typeof normalizedPrompt === "string" ? normalizedPrompt : normalizedPrompt.map((b) => b.text ?? "").join(" "),
+        session.title,
+      ),
       updatedAt: new Date().toISOString(),
       activeBlockSHA1: block.sha1,
     });
@@ -666,7 +836,7 @@ app.post("/api/blocks/reply", authenticateToken, async (request, response) => {
       operation: "reply",
       parentBlockSHA1: null,
       blockSHA1: null,
-      prompt: prompt?.trim() ?? "",
+      prompt: typeof normalizedPrompt === "string" ? normalizedPrompt : JSON.stringify(normalizedPrompt),
       modelAlias: modelAlias ?? "",
       error,
       meta: {
@@ -686,7 +856,7 @@ app.post("/api/blocks/reply", authenticateToken, async (request, response) => {
 app.post("/api/blocks/reply/stream", authenticateToken, async (request, response) => {
   const { sessionHash, prompt, modelAlias } = request.body ?? {};
 
-  if (!sessionHash || !prompt?.trim()) {
+  if (!sessionHash || !isValidPrompt(prompt)) {
     response.status(400).json({ error: "sessionHash 和 prompt 不能为空。" });
     return;
   }
@@ -702,6 +872,11 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
     response.status(403).json({ error: "无权访问该会话。" });
     return;
   }
+
+  const normalizedPrompt = normalizePrompt(prompt);
+  const promptPreview = typeof normalizedPrompt === "string"
+    ? normalizedPrompt
+    : normalizedPrompt.map((b) => b.text ?? "").join(" ");
 
   let requestAborted = false;
   let responseFinished = false;
@@ -726,7 +901,7 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
   response.on("finish", handleFinish);
 
   try {
-    logStream("request-start", { sessionHash, modelAlias, promptLength: prompt?.trim?.().length ?? 0 });
+    logStream("request-start", { sessionHash, modelAlias, promptLength: promptPreview.length });
     const selectedModel = await getModelByAlias(modelAlias, request.user.id, request.user.role);
     if (!selectedModel || selectedModel.enabled === false) {
       response.status(400).json({ error: "未找到可用的模型配置。" });
@@ -747,12 +922,18 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
       contextLength: context.contextLength,
       messageCount: context.messages.length,
     });
-    const providerMessages = [
+    let providerMessages = [
       ...(context.messages.length > 0
         ? context.messages
         : [{ role: "system", content: DEFAULT_SYSTEM_PROMPT }]),
-      { role: "user", content: prompt.trim() },
+      { role: "user", content: normalizedPrompt },
     ];
+
+    if (selectedModel.supportsMultimodal !== false) {
+      providerMessages = await resolveAttachmentMessages(providerMessages);
+    }
+
+    providerMessages = downgradeMessagesForModel(providerMessages, selectedModel.supportsMultimodal);
 
     writeRawSSE(response, JSON.stringify({
       type: "start",
@@ -792,7 +973,7 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
 
     const block = await createDialogueBlock(sessionHash, {
       modelAlias: selectedModel.alias,
-      prompt: prompt.trim(),
+      prompt: normalizedPrompt,
       response: result.reply,
       parentBlockSHA1: session.activeBlockSHA1,
       contextLength: context.contextLength,
@@ -804,8 +985,13 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
       },
     });
 
+    const streamAttachmentIds = extractAttachmentIds(normalizedPrompt);
+    if (streamAttachmentIds.length > 0) {
+      await Promise.all(streamAttachmentIds.map((id) => updateAttachmentBlockSHA1(sessionHash, id, block.sha1)));
+    }
+
     await updateSession(sessionHash, {
-      title: getSuggestedSessionTitle(prompt, session.title),
+      title: getSuggestedSessionTitle(promptPreview, session.title),
       updatedAt: new Date().toISOString(),
       activeBlockSHA1: block.sha1,
     });
@@ -837,7 +1023,7 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
       operation: "reply-stream",
       parentBlockSHA1: null,
       blockSHA1: null,
-      prompt: prompt?.trim() ?? "",
+      prompt: typeof normalizedPrompt === "string" ? normalizedPrompt : JSON.stringify(normalizedPrompt),
       modelAlias: modelAlias ?? "",
       error,
       meta: {
@@ -911,12 +1097,18 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, async (request,
     const context = parentBlockSHA1
       ? await buildContextForActiveBlock(sessionHash, parentBlockSHA1)
       : { messages: [], contextLength: 0 };
-    const providerMessages = [
+    let providerMessages = [
       ...(context.messages.length > 0
         ? context.messages
         : [{ role: "system", content: DEFAULT_SYSTEM_PROMPT }]),
       { role: "user", content: targetBlock.prompt },
     ];
+
+    if (selectedModel.supportsMultimodal !== false) {
+      providerMessages = await resolveAttachmentMessages(providerMessages);
+    }
+
+    providerMessages = downgradeMessagesForModel(providerMessages, selectedModel.supportsMultimodal);
 
     const result = await callProviderModel({
       modelConfig: selectedModel,
@@ -938,12 +1130,20 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, async (request,
       },
     });
 
+    const regenerateAttachmentIds = extractAttachmentIds(targetBlock.prompt);
+    if (regenerateAttachmentIds.length > 0) {
+      await Promise.all(regenerateAttachmentIds.map((id) => updateAttachmentBlockSHA1(sessionHash, id, regeneratedBlock.sha1)));
+    }
+
+    const promptPreview = typeof targetBlock.prompt === "string"
+      ? targetBlock.prompt
+      : targetBlock.prompt.map((b) => b.text ?? "").join(" ");
+
     await updateSession(sessionHash, {
-      title: getSuggestedSessionTitle(targetBlock.prompt, session.title),
+      title: getSuggestedSessionTitle(promptPreview, session.title),
       updatedAt: new Date().toISOString(),
       activeBlockSHA1: regeneratedBlock.sha1,
     });
-
     const detail = await getSessionDetail(sessionHash, { summaries: context.summaries, adaptationMap: context.adaptationMap });
     response.status(201).json(detail);
   } catch (error) {
@@ -952,7 +1152,7 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, async (request,
       operation: "regenerate",
       parentBlockSHA1: targetBlock?.parentBlockSHA1 ?? null,
       blockSHA1: request.params.blockSHA1,
-      prompt: targetBlock?.prompt ?? "",
+      prompt: typeof targetBlock?.prompt === "string" ? targetBlock.prompt : JSON.stringify(targetBlock?.prompt ?? ""),
       modelAlias: modelAlias ?? targetBlock?.modelAlias ?? "",
       error,
       meta: {

@@ -1,5 +1,80 @@
-﻿import React, { useRef, useState, useEffect } from 'react';
+﻿import React, { useRef, useState, useEffect, useCallback } from 'react';
 import BlockSelector from './BlockSelector';
+import { getAttachmentUrl } from '../lib/chatApi';
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function compressImageOnce(file, maxLongSide, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let width = img.width;
+      let height = img.height;
+      const longSide = Math.max(width, height);
+      if (longSide > maxLongSide) {
+        const ratio = maxLongSide / longSide;
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('Canvas toBlob failed'));
+            return;
+          }
+          resolve(blob);
+        },
+        'image/jpeg',
+        quality
+      );
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+async function compressImage(file, maxLongSide = 2048) {
+  const TARGET_MAX_BYTES = 500 * 1024;
+  let quality = 0.75;
+  let currentMaxLongSide = maxLongSide;
+
+  while (true) {
+    const blob = await compressImageOnce(file, currentMaxLongSide, quality);
+    if (blob.size <= TARGET_MAX_BYTES || quality <= 0.4) {
+      return blob;
+    }
+    quality -= 0.1;
+    if (quality < 0.5 && currentMaxLongSide > 1024) {
+      currentMaxLongSide = Math.round(currentMaxLongSide * 0.75);
+      quality = 0.75;
+    }
+  }
+}
+
+function getMaxLongSide(modelOptions, selectedModelId) {
+  const model = modelOptions.find((m) => m.alias === selectedModelId);
+  if (model?.providerType === 'anthropic') return 1568;
+  return 2048;
+}
 
 const ChatComposer = ({
   isLoading,
@@ -16,9 +91,18 @@ const ChatComposer = ({
   focusedBlockSHA1,
   activeBlockSHA1,
   onSelectBlock,
+  onUploadAttachment,
+  sessionHash,
 }) => {
+  const MAX_ATTACHMENTS = 10;
+
   const [text, setText] = useState('');
+  const [attachments, setAttachments] = useState([]);
   const textareaRef = useRef(null);
+  const prevSessionHashRef = useRef(sessionHash);
+  const onUploadAttachmentRef = useRef(onUploadAttachment);
+  const uploadingRef = useRef(false);
+  onUploadAttachmentRef.current = onUploadAttachment;
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -27,6 +111,33 @@ const ChatComposer = ({
     }
   }, [text]);
 
+  useEffect(() => {
+    const prev = prevSessionHashRef.current;
+    prevSessionHashRef.current = sessionHash;
+
+    if (!prev && sessionHash) {
+      return;
+    }
+
+    if (prev === sessionHash) {
+      return;
+    }
+
+    if (uploadingRef.current) {
+      return;
+    }
+
+    setText('');
+    setAttachments((prevAtts) => {
+      prevAtts.forEach((a) => {
+        if (a.isLocal && a.url) {
+          URL.revokeObjectURL(a.url);
+        }
+      });
+      return [];
+    });
+  }, [sessionHash]);
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -34,13 +145,236 @@ const ChatComposer = ({
     }
   };
 
-  const handleSend = () => {
-    if (text.trim() && !isLoading) {
-      onSend(text);
-      setText('');
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
+  const handlePaste = useCallback(async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageItems = Array.from(items).filter((item) => item.type.startsWith("image/"));
+    const maxLongSide = getMaxLongSide(modelOptions, selectedModelId);
+
+    for (const item of imageItems) {
+      if (attachments.length >= MAX_ATTACHMENTS) break;
+
+      const file = item.getAsFile();
+      if (!file) continue;
+
+      const fileName = file.name || `pasted-image.${file.type.split('/')[1] || 'png'}`;
+      const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
+      let compressedBlob;
+      let previewUrl;
+      try {
+        compressedBlob = await compressImage(file, maxLongSide);
+        previewUrl = URL.createObjectURL(compressedBlob);
+      } catch (compressError) {
+        console.error("图片压缩失败:", compressError);
+        compressedBlob = file;
+        previewUrl = URL.createObjectURL(file);
       }
+
+      setAttachments((prev) => {
+        if (prev.length >= MAX_ATTACHMENTS) return prev;
+        return [
+          ...prev,
+          {
+            attachmentId: localId,
+            fileName,
+            mimeType: 'image/jpeg',
+            url: previewUrl,
+            isLocal: true,
+          },
+        ];
+      });
+
+      try {
+        const base64Data = await readFileAsBase64(compressedBlob);
+        const fn = onUploadAttachment;
+        console.log('[ChatComposer] paste upload start, onUploadAttachment exists:', !!fn, 'file:', fileName);
+        if (!fn) {
+          console.error('[ChatComposer] paste: onUploadAttachment is not set, keeping local preview');
+          return;
+        }
+
+        uploadingRef.current = true;
+        const result = await fn({
+          fileName,
+          mimeType: 'image/jpeg',
+          base64Data,
+        });
+        uploadingRef.current = false;
+
+        console.log('[ChatComposer] paste upload result:', result);
+
+        if (result?.attachmentId) {
+          setAttachments((prev) =>
+            prev.map((a) =>
+              a.attachmentId === localId
+                ? {
+                    attachmentId: result.attachmentId,
+                    fileName: result.fileName,
+                    mimeType: result.mimeType,
+                    url: getAttachmentUrl(result.attachmentId),
+                  }
+                : a
+            )
+          );
+        } else {
+          console.error('[ChatComposer] paste: upload returned no attachmentId, keeping local preview');
+        }
+      } catch (error) {
+        uploadingRef.current = false;
+        console.error('[ChatComposer] paste upload error:', error);
+      }
+    }
+  }, [onUploadAttachment, modelOptions, selectedModelId]);
+
+  const handleAttachClick = useCallback(() => {
+    if (isLoading) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.style.cssText = 'position:absolute;opacity:0;width:0;height:0;pointer-events:none;';
+
+    let cleanedUp = false;
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      if (input.parentNode) input.remove();
+      window.removeEventListener('focus', onWindowFocus);
+    };
+
+    const onWindowFocus = () => {
+      setTimeout(cleanup, 800);
+    };
+
+    input.addEventListener('change', async (e) => {
+      cleanup();
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      const maxLongSide = getMaxLongSide(modelOptions, selectedModelId);
+
+      for (const file of files) {
+        if (attachments.length >= MAX_ATTACHMENTS) break;
+        if (!file.type.startsWith("image/")) continue;
+
+        const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
+        let compressedBlob;
+        let previewUrl;
+        try {
+          compressedBlob = await compressImage(file, maxLongSide);
+          previewUrl = URL.createObjectURL(compressedBlob);
+        } catch (compressError) {
+          console.error("图片压缩失败:", compressError);
+          compressedBlob = file;
+          previewUrl = URL.createObjectURL(file);
+        }
+
+        setAttachments((prev) => {
+          if (prev.length >= MAX_ATTACHMENTS) return prev;
+          return [
+            ...prev,
+            {
+              attachmentId: localId,
+              fileName: file.name,
+              mimeType: 'image/jpeg',
+              url: previewUrl,
+              isLocal: true,
+            },
+          ];
+        });
+
+        try {
+          const base64Data = await readFileAsBase64(compressedBlob);
+          const fn = onUploadAttachmentRef.current;
+          console.log('[ChatComposer] upload start, onUploadAttachment exists:', !!fn, 'file:', file.name);
+          if (!fn) {
+            console.error('[ChatComposer] onUploadAttachment is not set, keeping local preview');
+            return;
+          }
+
+          uploadingRef.current = true;
+          const result = await fn({
+            fileName: file.name,
+            mimeType: 'image/jpeg',
+            base64Data,
+          });
+          uploadingRef.current = false;
+
+          console.log('[ChatComposer] upload result:', result);
+
+          if (result?.attachmentId) {
+            setAttachments((prev) =>
+              prev.map((a) =>
+                a.attachmentId === localId
+                  ? {
+                      attachmentId: result.attachmentId,
+                      fileName: result.fileName,
+                      mimeType: result.mimeType,
+                      url: getAttachmentUrl(result.attachmentId),
+                    }
+                  : a
+              )
+            );
+          } else {
+            console.error('[ChatComposer] upload returned no attachmentId, keeping local preview');
+          }
+        } catch (error) {
+          uploadingRef.current = false;
+          console.error('[ChatComposer] upload error:', error);
+        }
+      }
+    });
+
+    window.addEventListener('focus', onWindowFocus, { once: true });
+    document.body.appendChild(input);
+    input.click();
+
+    setTimeout(cleanup, 60000);
+  }, [isLoading, modelOptions, selectedModelId]);
+
+  const removeAttachment = (attachmentId) => {
+    setAttachments((prev) => {
+      const toRemove = prev.find((a) => a.attachmentId === attachmentId);
+      if (toRemove?.isLocal && toRemove.url) {
+        URL.revokeObjectURL(toRemove.url);
+      }
+      return prev.filter((a) => a.attachmentId !== attachmentId);
+    });
+  };
+
+  const handleSend = () => {
+    const trimmedText = text.trim();
+    const readyAttachments = attachments.filter((a) => !a.isLocal);
+    const hasContent = trimmedText || readyAttachments.length > 0;
+
+    if (!hasContent || isLoading) return;
+
+    if (readyAttachments.length === 0) {
+      onSend(trimmedText);
+    } else {
+      const content = [];
+      if (trimmedText) {
+        content.push({ type: "text", text: trimmedText });
+      }
+      for (const attachment of readyAttachments) {
+        content.push({
+          type: "image_attachment",
+          attachmentId: attachment.attachmentId,
+          fileName: attachment.fileName,
+          mimeType: attachment.mimeType,
+        });
+      }
+      onSend(content);
+    }
+
+    setText('');
+    setAttachments([]);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
     }
   };
 
@@ -62,6 +396,27 @@ const ChatComposer = ({
         ) : null}
         {!isCollapsed ? (
           <>
+        {attachments.length > 0 && (
+          <div className="composer-attachments">
+            {attachments.map((attachment) => (
+              <div key={attachment.attachmentId} className="composer-attachment-item">
+                <img
+                  src={attachment.url}
+                  alt={attachment.fileName}
+                  className="composer-attachment-thumb"
+                />
+                <button
+                  type="button"
+                  className="composer-attachment-remove"
+                  onClick={() => removeAttachment(attachment.attachmentId)}
+                  title="移除图片"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="chat-input-wrapper">
           <textarea
             ref={textareaRef}
@@ -71,13 +426,27 @@ const ChatComposer = ({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             disabled={isLoading}
           />
+          <button
+            type="button"
+            className="composer-attach-btn"
+            onClick={handleAttachClick}
+            disabled={isLoading}
+            title="上传图片"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+          </button>
           <button
             className={`send-button ${canStop ? 'stop' : ''}`.trim()}
             type="button"
             onClick={canStop ? onStop : handleSend}
-            disabled={canStop ? false : !text.trim() || isLoading}
+            disabled={canStop ? false : (!text.trim() && !attachments.some((a) => !a.isLocal)) || isLoading}
             aria-label={canStop ? '停止生成' : '发送消息'}
           >
             {canStop ? (

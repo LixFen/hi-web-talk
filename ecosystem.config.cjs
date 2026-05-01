@@ -8,8 +8,8 @@ export default {
       env: {
         NODE_ENV: "production",
       },
-      instances: "max",
-      exec_mode: "cluster",
+      instances: 1,
+      exec_mode: "fork",
       autorestart: true,
       max_restarts: 10,
       restart_delay: 3000,

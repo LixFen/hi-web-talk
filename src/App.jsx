@@ -25,11 +25,13 @@ import {
   listModelProviderDefinitions,
   listModels,
   listSessions,
+  logoutUser,
   regenerateBlock,
   runBlockAdaptationCommand,
   sendReply,
   sendReplyStream,
   setActiveBlock,
+  uploadAttachment,
   setFocusedBlock,
   updateAppSettings,
   updateSessionTitle,
@@ -149,6 +151,7 @@ export default function App() {
   }
 
   function handleLogout() {
+    logoutUser().catch(() => {});
     clearToken();
     clearStoredUser();
     setCurrentUser(null);
@@ -989,15 +992,33 @@ export default function App() {
     });
   }
 
-  async function handleSend(rawText) {
-    const text = rawText.trim();
+  async function handleUploadAttachment({ fileName, mimeType, base64Data }) {
+    const sessionHash = activeConversation?.sessionHash;
+    if (!sessionHash) {
+      const createdDetail = await createSession();
+      applySessionDetail(createdDetail);
+      return uploadAttachment({
+        sessionHash: createdDetail.session.sessionHash,
+        fileName,
+        mimeType,
+        base64Data,
+      });
+    }
+    return uploadAttachment({ sessionHash, fileName, mimeType, base64Data });
+  }
 
-    if (!text || isLoading || !selectedModel) {
+  async function handleSend(rawContent) {
+    const isArray = Array.isArray(rawContent);
+    const textPreview = isArray
+      ? rawContent.map((b) => b.text ?? "").join(" ").trim()
+      : rawContent.trim();
+
+    if ((!textPreview && !isArray) || isLoading || !selectedModel) {
       return;
     }
 
     setIsLoading(true);
-    setPendingPrompt(text);
+    setPendingPrompt(textPreview || "[图片消息]");
     setStreamingReply("");
     setError("");
 
@@ -1011,10 +1032,12 @@ export default function App() {
         sessionHash = createdDetail.session.sessionHash;
       }
 
+      const prompt = isArray ? rawContent : rawContent.trim();
+
       if (!supportsStreaming) {
         const detail = await sendReply({
           sessionHash,
-          prompt: text,
+          prompt,
           modelAlias: selectedModel.alias,
         });
 
@@ -1034,7 +1057,7 @@ export default function App() {
 
       await sendReplyStream({
         sessionHash,
-        prompt: text,
+        prompt,
         modelAlias: selectedModel.alias,
         signal: abortController.signal,
         onEvent: async (event) => {
@@ -1383,12 +1406,14 @@ export default function App() {
           onToggleCollapsed={() => setIsComposerCollapsed((current) => !current)}
           onChangeModel={setSelectedModelId}
           onSend={handleSend}
+          onUploadAttachment={handleUploadAttachment}
           onStop={handleStopStreaming}
           hideToolbar={shouldHideComposer}
           blocks={blocks}
           focusedBlockSHA1={focusedBlockSHA1}
           activeBlockSHA1={activeBlockSHA1}
           onSelectBlock={handleSelectBlock}
+          sessionHash={activeConversation?.sessionHash}
         />
         </div>
         )}

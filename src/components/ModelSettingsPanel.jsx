@@ -14,6 +14,8 @@ function buildEmptyDraft(providerDefinitions) {
     modelName: "",
     enabled: true,
     supportsStreaming: true,
+    supportsSystemRole: firstProvider?.supportsSystemRole !== false,
+    supportsMultimodal: firstProvider?.supportsMultimodal !== false,
     systemPromptRole: firstProvider?.defaultSystemPromptRole || "system",
     requestOptions: {
       reasoningEffort: firstProvider?.defaultRequestOptions?.reasoningEffort || "",
@@ -33,6 +35,8 @@ function mapModelToDraft(model) {
     modelName: model.modelName,
     enabled: model.enabled !== false,
     supportsStreaming: model.supportsStreaming !== false,
+    supportsSystemRole: model.supportsSystemRole !== false,
+    supportsMultimodal: model.supportsMultimodal !== false,
     systemPromptRole: model.systemPromptRole || "system",
     requestOptions: {
       reasoningEffort: model.requestOptions?.reasoningEffort || "",
@@ -120,6 +124,8 @@ export default function ModelSettingsPanel({
       baseURL: providerDefinition?.defaultBaseURL || "",
       apiKeyEnvName: providerDefinition?.defaultEnvKeyName || "OPENAI_API_KEY",
       systemPromptRole: providerDefinition?.defaultSystemPromptRole || "system",
+      supportsSystemRole: providerDefinition?.supportsSystemRole !== false,
+      supportsMultimodal: providerDefinition?.supportsMultimodal !== false,
       requestOptions: {
         reasoningEffort: providerDefinition?.defaultRequestOptions?.reasoningEffort || "",
       },
@@ -141,6 +147,8 @@ export default function ModelSettingsPanel({
       modelName: draft.modelName.trim(),
       enabled: draft.enabled,
       supportsStreaming: draft.supportsStreaming,
+      supportsSystemRole: draft.supportsSystemRole,
+      supportsMultimodal: draft.supportsMultimodal,
       systemPromptRole: draft.systemPromptRole,
       requestOptions: {
         reasoningEffort: draft.requestOptions?.reasoningEffort || undefined,
@@ -413,6 +421,24 @@ export default function ModelSettingsPanel({
                 onChange={(event) => handleDraftChange({ supportsStreaming: event.target.checked })}
               />
               标记为支持流式
+            </label>
+
+            <label className="settings-toggle-row">
+              <input
+                type="checkbox"
+                checked={draft.supportsSystemRole}
+                onChange={(event) => handleDraftChange({ supportsSystemRole: event.target.checked })}
+              />
+              API 支持 System 角色
+            </label>
+
+            <label className="settings-toggle-row">
+              <input
+                type="checkbox"
+                checked={draft.supportsMultimodal}
+                onChange={(event) => handleDraftChange({ supportsMultimodal: event.target.checked })}
+              />
+              API 支持多模态（图片）
             </label>
 
             {isAdmin ? (
