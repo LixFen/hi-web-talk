@@ -1400,7 +1400,10 @@ export default function App() {
         providerDefinitions={providerDefinitions}
         isSaving={isModelSaving}
         isAdmin={isAdmin}
-        onClose={() => setIsModelPanelOpen(false)}
+        onClose={() => {
+          setIsModelPanelOpen(false);
+          setIsSettingsMenuOpen(true);
+        }}
         onCreateModel={handleCreateModel}
         onUpdateModel={handleUpdateModel}
         onDeleteModel={handleDeleteModel}
@@ -1410,7 +1413,10 @@ export default function App() {
         open={isAppearancePanelOpen}
         settings={appSettings}
         isSaving={isAppearanceSaving}
-        onClose={() => setIsAppearancePanelOpen(false)}
+        onClose={() => {
+          setIsAppearancePanelOpen(false);
+          setIsSettingsMenuOpen(true);
+        }}
         onToggleShowChatFocusOutline={handleToggleShowChatFocusOutline}
         onToggleHideWideScreenSideBranches={handleToggleHideWideScreenSideBranches}
         onToggleDarkMode={handleToggleDarkMode}
@@ -1420,7 +1426,10 @@ export default function App() {
         open={isInteractionPanelOpen}
         settings={appSettings}
         isSaving={isInteractionSaving}
-        onClose={() => setIsInteractionPanelOpen(false)}
+        onClose={() => {
+          setIsInteractionPanelOpen(false);
+          setIsSettingsMenuOpen(true);
+        }}
         onToggleShowChatAdaptationButtons={handleToggleShowChatAdaptationButtons}
         onToggleSingleChatAdaptationButton={handleToggleSingleChatAdaptationButton}
       />

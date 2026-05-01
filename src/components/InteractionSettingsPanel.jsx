@@ -62,7 +62,11 @@ export default function InteractionSettingsPanel({
               <h2 className="settings-title">交互设置</h2>
             </div>
             <button type="button" className="topbar-btn subtle" onClick={onClose}>
-              关闭
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "0.35rem", verticalAlign: "-0.125rem" }}>
+                <path d="M19 12H5" />
+                <path d="M12 19l-7-7 7-7" />
+              </svg>
+              返回
             </button>
           </div>
 

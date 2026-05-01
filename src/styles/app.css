@@ -1658,6 +1658,8 @@
   flex-direction: column;
   gap: 0.55rem;
   overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .settings-menu-item {
@@ -1712,6 +1714,7 @@
   max-height: calc(100vh - 3rem);
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   background: var(--bg-glass-strong);
   backdrop-filter: blur(32px) saturate(1.4);
   -webkit-backdrop-filter: blur(32px) saturate(1.4);
@@ -3193,13 +3196,23 @@
 /* Settings modal tablet */
 @media (max-width: 960px) {
   .settings-modal {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
   }
 
   .settings-sidebar {
     border-right: none;
     border-bottom: 1px solid var(--border-light);
-    max-height: 40vh;
+    max-height: 35vh;
+    min-height: 0;
+    flex: 0 0 auto;
+    overflow-y: auto;
+  }
+
+  .settings-form {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .settings-appearance-card {
