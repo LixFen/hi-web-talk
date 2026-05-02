@@ -122,6 +122,8 @@ export const DEFAULT_APP_SETTINGS = {
   showSummaryGenerateButton: true,
   showImportantLabelButton: true,
   showPendingOrganizeLabelButton: true,
+  titleModelAlias: "",
+  summaryModelAlias: "",
 };
 
 export const DEFAULT_SESSION_TITLE = "\u65b0\u5bf9\u8bdd";

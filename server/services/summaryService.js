@@ -5,8 +5,9 @@ import {
   readSummaryRecord,
   upsertSummaryRecord,
 } from "../lib/database.js";
+import { readSessionRecord } from "../lib/database.js";
 import { readBlock } from "./blockGraphService.js";
-import { getModelByAlias, listEnabledModels } from "./modelConfigService.js";
+import { getAppSettings, listModels } from "./modelConfigService.js";
 import { callProviderModel } from "./llmProviderService.js";
 import { upsertBlockAdaptation } from "./blockAdaptationService.js";
 
@@ -104,7 +105,7 @@ export async function deleteSummariesForBlocks(sessionHash, blockSHA1s = []) {
   return deleteSummaryRecordsForBlocks(sessionHash, targetSHA1s);
 }
 
-export async function generateSummaryForBlock(sessionHash, blockSHA1, modelAlias) {
+export async function generateSummaryForBlock(sessionHash, blockSHA1, modelAlias, { role = "user" } = {}) {
   const block = await readBlock(sessionHash, blockSHA1);
 
   if (!block || block.blockType !== "dialogue") {
@@ -113,8 +114,28 @@ export async function generateSummaryForBlock(sessionHash, blockSHA1, modelAlias
     throw error;
   }
 
-  const selectedModel =
-    (modelAlias ? await getModelByAlias(modelAlias) : null) ?? (await listEnabledModels())[0] ?? null;
+  const session = await readSessionRecord(sessionHash);
+  const userId = session?.userId ?? null;
+
+  const allModels = userId
+    ? await listModels(userId, role, { includeDisabled: false, includeSecrets: true })
+    : [];
+
+  let selectedModel = null;
+
+  if (modelAlias) {
+    selectedModel = allModels.find((m) => m.alias === modelAlias) ?? null;
+  } else if (userId) {
+    const appSettings = await getAppSettings(userId);
+
+    if (appSettings?.summaryModelAlias) {
+      selectedModel = allModels.find((m) => m.alias === appSettings.summaryModelAlias) ?? null;
+    }
+  }
+
+  if (!selectedModel) {
+    selectedModel = allModels[0] ?? null;
+  }
 
   if (!selectedModel) {
     const error = new Error("没有可用模型，无法生成摘要。");
@@ -132,8 +153,7 @@ export async function generateSummaryForBlock(sessionHash, blockSHA1, modelAlias
 
   try {
     const result = await callProviderModel({
-      provider: selectedModel.provider,
-      model: selectedModel.model,
+      modelConfig: selectedModel,
       messages: [
         {
           role: "system",

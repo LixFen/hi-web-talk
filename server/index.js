@@ -45,6 +45,7 @@ import {
   createSession,
   deleteSession,
   ensureDataLayout,
+  generateTitleForSession,
   getSessionDetail,
   getSessionOrThrow,
   getSuggestedSessionTitle,
@@ -499,6 +500,19 @@ app.patch("/api/sessions/:sessionHash", authenticateToken, requireSessionOwnersh
   }
 });
 
+app.post("/api/sessions/:sessionHash/regenerate-title", authenticateToken, requireSessionOwnership(), async (request, response) => {
+  try {
+    const mode = request.body?.mode === "important" ? "important" : "default";
+    const useChain = request.body?.useChain !== false;
+    const detail = await generateTitleForSession(request.params.sessionHash, { mode, useChain, role: request.user.role });
+    response.json(detail);
+  } catch (error) {
+    response.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "生成标题失败。",
+    });
+  }
+});
+
 app.patch("/api/sessions/:sessionHash/view-state", authenticateToken, requireSessionOwnership(), async (request, response) => {
   try {
     const partialViewState = {};
@@ -626,6 +640,7 @@ app.post("/api/sessions/:sessionHash/blocks/:blockSHA1/adaptations/:key/run", au
       request.params.sessionHash,
       request.params.blockSHA1,
       modelAlias,
+      { role: request.user.role },
     );
     const detail = await getSessionDetail(request.params.sessionHash);
 
@@ -692,6 +707,7 @@ app.post("/api/sessions/:sessionHash/summaries/:blockSHA1/generate", authenticat
       request.params.sessionHash,
       request.params.blockSHA1,
       modelAlias,
+      { role: request.user.role },
     );
     const detail = await getSessionDetail(request.params.sessionHash);
     response.status(201).json({ summary, detail });

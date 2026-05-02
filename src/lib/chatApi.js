@@ -168,6 +168,13 @@ export function updateSessionTitle(sessionHash, title) {
   });
 }
 
+export function regenerateSessionTitle(sessionHash, { mode = "default", useChain = true } = {}) {
+  return requestJson(`/api/sessions/${sessionHash}/regenerate-title`, {
+    method: "POST",
+    body: JSON.stringify({ mode, useChain }),
+  });
+}
+
 export function updateSessionViewState(sessionHash, mode) {
   return requestJson(`/api/sessions/${sessionHash}/view-state`, {
     method: "PATCH",

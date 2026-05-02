@@ -1,4 +1,5 @@
-﻿import React from "react";
+﻿import React, { useState } from "react";
+import ContextMenu from "./ContextMenu";
 
 const Sidebar = ({
   conversations,
@@ -7,6 +8,7 @@ const Sidebar = ({
   onSelectConversation,
   onDeleteConversation,
   onRenameConversation,
+  onRegenerateTitle,
   isCollapsed,
   onToggleCollapse,
   onOpenSettings,
@@ -19,6 +21,13 @@ const Sidebar = ({
   currentUser,
   onLogout,
 }) => {
+  const [contextMenu, setContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    conversation: null,
+  });
+
   const handleRenameClick = async (conversation) => {
     const nextTitle = window.prompt("请输入新的会话名称", conversation.title || "");
 
@@ -31,6 +40,49 @@ const Sidebar = ({
     } catch {
       // The parent already handles the user-facing error state.
     }
+  };
+
+  const handleContextMenu = (event, conversation) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+      conversation,
+    });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+  };
+
+  const buildContextMenuItems = () => {
+    const conversation = contextMenu.conversation;
+    if (!conversation) return [];
+
+    return [
+      {
+        key: "regenerate-title",
+        label: "重新生成标题",
+        onClick: () => {
+          const confirmed = window.confirm("是否根据当前活动块链来生成标题？");
+          if (confirmed) {
+            onRegenerateTitle?.(conversation, "default", true);
+          }
+        },
+      },
+      {
+        key: "regenerate-title-important",
+        label: "根据重要程度生成标题",
+        onClick: () => {
+          const confirmed = window.confirm("是否根据已标记的重要内容来生成标题？");
+          if (confirmed) {
+            onRegenerateTitle?.(conversation, "important", true);
+          }
+        },
+      },
+    ];
   };
 
   const toggleAriaLabel =
@@ -90,6 +142,7 @@ const Sidebar = ({
             <div
               key={conversation.id}
               className={`history-item-row ${conversation.id === activeConversationId ? "active" : ""}`}
+              onContextMenu={(event) => handleContextMenu(event, conversation)}
             >
               <button
                 className={`history-item ${conversation.id === activeConversationId ? "active" : ""}`}
@@ -169,6 +222,14 @@ const Sidebar = ({
           {!isCollapsed ? "设置" : null}
         </button>
       </div>
+
+      <ContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        visible={contextMenu.visible}
+        items={buildContextMenuItems()}
+        onClose={closeContextMenu}
+      />
     </div>
   );
 };

@@ -643,6 +643,14 @@ export async function updateAppSettings(partialSettings = {}, userId = null) {
       partialSettings.showPendingOrganizeLabelButton !== false;
   }
 
+  if (Object.prototype.hasOwnProperty.call(partialSettings, "titleModelAlias")) {
+    nextSettings.titleModelAlias = `${partialSettings.titleModelAlias ?? ""}`.trim();
+  }
+
+  if (Object.prototype.hasOwnProperty.call(partialSettings, "summaryModelAlias")) {
+    nextSettings.summaryModelAlias = `${partialSettings.summaryModelAlias ?? ""}`.trim();
+  }
+
   if (Object.prototype.hasOwnProperty.call(partialSettings, "darkMode")) {
     nextSettings.darkMode = partialSettings.darkMode;
   }

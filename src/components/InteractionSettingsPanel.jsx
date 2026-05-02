@@ -4,42 +4,45 @@ const CHAT_VIEW_ADAPTATION_BUTTON_SWITCHES = [
   {
     key: "showContextIgnoreButton",
     label: "忽略上下文",
-    description: "控制“忽略上下文”按钮是否显示。",
+    description: "控制「忽略上下文」按钮是否显示。",
   },
   {
     key: "showSummaryPreferButton",
     label: "优先摘要",
-    description: "控制“优先摘要”按钮是否显示。",
+    description: "控制「优先摘要」按钮是否显示。",
   },
   {
     key: "showSummaryPinButton",
     label: "固定摘要",
-    description: "控制“固定摘要”按钮是否显示。",
+    description: "控制「固定摘要」按钮是否显示。",
   },
   {
     key: "showSummaryGenerateButton",
     label: "生成摘要",
-    description: "控制“生成摘要”按钮是否显示。",
+    description: "控制「生成摘要」按钮是否显示。",
   },
   {
     key: "showImportantLabelButton",
     label: "重要",
-    description: "控制“重要”标签按钮是否显示。",
+    description: "控制「重要」标签按钮是否显示。",
   },
   {
     key: "showPendingOrganizeLabelButton",
     label: "待整理",
-    description: "控制“待整理”标签按钮是否显示。",
+    description: "控制「待整理」标签按钮是否显示。",
   },
 ];
 
 export default function InteractionSettingsPanel({
   open,
   settings = {},
+  enabledModels = [],
   isSaving = false,
   onClose,
   onToggleShowChatAdaptationButtons,
   onToggleSingleChatAdaptationButton,
+  onChangeTitleModel,
+  onChangeSummaryModel,
 }) {
   const [activeLeaf, setActiveLeaf] = useState("chat-adaptation-buttons");
   const showChatAdaptationButtons = settings.showChatAdaptationButtons !== false;
@@ -47,6 +50,8 @@ export default function InteractionSettingsPanel({
     ...item,
     enabled: settings[item.key] !== false,
   }));
+  const titleModelAlias = settings.titleModelAlias || "";
+  const summaryModelAlias = settings.summaryModelAlias || "";
 
   if (!open) {
     return null;
@@ -71,7 +76,7 @@ export default function InteractionSettingsPanel({
           </div>
 
           <p className="appearance-settings-summary">
-            管理聊天视图中交互控件的可见性，减少视觉干扰或保留常用快捷动作。
+            管理聊天视图中交互控件的可见性与专用模型选择。
           </p>
 
           <div className="settings-model-list" role="list" aria-label="交互设置三级菜单">
@@ -84,6 +89,15 @@ export default function InteractionSettingsPanel({
               <span className="settings-model-name">聊天视图</span>
               <span className="settings-model-meta">适配按钮显示</span>
             </button>
+            <button
+              type="button"
+              role="listitem"
+              className={`settings-model-item ${activeLeaf === "interaction-model" ? "active" : ""}`.trim()}
+              onClick={() => setActiveLeaf("interaction-model")}
+            >
+              <span className="settings-model-name">交互模型配置</span>
+              <span className="settings-model-meta">标题与摘要专用模型</span>
+            </button>
           </div>
         </div>
 
@@ -91,7 +105,9 @@ export default function InteractionSettingsPanel({
           <div className="settings-form-header">
             <div>
               <div className="settings-eyebrow">Interaction</div>
-              <h3 className="settings-panel-title">聊天视图 / 适配按钮显示</h3>
+              <h3 className="settings-panel-title">
+                {activeLeaf === "interaction-model" ? "交互模型配置" : "聊天视图 / 适配按钮显示"}
+              </h3>
             </div>
           </div>
 
@@ -101,7 +117,7 @@ export default function InteractionSettingsPanel({
                 <div>
                   <h4 className="settings-appearance-card-title">显示聊天适配按钮</h4>
                   <p className="settings-appearance-card-desc">
-                    关闭后，聊天视图将隐藏“忽略上下文、优先摘要、固定摘要、生成摘要、重要、待整理”按钮。
+                    关闭后，聊天视图将隐藏「忽略上下文、优先摘要、固定摘要、生成摘要、重要、待整理」按钮。
                   </p>
                 </div>
 
@@ -154,6 +170,58 @@ export default function InteractionSettingsPanel({
                   </section>
                 ))
               ) : null}
+            </>
+          ) : null}
+
+          {activeLeaf === "interaction-model" ? (
+            <>
+              <section className="settings-appearance-card" aria-label="标题生成模型">
+                <div>
+                  <h4 className="settings-appearance-card-title">标题生成模型</h4>
+                  <p className="settings-appearance-card-desc">
+                    右键会话列表中的会话，选择「重新生成标题」或「根据重要程度生成标题」时将使用此模型。
+                  </p>
+                </div>
+
+                <select
+                  className="composer-model-selector"
+                  value={titleModelAlias}
+                  onChange={(e) => onChangeTitleModel?.(e.target.value)}
+                  disabled={isSaving}
+                  aria-label="选择标题生成模型"
+                >
+                  <option value="">自动选择</option>
+                  {enabledModels.map((option) => (
+                    <option key={option.alias} value={option.alias}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </section>
+
+              <section className="settings-appearance-card" aria-label="摘要模型">
+                <div>
+                  <h4 className="settings-appearance-card-title">摘要模型</h4>
+                  <p className="settings-appearance-card-desc">
+                    为对话块生成内容摘要时将使用此模型。
+                  </p>
+                </div>
+
+                <select
+                  className="composer-model-selector"
+                  value={summaryModelAlias}
+                  onChange={(e) => onChangeSummaryModel?.(e.target.value)}
+                  disabled={isSaving}
+                  aria-label="选择摘要模型"
+                >
+                  <option value="">自动选择</option>
+                  {enabledModels.map((option) => (
+                    <option key={option.alias} value={option.alias}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </section>
             </>
           ) : null}
         </div>

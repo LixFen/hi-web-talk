@@ -27,10 +27,11 @@ import {
   listBlocks,
   readBlock,
 } from "./blockGraphService.js";
-import { ensureConfigFiles, getAppSettings } from "./modelConfigService.js";
+import { ensureConfigFiles, getAppSettings, listModels } from "./modelConfigService.js";
 import { deleteErrorLogsForBlocks } from "./errorLogService.js";
 import { deleteSummariesForBlocks, listSummaries } from "./summaryService.js";
 import { deleteAttachmentsForBlocks } from "./attachmentService.js";
+import { callProviderModel } from "./llmProviderService.js";
 import { sessionDetailCache } from "../lib/cache.js";
 
 function getSessionDir(sessionHash) {
@@ -581,4 +582,252 @@ export function getSuggestedSessionTitle(prompt, currentTitle) {
   }
 
   return createTitleFromPrompt(prompt);
+}
+
+function buildTitlePrompt(messages) {
+  const dialogueMessages = messages.filter(
+    (msg) => msg.role === "user" || msg.role === "assistant",
+  );
+
+  const conversationText = dialogueMessages
+    .map((msg) => `${msg.role === "user" ? "用户" : "助手"}：${msg.content}`)
+    .join("\n\n");
+
+  return [
+    "根据以下对话内容，生成一个简洁的中文标题（不超过 20 字）。",
+    "只输出标题本身，不要加任何前缀、引号或解释。",
+    "",
+    conversationText,
+  ].join("\n");
+}
+
+async function getChainForBlock(sessionHash, blockSHA1) {
+  const chain = [];
+  let currentSHA1 = blockSHA1;
+
+  while (currentSHA1) {
+    const block = await readBlock(sessionHash, currentSHA1);
+
+    if (!block) {
+      break;
+    }
+
+    chain.push(block);
+    currentSHA1 = block.parentBlockSHA1;
+  }
+
+  return chain.reverse();
+}
+
+function buildTitleMessagesFromChain(chainBlocks) {
+  const messages = [];
+
+  for (const block of chainBlocks) {
+    if (block.blockType !== "dialogue") {
+      continue;
+    }
+
+    if (block.prompt) {
+      messages.push({ role: "user", content: block.prompt });
+    }
+
+    if (block.response) {
+      messages.push({ role: "assistant", content: block.response });
+    }
+  }
+
+  return messages;
+}
+
+function formatChainDialogueText(messages) {
+  return messages
+    .map((msg) => `${msg.role === "user" ? "用户" : "助手"}：${msg.content}`)
+    .join("\n\n");
+}
+
+export async function generateTitleForSession(sessionHash, { mode = "default", useChain = true, role = "user" } = {}) {
+  const session = await getSessionOrThrow(sessionHash);
+  const appSettings = await getAppSettings(session.userId);
+
+  const configuredAlias = appSettings?.titleModelAlias || "";
+
+  const allModels = await listModels(session.userId, role, { includeDisabled: false, includeSecrets: true });
+
+  let selectedModel = null;
+
+  if (configuredAlias) {
+    selectedModel = allModels.find((m) => m.alias === configuredAlias) ?? null;
+
+    if (!selectedModel) {
+      console.error(`[generateTitleForSession] 未找到标题生成模型: ${configuredAlias}（可用模型: ${allModels.map(m => m.alias).join(", ")}）`);
+    }
+  } else {
+    console.error("[generateTitleForSession] 未配置标题生成模型，使用首个可用模型");
+  }
+
+  if (!selectedModel) {
+    selectedModel = allModels[0] ?? null;
+  }
+
+  //console.error(`[generateTitleForSession] 实际使用模型: ${selectedModel?.alias} (${selectedModel?.providerType})`);
+
+  if (!selectedModel) {
+    const error = new Error("没有可用模型，无法生成标题。");
+    error.status = 400;
+    throw error;
+  }
+
+  let callMessages;
+
+  if (mode === "important") {
+    const allBlocks = await listBlocks(sessionHash);
+    const adaptationMap = await getSessionAdaptationMap(sessionHash);
+    const dialogueBlocks = allBlocks.filter((block) => block.blockType === "dialogue");
+
+    const importantBlocks = dialogueBlocks.filter((block) => {
+      const adaptations = adaptationMap.get(block.sha1) ?? [];
+
+      return adaptations.some((adaptation) => adaptation.key === "label.important" && adaptation.enabled);
+    });
+
+    if (importantBlocks.length === 0) {
+      const error = new Error("该会话暂无标记为重要的对话块，请先在对话中标记重要内容。");
+      error.status = 400;
+      throw error;
+    }
+
+    const chainPromises = importantBlocks.map(async (block) => {
+      const chain = await getChainForBlock(sessionHash, block.sha1);
+      const chainMessages = buildTitleMessagesFromChain(chain);
+
+      return {
+        messages: chainMessages,
+        length: chainMessages.length,
+        headSHA1: block.sha1,
+        headCreatedAt: block.createdAt,
+      };
+    });
+
+    const chains = await Promise.all(chainPromises);
+
+    chains.sort((a, b) => {
+      if (a.length !== b.length) {
+        return b.length - a.length;
+      }
+
+      return b.headCreatedAt.localeCompare(a.headCreatedAt);
+    });
+
+    const totalChains = chains.length;
+    const chainSections = chains.map((chain, index) => {
+      const label = totalChains > 1 ? `链${index + 1}：\n` : "";
+      return `${label}${formatChainDialogueText(chain.messages)}`;
+    });
+
+    const conversationText = chainSections.join("\n\n---\n\n");
+
+    callMessages = [
+      {
+        role: "system",
+        content: "你是一个专业的对话标题生成助手，擅长从对话内容中提炼简洁准确的标题。",
+      },
+      {
+        role: "user",
+        content: [
+          "以下对话内容可能包含多个分支链，每条链以「链N」标注。请提炼出对话中最重要的主题或核心问题，用一句简短的中文作为标题（不超过 20 字）。",
+          "只输出标题本身，不要加任何前缀、引号或解释。",
+          "",
+          conversationText,
+        ].join("\n"),
+      },
+    ];
+  } else if (useChain) {
+    const activeBlockSHA1 = session.activeBlockSHA1;
+    let messages = [];
+
+    if (activeBlockSHA1) {
+      const chainBlocks = await getChainBlocks(sessionHash, activeBlockSHA1);
+      messages = buildTitleMessagesFromChain(chainBlocks);
+    }
+
+    if (messages.length === 0) {
+      const allBlocks = await listBlocks(sessionHash);
+      const dialogueBlocks = allBlocks.filter((block) => block.blockType === "dialogue");
+
+      for (const block of dialogueBlocks) {
+        if (block.prompt) {
+          messages.push({ role: "user", content: block.prompt });
+        }
+
+        if (block.response) {
+          messages.push({ role: "assistant", content: block.response });
+        }
+      }
+    }
+
+    if (messages.length === 0) {
+      const error = new Error("该会话暂无对话内容，无法生成标题。");
+      error.status = 400;
+      throw error;
+    }
+
+    callMessages = [
+      {
+        role: "system",
+        content: "你是一个专业的对话标题生成助手，擅长从对话内容中提炼简洁准确的标题。",
+      },
+      {
+        role: "user",
+        content: buildTitlePrompt(messages),
+      },
+    ];
+  } else {
+    const allBlocks = await listBlocks(sessionHash);
+    const dialogueBlocks = allBlocks.filter((block) => block.blockType === "dialogue");
+
+    if (dialogueBlocks.length === 0) {
+      const error = new Error("该会话暂无对话内容，无法生成标题。");
+      error.status = 400;
+      throw error;
+    }
+
+    const messages = [];
+
+    for (const block of dialogueBlocks) {
+      if (block.prompt) {
+        messages.push({ role: "user", content: block.prompt });
+      }
+
+      if (block.response) {
+        messages.push({ role: "assistant", content: block.response });
+      }
+    }
+
+    callMessages = [
+      {
+        role: "system",
+        content: "你是一个专业的对话标题生成助手，擅长从对话内容中提炼简洁准确的标题。",
+      },
+      {
+        role: "user",
+        content: buildTitlePrompt(messages.slice(-20)),
+      },
+    ];
+  }
+
+  const result = await callProviderModel({
+    modelConfig: selectedModel,
+    messages: callMessages,
+  });
+
+  const generatedTitle = result.reply.trim().slice(0, 50);
+
+  if (!generatedTitle) {
+    const error = new Error("生成的标题为空，请稍后再试。");
+    error.status = 500;
+    throw error;
+  }
+
+  await updateSessionTitle(sessionHash, generatedTitle);
+  return getSessionDetail(sessionHash);
 }

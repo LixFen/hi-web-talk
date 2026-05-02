@@ -196,6 +196,7 @@
   margin: 0 auto;
   padding: 0;
   border-radius: var(--radius-md);
+  display: flex;
 }
 
 .history-list {
@@ -218,6 +219,10 @@
   text-align: left;
   width: 100%;
   transition: background-color var(--duration-fast), transform var(--duration-fast);
+}
+
+.sidebar .history-item {
+  font-size: 0.8rem;
 }
 
 .history-item.active {

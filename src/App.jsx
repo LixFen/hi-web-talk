@@ -35,6 +35,7 @@ import {
   setFocusedBlock,
   updateAppSettings,
   updateSessionTitle,
+  regenerateSessionTitle,
   updateBlockAdaptation,
   updateModelConfig,
   updateSessionViewState,
@@ -655,6 +656,36 @@ export default function App() {
     }
   };
 
+  const handleRegenerateTitle = async (conversation, mode = "default", useChain = true) => {
+    if (!conversation?.id || isLoading) {
+      return;
+    }
+
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const detail = await regenerateSessionTitle(conversation.id, { mode, useChain });
+
+      if (activeConversation?.sessionHash === conversation.id) {
+        applySessionDetail(detail);
+      } else {
+        setSessionSummaries((currentSessions) =>
+          upsertSessionSummary(currentSessions, detail.session),
+        );
+      }
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "重新生成标题失败，请稍后再试。",
+      );
+      throw requestError;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleChangeViewMode = (nextMode) => {
     if (!nextMode || nextMode === currentViewMode) {
       return;
@@ -980,6 +1011,14 @@ export default function App() {
     await updateInteractionSettings({
       [settingKey]: enabled,
     });
+  };
+
+  const handleChangeTitleModel = async (alias) => {
+    await updateInteractionSettings({ titleModelAlias: alias });
+  };
+
+  const handleChangeSummaryModel = async (alias) => {
+    await updateInteractionSettings({ summaryModelAlias: alias });
   };
 
   function scheduleStreamingFlush() {
@@ -1309,6 +1348,7 @@ export default function App() {
           onSelectConversation={handleSelectConversationFromSidebar}
           onDeleteConversation={handleDeleteConversation}
           onRenameConversation={handleRenameConversation}
+          onRegenerateTitle={handleRegenerateTitle}
           isCollapsed={layoutMode === "tablet" ? true : isSidebarCollapsed}
           onToggleCollapse={handleToggleSidebarMenu}
           onOpenSettings={() => setIsSettingsMenuOpen(true)}
@@ -1333,6 +1373,7 @@ export default function App() {
             onSelectConversation={handleSelectConversationFromSidebar}
             onDeleteConversation={handleDeleteConversation}
             onRenameConversation={handleRenameConversation}
+            onRegenerateTitle={handleRegenerateTitle}
             isCollapsed={false}
             onToggleCollapse={() => setIsSidebarDrawerOpen(false)}
             onOpenSettings={() => {
@@ -1450,6 +1491,7 @@ export default function App() {
       <InteractionSettingsPanel
         open={isInteractionPanelOpen}
         settings={appSettings}
+        enabledModels={enabledModels}
         isSaving={isInteractionSaving}
         onClose={() => {
           setIsInteractionPanelOpen(false);
@@ -1457,6 +1499,8 @@ export default function App() {
         }}
         onToggleShowChatAdaptationButtons={handleToggleShowChatAdaptationButtons}
         onToggleSingleChatAdaptationButton={handleToggleSingleChatAdaptationButton}
+        onChangeTitleModel={handleChangeTitleModel}
+        onChangeSummaryModel={handleChangeSummaryModel}
       />
 
       <SettingsMenuPanel
