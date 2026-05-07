@@ -31,7 +31,7 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
       body.system = systemText;
     }
 
-    if (thinkingEnabled) {
+    if (modelConfig.supportsThinking !== false && thinkingEnabled) {
       const minBudget = 256;
       const safeMaxTokens = Math.max(maxTokens - 1, minBudget);
       const clampedBudget = Math.min(Math.max(thinkingBudgetTokens, minBudget), safeMaxTokens);
@@ -54,7 +54,9 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
     const textBlocks = result.content?.filter((block) => block.type === "text") ?? [];
     const reply = textBlocks.map((block) => block.text).join("");
 
-    const thinkingBlocks = result.content?.filter((block) => block.type === "thinking") ?? [];
+    const thinkingBlocks = modelConfig.supportsThinking !== false
+      ? (result.content?.filter((block) => block.type === "thinking") ?? [])
+      : [];
     const reasoning = thinkingBlocks.map((block) => block.thinking).join("\n");
 
     return {
@@ -93,7 +95,8 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
 
       if (
         chunk.type === "content_block_delta" &&
-        chunk.delta?.type === "thinking_delta"
+        chunk.delta?.type === "thinking_delta" &&
+        modelConfig.supportsThinking !== false
       ) {
         const reasoningDelta = chunk.delta.thinking ?? "";
         reasoning += reasoningDelta;

@@ -6,6 +6,10 @@ import {
 } from "./baseAdapter.js";
 
 function buildExtraBody(modelConfig) {
+  if (modelConfig.supportsThinking === false) {
+    return undefined;
+  }
+
   const opts = modelConfig.requestOptions ?? {};
   const providerType = modelConfig.providerType;
   const extraBody = {};
@@ -105,7 +109,7 @@ export function createOpenAIChatCompletionsAdapter(modelConfig, credential) {
 
     return {
       reply: message.content || "",
-      reasoning: extractReasoningFromMessage(message),
+      reasoning: modelConfig.supportsThinking !== false ? extractReasoningFromMessage(message) : "",
       usage: formatTokenUsage(completion.usage),
       provider: modelConfig.providerType,
       providerType: modelConfig.providerType,
@@ -145,7 +149,7 @@ export function createOpenAIChatCompletionsAdapter(modelConfig, credential) {
         await onChunk?.({ delta: textDelta });
       }
 
-      if (reasoningDelta) {
+      if (reasoningDelta && modelConfig.supportsThinking !== false) {
         reasoning += reasoningDelta;
         await onChunk?.({ delta: "", reasoningDelta });
       }

@@ -34,7 +34,7 @@ export function createOpenAIResponsesAdapter(modelConfig, credential) {
       stream: false,
     };
 
-    if (modelConfig.requestOptions?.reasoningEffort) {
+    if (modelConfig.supportsThinking !== false && modelConfig.requestOptions?.reasoningEffort) {
       options.reasoning = {
         effort: modelConfig.requestOptions.reasoningEffort,
       };
@@ -47,12 +47,14 @@ export function createOpenAIResponsesAdapter(modelConfig, credential) {
     const result = await client.responses.create(buildRequestOptions(messages));
 
     let reasoning = "";
-    const reasoningItems = result.output?.filter((item) => item.type === "reasoning") ?? [];
-    for (const item of reasoningItems) {
-      if (item.summary) {
-        reasoning += item.summary;
-      } else if (item.text) {
-        reasoning += item.text;
+    if (modelConfig.supportsThinking !== false) {
+      const reasoningItems = result.output?.filter((item) => item.type === "reasoning") ?? [];
+      for (const item of reasoningItems) {
+        if (item.summary) {
+          reasoning += item.summary;
+        } else if (item.text) {
+          reasoning += item.text;
+        }
       }
     }
 
@@ -87,12 +89,12 @@ export function createOpenAIResponsesAdapter(modelConfig, credential) {
         await onChunk?.({ delta });
       }
 
-      if (event?.type === "response.reasoning_part.added" && event.part?.text) {
+      if (event?.type === "response.reasoning_part.added" && event.part?.text && modelConfig.supportsThinking !== false) {
         reasoning += event.part.text;
         await onChunk?.({ delta: "", reasoningDelta: event.part.text });
       }
 
-      if (event?.type === "response.reasoning_text.delta") {
+      if (event?.type === "response.reasoning_text.delta" && modelConfig.supportsThinking !== false) {
         const reasoningDelta = event.delta ?? "";
         reasoning += reasoningDelta;
         await onChunk?.({ delta: "", reasoningDelta });

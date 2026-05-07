@@ -44,15 +44,17 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
     }
 
     const opts = modelConfig.requestOptions ?? {};
-    const thinkingLevel = opts.thinkingLevel;
-    if (thinkingLevel && thinkingLevel !== "") {
-      options.generationConfig = {
-        ...(options.generationConfig ?? {}),
-        thinkingConfig: {
-          includeThoughts: true,
-          thinkingLevel,
-        },
-      };
+    if (modelConfig.supportsThinking !== false) {
+      const thinkingLevel = opts.thinkingLevel;
+      if (thinkingLevel && thinkingLevel !== "") {
+        options.generationConfig = {
+          ...(options.generationConfig ?? {}),
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingLevel,
+          },
+        };
+      }
     }
 
     const result = await client.models.generateContent(options);
@@ -63,9 +65,9 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
     let reasoning = "";
 
     for (const part of parts) {
-      if (part.thought) {
+      if (part.thought && modelConfig.supportsThinking !== false) {
         reasoning += part.text ?? "";
-      } else {
+      } else if (!part.thought) {
         reply += part.text ?? "";
       }
     }
@@ -98,15 +100,17 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
     }
 
     const opts = modelConfig.requestOptions ?? {};
-    const thinkingLevel = opts.thinkingLevel;
-    if (thinkingLevel && thinkingLevel !== "") {
-      options.generationConfig = {
-        ...(options.generationConfig ?? {}),
-        thinkingConfig: {
-          includeThoughts: true,
-          thinkingLevel,
-        },
-      };
+    if (modelConfig.supportsThinking !== false) {
+      const thinkingLevel = opts.thinkingLevel;
+      if (thinkingLevel && thinkingLevel !== "") {
+        options.generationConfig = {
+          ...(options.generationConfig ?? {}),
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingLevel,
+          },
+        };
+      }
     }
 
     const streamResult = await client.models.generateContentStream(options);
@@ -125,10 +129,10 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
           const text = part.text ?? "";
           if (!text) continue;
 
-          if (part.thought) {
+          if (part.thought && modelConfig.supportsThinking !== false) {
             reasoning += text;
             await onChunk?.({ delta: "", reasoningDelta: text });
-          } else {
+          } else if (!part.thought) {
             reply += text;
             await onChunk?.({ delta: text });
           }
