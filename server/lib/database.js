@@ -38,6 +38,7 @@ function createDatabaseSchema(db) {
       modelAlias TEXT NOT NULL,
       prompt TEXT NOT NULL,
       response TEXT NOT NULL,
+      reasoning TEXT NOT NULL DEFAULT '',
       tokenUsage TEXT NOT NULL,
       contextLength INTEGER NOT NULL,
       parentBlockSHA1 TEXT,
@@ -140,6 +141,13 @@ function runMigrations(db) {
 
   if (!hasRole) {
     db.exec(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
+  }
+
+  const blockColumns = db.prepare("PRAGMA table_info(blocks)").all();
+  const hasReasoning = blockColumns.some((col) => col.name === "reasoning");
+
+  if (!hasReasoning) {
+    db.exec(`ALTER TABLE blocks ADD COLUMN reasoning TEXT NOT NULL DEFAULT ''`);
   }
 
   const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_sessions_userId_updatedAt'").all();
@@ -315,6 +323,7 @@ export function blockRowToRecord(row) {
     modelAlias: row.modelAlias,
     prompt: parseMaybeContent(row.prompt),
     response: parseMaybeContent(row.response),
+    reasoning: parseMaybeContent(row.reasoning ?? ""),
     tokenUsage: JSON.parse(row.tokenUsage),
     contextLength: Number(row.contextLength ?? 0),
     parentBlockSHA1: row.parentBlockSHA1 ?? null,
@@ -344,6 +353,7 @@ export function recordToBlockRow(block, sessionHash) {
     modelAlias: block.modelAlias,
     prompt: serializeMaybeContent(block.prompt),
     response: serializeMaybeContent(block.response),
+    reasoning: serializeMaybeContent(block.reasoning ?? ""),
     tokenUsage: JSON.stringify(block.tokenUsage ?? {}),
     contextLength: Number(block.contextLength ?? 0),
     parentBlockSHA1: block.parentBlockSHA1 ?? null,
@@ -365,6 +375,7 @@ export function upsertBlockRecord(sessionHash, block) {
       modelAlias,
       prompt,
       response,
+      reasoning,
       tokenUsage,
       contextLength,
       parentBlockSHA1,
@@ -378,6 +389,7 @@ export function upsertBlockRecord(sessionHash, block) {
       @modelAlias,
       @prompt,
       @response,
+      @reasoning,
       @tokenUsage,
       @contextLength,
       @parentBlockSHA1,
@@ -390,6 +402,7 @@ export function upsertBlockRecord(sessionHash, block) {
       modelAlias = excluded.modelAlias,
       prompt = excluded.prompt,
       response = excluded.response,
+      reasoning = excluded.reasoning,
       tokenUsage = excluded.tokenUsage,
       contextLength = excluded.contextLength,
       parentBlockSHA1 = excluded.parentBlockSHA1,

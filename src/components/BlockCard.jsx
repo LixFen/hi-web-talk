@@ -9,6 +9,79 @@ import { normalizeMarkdownMath } from "../lib/markdown";
 const markdownRemarkPlugins = [remarkMath, remarkGfm];
 const markdownRehypePlugins = [rehypeKatex, rehypeHighlight];
 
+function ReasoningIcon({ isOpen }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{
+        transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+        transition: "transform 0.2s var(--ease-out-expo)",
+      }}
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+function ReasoningPanel({ reasoning, defaultOpen = false }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const normalizedReasoning = normalizeMarkdownMath(reasoning);
+
+  if (!reasoning || reasoning.trim().length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="reasoning-panel">
+      <button
+        className="reasoning-panel-header"
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+      >
+        <span className="reasoning-panel-title">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="reasoning-panel-icon"
+          >
+            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z" />
+            <path d="M12 16v-4" />
+            <path d="M12 8h.01" />
+          </svg>
+          推理过程
+        </span>
+        <ReasoningIcon isOpen={isOpen} />
+      </button>
+      {isOpen ? (
+        <div className="reasoning-panel-content">
+          <div className="markdown-body reasoning-markdown">
+            <ReactMarkdown
+              remarkPlugins={markdownRemarkPlugins}
+              rehypePlugins={markdownRehypePlugins}
+            >
+              {normalizedReasoning}
+            </ReactMarkdown>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function getCommandLabel(definition, adaptationInfo) {
   if (definition.key === "summary.generate") {
     const status = adaptationInfo?.summaryGenerationStatus ?? "idle";
@@ -121,6 +194,13 @@ export default function BlockCard({
           <div className="block-card-section-title">用户</div>
           <div className="block-card-prompt">{block.prompt || "暂无内容"}</div>
         </section>
+
+        {!isSystemBlock && block.reasoning ? (
+          <section className="block-card-section">
+            <div className="block-card-section-title">推理过程</div>
+            <ReasoningPanel reasoning={block.reasoning} />
+          </section>
+        ) : null}
 
         {!isSystemBlock ? (
           <section className="block-card-section">

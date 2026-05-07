@@ -28,6 +28,7 @@ import {
   listErrorLogs,
 } from "./services/errorLogService.js";
 import { callProviderModel, streamProviderModel } from "./services/llmProviderService.js";
+import { streamSessionManager } from "./services/streamSessionManager.js";
 import { saveAttachment, readAttachment, updateAttachmentBlockSHA1 } from "./services/attachmentService.js";
 import { resolveAttachmentMessages } from "./services/providerAdapters/attachmentResolver.js";
 import {
@@ -284,11 +285,11 @@ function logStream(stage, payload = null) {
   const timestamp = new Date().toISOString();
 
   if (payload === null) {
-    console.log(`[stream] ${timestamp} ${stage}`);
+    //console.log(`[stream] ${timestamp} ${stage}`);
     return;
   }
 
-  console.log(`[stream] ${timestamp} ${stage}`, payload);
+  //console.log(`[stream] ${timestamp} ${stage}`, payload);
 }
 
 app.get("/api/health", async (_request, response) => {
@@ -820,6 +821,7 @@ app.post("/api/blocks/reply", authenticateToken, async (request, response) => {
       modelAlias: selectedModel.alias,
       prompt: normalizedPrompt,
       response: result.reply,
+      reasoning: result.reasoning ?? "",
       parentBlockSHA1: session.activeBlockSHA1,
       contextLength: context.contextLength,
       tokenUsage: result.usage,
@@ -889,17 +891,31 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
     return;
   }
 
+  logStream("request-start", { sessionHash, modelAlias, promptLength: (typeof prompt === "string" ? prompt : "").length });
+  const selectedModel = await getModelByAlias(modelAlias, request.user.id, request.user.role);
+  if (!selectedModel || selectedModel.enabled === false) {
+    response.status(400).json({ error: "未找到可用的模型配置。" });
+    return;
+  }
+
+  if (selectedModel.supportsStreaming === false) {
+    response.status(400).json({ error: "该模型未启用流式传输，请改用非流式回复接口。" });
+    return;
+  }
+
   const normalizedPrompt = normalizePrompt(prompt);
   const promptPreview = typeof normalizedPrompt === "string"
     ? normalizedPrompt
     : normalizedPrompt.map((b) => b.text ?? "").join(" ");
 
-  let requestAborted = false;
+  prepareSSE(response);
+  response.write(":ok\n\n");
+  logStream("sse-prepared", { sessionHash, activeBlockSHA1: session.activeBlockSHA1 });
+
+  let clientConnected = true;
   let responseFinished = false;
-  let responseClosed = false;
   const handleAbort = () => {
-    requestAborted = true;
-    responseClosed = true;
+    clientConnected = false;
     logStream("request-close", {
       sessionHash,
       modelAlias,
@@ -916,21 +932,18 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
   request.on("close", handleAbort);
   response.on("finish", handleFinish);
 
+  const streamSession = streamSessionManager.create(sessionHash);
+  const unsubscribe = streamSession.subscribe((event) => {
+    if (clientConnected && !response.writableEnded && !response.destroyed) {
+      try {
+        writeRawSSE(response, JSON.stringify(event));
+      } catch {
+        // ignore write errors on closed connections
+      }
+    }
+  });
+
   try {
-    logStream("request-start", { sessionHash, modelAlias, promptLength: promptPreview.length });
-    const selectedModel = await getModelByAlias(modelAlias, request.user.id, request.user.role);
-    if (!selectedModel || selectedModel.enabled === false) {
-      response.status(400).json({ error: "未找到可用的模型配置。" });
-      return;
-    }
-
-    if (selectedModel.supportsStreaming === false) {
-      response.status(400).json({ error: "该模型未启用流式传输，请改用非流式回复接口。" });
-      return;
-    }
-
-    prepareSSE(response);
-    logStream("sse-prepared", { sessionHash, activeBlockSHA1: session.activeBlockSHA1 });
 
     const context = await buildContextForActiveBlock(sessionHash, session.activeBlockSHA1);
     logStream("context-built", {
@@ -951,27 +964,25 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
 
     providerMessages = downgradeMessagesForModel(providerMessages, selectedModel.supportsMultimodal);
 
-    writeRawSSE(response, JSON.stringify({
+    const startEvent = {
       type: "start",
       sessionHash,
       modelAlias: selectedModel.alias,
-    }));
+    };
+    streamSession.pushEvent(startEvent);
     logStream("start-sent", { sessionHash, modelAlias: selectedModel.alias });
 
     const result = await streamProviderModel({
       modelConfig: selectedModel,
       messages: providerMessages,
-      onChunk: async (delta) => {
-        if (response.writableEnded || response.destroyed) {
-          logStream("delta-skipped-closed", { length: delta.length });
-          return;
+      onChunk: async ({ delta = "", reasoningDelta = "" } = {}) => {
+        if (delta || reasoningDelta) {
+          const payload = { type: "delta" };
+          if (delta) payload.delta = delta;
+          if (reasoningDelta) payload.reasoningDelta = reasoningDelta;
+          streamSession.pushEvent(payload);
+          logStream("delta-sent", { length: delta.length, reasoningLength: reasoningDelta.length, preview: delta.slice(0, 60) });
         }
-
-        writeRawSSE(response, JSON.stringify({
-          type: "delta",
-          delta,
-        }));
-        logStream("delta-sent", { length: delta.length, preview: delta.slice(0, 60) });
       },
     });
 
@@ -981,16 +992,11 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
       usage: result.usage,
     });
 
-    if (response.writableEnded || response.destroyed) {
-      logStream("aborted-before-persist", { sessionHash, modelAlias: selectedModel.alias });
-      response.end();
-      return;
-    }
-
     const block = await createDialogueBlock(sessionHash, {
       modelAlias: selectedModel.alias,
       prompt: normalizedPrompt,
       response: result.reply,
+      reasoning: result.reasoning ?? "",
       parentBlockSHA1: session.activeBlockSHA1,
       contextLength: context.contextLength,
       tokenUsage: result.usage,
@@ -1019,11 +1025,12 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
       messageCount: detail.messages.length,
       activeBlockSHA1: detail.graph?.activeBlockSHA1,
     });
-    writeRawSSE(response, JSON.stringify({
-      type: "complete",
-      detail,
-    }));
+
+    const completeEvent = { type: "complete", detail };
+    streamSession.pushEvent(completeEvent);
     logStream("complete-sent", { sessionHash });
+
+    streamSession.complete(detail);
     writeDoneSSE(response);
     logStream("done-sent", { sessionHash });
     response.end();
@@ -1047,6 +1054,8 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
       },
     });
 
+    streamSession.fail(error);
+
     if (!response.headersSent) {
       response.status(error?.status || 500).json({
         error:
@@ -1057,19 +1066,74 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
       return;
     }
 
-    writeRawSSE(response, JSON.stringify({
-      type: "error",
-      error:
-        error instanceof Error
-          ? error.message
-          : "调用模型接口时出错了，请检查 Key、模型名或网络。",
-    }));
     writeDoneSSE(response);
     response.end();
   } finally {
     request.off("close", handleAbort);
     response.off("finish", handleFinish);
+    unsubscribe();
   }
+});
+
+app.get("/api/sessions/:sessionHash/stream", authenticateToken, requireSessionOwnership(), async (request, response) => {
+  const { sessionHash } = request.params;
+  const streamSession = streamSessionManager.get(sessionHash);
+
+  if (!streamSession) {
+    response.status(204).end();
+    return;
+  }
+
+  prepareSSE(response);
+  response.write(":ok\n\n");
+
+  let clientConnected = true;
+  let unsubscribeStream = null;
+
+  const handleAbort = () => {
+    clientConnected = false;
+    if (unsubscribeStream) {
+      unsubscribeStream();
+    }
+  };
+  request.on("close", handleAbort);
+
+  const pastEvents = [...streamSession.events];
+  for (const event of pastEvents) {
+    if (!clientConnected || response.writableEnded || response.destroyed) {
+      break;
+    }
+    writeRawSSE(response, JSON.stringify(event));
+  }
+
+  if (!clientConnected || response.writableEnded || response.destroyed) {
+    response.end();
+    return;
+  }
+
+  if (streamSession.completed) {
+    writeDoneSSE(response);
+    response.end();
+    return;
+  }
+
+  unsubscribeStream = streamSession.subscribe((event) => {
+    if (!clientConnected || response.writableEnded || response.destroyed) {
+      return;
+    }
+    try {
+      writeRawSSE(response, JSON.stringify(event));
+      if (event.type === "complete") {
+        writeDoneSSE(response);
+        response.end();
+      } else if (event.type === "error") {
+        writeDoneSSE(response);
+        response.end();
+      }
+    } catch {
+      // ignore write errors
+    }
+  });
 });
 
 app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, async (request, response) => {
@@ -1135,6 +1199,7 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, async (request,
       modelAlias: selectedModel.alias,
       prompt: targetBlock.prompt,
       response: result.reply,
+      reasoning: result.reasoning ?? "",
       parentBlockSHA1,
       contextLength: context.contextLength,
       tokenUsage: result.usage,
@@ -1297,6 +1362,7 @@ function validateEnvironment() {
 }
 
 await ensureDataLayout();
+streamSessionManager.startCleanupTimer();
 
 let httpServer = null;
 

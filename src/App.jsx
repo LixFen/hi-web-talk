@@ -30,6 +30,7 @@ import {
   runBlockAdaptationCommand,
   sendReply,
   sendReplyStream,
+  subscribeToSessionStream,
   setActiveBlock,
   uploadAttachment,
   setFocusedBlock,
@@ -122,6 +123,7 @@ export default function App() {
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState("");
   const [streamingReply, setStreamingReply] = useState("");
+  const [streamingReasoning, setStreamingReasoning] = useState("");
   const [error, setError] = useState("");
   const [chatNavigationRequest, setChatNavigationRequest] = useState(null);
   const [isComposerCollapsed, setIsComposerCollapsed] = useState(false);
@@ -135,7 +137,9 @@ export default function App() {
   const activeSessionHashRef = useRef("");
   const viewSwitchVersionRef = useRef(0);
   const streamAbortControllerRef = useRef(null);
+  const streamReconnectControllerRef = useRef(null);
   const streamBufferRef = useRef("");
+  const streamReasoningBufferRef = useRef("");
   const streamFlushRafRef = useRef(0);
   const drawerTouchStartRef = useRef({ x: 0, y: 0, active: false });
   const drawerSwipeDetectedRef = useRef(false);
@@ -219,6 +223,7 @@ export default function App() {
           reason: "bootstrap",
           behavior: "auto",
         });
+        subscribeToActiveStream(sessions[0].sessionHash);
       } catch (requestError) {
         if (!isDisposed) {
           setError(
@@ -362,19 +367,20 @@ export default function App() {
   );
   const pendingAssistantAlreadyPersisted = useMemo(
     () =>
-      Boolean(streamingReply) &&
+      (Boolean(streamingReply) || Boolean(streamingReasoning)) &&
       messages.some(
         (message) =>
           message.role === "assistant" &&
-          message.text === streamingReply,
+          message.text === streamingReply &&
+          (message.reasoning || "") === streamingReasoning,
       ),
-    [messages, streamingReply],
+    [messages, streamingReply, streamingReasoning],
   );
   const shouldShowPendingUserMessage = Boolean(pendingPrompt) && !pendingUserAlreadyPersisted;
   const shouldShowPendingAssistantMessage =
-    Boolean(streamingReply) &&
+    (Boolean(streamingReply) || Boolean(streamingReasoning)) &&
     !pendingAssistantAlreadyPersisted &&
-    (!pendingUserAlreadyPersisted || Boolean(streamingReply));
+    (!pendingUserAlreadyPersisted || Boolean(streamingReply) || Boolean(streamingReasoning));
   const isReplyPending = shouldShowPendingUserMessage || shouldShowPendingAssistantMessage;
   const displayMessages =
     shouldShowPendingUserMessage || shouldShowPendingAssistantMessage
@@ -395,6 +401,7 @@ export default function App() {
                   id: "pending-assistant-message",
                   role: "assistant",
                   text: streamingReply,
+                  reasoning: streamingReasoning,
                 },
               ]
             : []),
@@ -569,6 +576,7 @@ export default function App() {
         reason: "select-session",
         behavior: "auto",
       });
+      subscribeToActiveStream(conversationId);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -1028,7 +1036,73 @@ export default function App() {
     streamFlushRafRef.current = requestAnimationFrame(() => {
       streamFlushRafRef.current = 0;
       setStreamingReply(streamBufferRef.current);
+      setStreamingReasoning(streamReasoningBufferRef.current);
     });
+  }
+
+  async function subscribeToActiveStream(sessionHash) {
+    streamReconnectControllerRef.current?.abort();
+
+    const abortController = new AbortController();
+    streamReconnectControllerRef.current = abortController;
+
+    setIsLoading(true);
+    setStreamingReply("");
+    setStreamingReasoning("");
+    streamBufferRef.current = "";
+    streamReasoningBufferRef.current = "";
+
+    try {
+      const result = await subscribeToSessionStream(sessionHash, {
+        signal: abortController.signal,
+        onEvent: (event) => {
+          if (event?.type === "delta") {
+            streamBufferRef.current += event.delta || "";
+            if (event.reasoningDelta || event.reasoning_delta) {
+              streamReasoningBufferRef.current += event.reasoningDelta || event.reasoning_delta || "";
+            }
+            scheduleStreamingFlush();
+            return;
+          }
+
+          if (event?.type === "complete") {
+            applySessionDetail(event.detail);
+            return;
+          }
+
+          if (event?.type === "error") {
+            throw new Error(event.error || "流式重连出错。");
+          }
+        },
+      });
+
+      if (!result.active) {
+        setIsLoading(false);
+        setPendingPrompt("");
+        setStreamingReply("");
+        setStreamingReasoning("");
+      }
+    } catch (requestError) {
+      if (requestError?.name !== "AbortError") {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "流式重连失败。",
+        );
+      }
+    } finally {
+      if (streamFlushRafRef.current) {
+        cancelAnimationFrame(streamFlushRafRef.current);
+        streamFlushRafRef.current = 0;
+      }
+      streamBufferRef.current = "";
+      streamReasoningBufferRef.current = "";
+      setIsLoading(false);
+      setPendingPrompt("");
+      setStreamingReply("");
+      setStreamingReasoning("");
+      streamReconnectControllerRef.current = null;
+    }
   }
 
   async function handleUploadAttachment({ fileName, mimeType, base64Data }) {
@@ -1060,6 +1134,9 @@ export default function App() {
     setPendingPrompt(textPreview || "[图片消息]");
     setStreamingReply("");
     setError("");
+
+    streamReconnectControllerRef.current?.abort();
+    streamReconnectControllerRef.current = null;
 
     let sessionHash = activeConversation?.sessionHash || "";
     const supportsStreaming = selectedModel.supportsStreaming !== false;
@@ -1102,6 +1179,9 @@ export default function App() {
         onEvent: async (event) => {
           if (event?.type === "delta") {
             streamBufferRef.current += event.delta || "";
+            if (event.reasoningDelta || event.reasoning_delta) {
+              streamReasoningBufferRef.current += event.reasoningDelta || event.reasoning_delta || "";
+            }
             scheduleStreamingFlush();
             return;
           }
@@ -1124,9 +1204,7 @@ export default function App() {
       const detail = streamedDetail;
 
       applySessionDetail(detail, {
-        revealLatestInChat: true,
-        reason: "send-reply",
-        behavior: "auto",
+        revealLatestInChat: false,
       });
     } catch (requestError) {
       if (requestError?.name === "AbortError") {
@@ -1144,9 +1222,11 @@ export default function App() {
         streamFlushRafRef.current = 0;
       }
       streamBufferRef.current = "";
+      streamReasoningBufferRef.current = "";
       setIsLoading(false);
       setPendingPrompt("");
       setStreamingReply("");
+      setStreamingReasoning("");
       streamAbortControllerRef.current = null;
     }
   }

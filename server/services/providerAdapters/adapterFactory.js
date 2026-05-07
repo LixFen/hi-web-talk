@@ -16,6 +16,10 @@ function getAdapterCacheKey(modelConfig, credential) {
 function createAdapter(modelConfig, credential) {
   switch (modelConfig.providerType) {
     case "openai-chat-completions":
+    case "doubao":
+    case "glm":
+    case "kimi":
+    case "qwen":
       return createOpenAIChatCompletionsAdapter(modelConfig, credential);
     case "openai-responses":
       return createOpenAIResponsesAdapter(modelConfig, credential);

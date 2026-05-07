@@ -14,17 +14,32 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
   function buildRequestBody(messages) {
     const { systemText, otherMessages } = splitSystemMessage(messages);
 
+    const maxTokens = modelConfig.requestOptions?.maxTokens ?? 4096;
+    const thinkingEnabled = modelConfig.requestOptions?.thinkingEnabled === true;
+    const thinkingBudgetTokens = Number(modelConfig.requestOptions?.thinkingBudgetTokens) || 1024;
+
     const body = {
       model: modelConfig.modelName,
       messages: otherMessages.map((message) => ({
         role: message.role,
         content: convertMultimodalContentForClaude(message.content),
       })),
-      max_tokens: modelConfig.requestOptions?.maxTokens ?? 4096,
+      max_tokens: maxTokens,
     };
 
     if (systemText) {
       body.system = systemText;
+    }
+
+    if (thinkingEnabled) {
+      const minBudget = 256;
+      const safeMaxTokens = Math.max(maxTokens - 1, minBudget);
+      const clampedBudget = Math.min(Math.max(thinkingBudgetTokens, minBudget), safeMaxTokens);
+
+      body.thinking = {
+        type: "enabled",
+        budget_tokens: clampedBudget,
+      };
     }
 
     return body;
@@ -36,11 +51,15 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
       stream: false,
     });
 
-    const reply =
-      result.content?.[0]?.type === "text" ? result.content[0].text : "";
+    const textBlocks = result.content?.filter((block) => block.type === "text") ?? [];
+    const reply = textBlocks.map((block) => block.text).join("");
+
+    const thinkingBlocks = result.content?.filter((block) => block.type === "thinking") ?? [];
+    const reasoning = thinkingBlocks.map((block) => block.thinking).join("\n");
 
     return {
       reply: reply || "",
+      reasoning: reasoning.trim() || "",
       usage: formatTokenUsage(result.usage),
       provider: modelConfig.providerType,
       providerType: modelConfig.providerType,
@@ -56,6 +75,7 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
     });
 
     let reply = "";
+    let reasoning = "";
     let usage = { input: 0, output: 0, total: 0 };
     let responseId = null;
 
@@ -68,7 +88,16 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
       ) {
         const delta = chunk.delta.text ?? "";
         reply += delta;
-        await onChunk?.(delta);
+        await onChunk?.({ delta });
+      }
+
+      if (
+        chunk.type === "content_block_delta" &&
+        chunk.delta?.type === "thinking_delta"
+      ) {
+        const reasoningDelta = chunk.delta.thinking ?? "";
+        reasoning += reasoningDelta;
+        await onChunk?.({ delta: "", reasoningDelta });
       }
 
       if (chunk.type === "message_delta" && chunk.usage) {
@@ -82,6 +111,7 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
 
     return {
       reply: reply.trim() || "",
+      reasoning: reasoning.trim() || "",
       usage,
       provider: modelConfig.providerType,
       providerType: modelConfig.providerType,

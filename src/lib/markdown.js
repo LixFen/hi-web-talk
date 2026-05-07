@@ -5,6 +5,10 @@ export function normalizeMarkdownMath(value = "") {
     return "";
   }
 
+  // remark-math v6 only supports $...$ and $$...$$ by default.
+  // We must convert \(...\) and \[...\] to the supported delimiters.
+  // Code blocks are preserved to avoid modifying math inside them.
+
   const fencedCodeBlockPattern = /(```[\s\S]*?```|`[^`\n]*`)/g;
   const segments = source.split(fencedCodeBlockPattern);
 
@@ -14,22 +18,20 @@ export function normalizeMarkdownMath(value = "") {
         return segment;
       }
 
-      const normalizedBlockMath = segment.replace(
-        /(^[ \t]*)\\\[\s*\n([\s\S]*?)\n\1\\\]/gm,
-        (_match, indent, formula) => {
-          const normalizedFormula = formula
-            .trim()
-            .split("\n")
-            .map((line) => `${indent}${line.trimEnd()}`)
-            .join("\n");
-
-          return `${indent}$$\n${normalizedFormula}\n${indent}$$`;
-        },
+      // Convert \[ ... \] to $$ ... $$ (block math)
+      // Handles both inline-style \[ formula \] and block-style with newlines
+      let result = segment.replace(
+        /\\\[\s*\n?((?:[^\n]|\n(?!\s*\\\]))*)\n?\s*\\\]/g,
+        (_match, formula) => `$$\n${formula.trim()}\n$$`,
       );
 
-      return normalizedBlockMath.replace(/\\\(([^\n]+?)\\\)/g, (_match, formula) => {
-        return `$${formula.trim()}$`;
-      });
+      // Convert \( ... \) to $...$ (inline math)
+      result = result.replace(
+        /\\\(([\s\S]*?)\\\)/g,
+        (_match, formula) => `$${formula.trim()}$`,
+      );
+
+      return result;
     })
     .join("");
 }

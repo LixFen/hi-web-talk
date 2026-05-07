@@ -399,6 +399,94 @@ export function logoutUser() {
   });
 }
 
+export async function subscribeToSessionStream(sessionHash, { signal, onEvent } = {}) {
+  const token = getToken();
+  const response = await fetch(`/api/sessions/${sessionHash}/stream`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    signal,
+  });
+
+  if (response.status === 204) {
+    return { active: false };
+  }
+
+  if (!response.ok) {
+    throw new Error(await readResponseError(response));
+  }
+
+  if (!response.body) {
+    throw new Error("当前环境不支持流式读取响应。");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let isDone = false;
+  let pendingPayload = "";
+
+  while (!isDone) {
+    const { value, done } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    buffer += normalizeSseLineBreaks(decoder.decode(value, { stream: true }));
+    const frames = buffer.split("\n\n");
+    buffer = frames.pop() ?? "";
+
+    for (const frame of frames) {
+      const payload = collectSseDataPayload(frame);
+
+      if (!payload) {
+        continue;
+      }
+
+      const combinedPayload = pendingPayload ? `${pendingPayload}\n${payload}` : payload;
+
+      if (combinedPayload === "[DONE]") {
+        isDone = true;
+        pendingPayload = "";
+        break;
+      }
+
+      const parsedPayload = parseSsePayload(combinedPayload);
+
+      if (!parsedPayload.ok) {
+        pendingPayload = combinedPayload;
+        continue;
+      }
+
+      pendingPayload = "";
+      await onEvent?.(parsedPayload.value);
+    }
+  }
+
+  buffer += normalizeSseLineBreaks(decoder.decode());
+  const tailPayload = collectSseDataPayload(buffer);
+  const finalPayload = pendingPayload
+    ? `${pendingPayload}${tailPayload ? `\n${tailPayload}` : ""}`
+    : tailPayload;
+
+  if (!isDone && finalPayload) {
+    if (finalPayload === "[DONE]") {
+      return { active: true };
+    }
+
+    const parsedPayload = parseSsePayload(finalPayload);
+
+    if (!parsedPayload.ok) {
+      throw new Error("流式消息格式无效，可能包含未正确转义的特殊字符。");
+    }
+
+    await onEvent?.(parsedPayload.value);
+  }
+
+  return { active: true };
+}
+
 export function getCurrentUser() {
   return requestJson("/api/auth/me");
 }

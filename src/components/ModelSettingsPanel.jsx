@@ -16,11 +16,17 @@ function buildEmptyDraft(providerDefinitions) {
     supportsStreaming: true,
     supportsSystemRole: firstProvider?.supportsSystemRole !== false,
     supportsMultimodal: firstProvider?.supportsMultimodal !== false,
+    supportsThinking: firstProvider?.supportsThinking !== false,
     systemPromptRole: firstProvider?.defaultSystemPromptRole || "system",
     requestOptions: {
       reasoningEffort: firstProvider?.defaultRequestOptions?.reasoningEffort || "",
+      thinkingBudgetTokens: firstProvider?.defaultRequestOptions?.thinkingBudgetTokens ?? 1024,
+      thinkingBudget: firstProvider?.defaultRequestOptions?.thinkingBudget ?? 0,
+      thinkingLevel: firstProvider?.defaultRequestOptions?.thinkingLevel || "",
+      enableThinking: firstProvider?.defaultRequestOptions?.enableThinking ?? false,
+      clearThinking: firstProvider?.defaultRequestOptions?.clearThinking ?? false,
     },
-  }; 
+  };
 }
 
 function mapModelToDraft(model) {
@@ -37,9 +43,15 @@ function mapModelToDraft(model) {
     supportsStreaming: model.supportsStreaming !== false,
     supportsSystemRole: model.supportsSystemRole !== false,
     supportsMultimodal: model.supportsMultimodal !== false,
+    supportsThinking: model.supportsThinking !== false,
     systemPromptRole: model.systemPromptRole || "system",
     requestOptions: {
       reasoningEffort: model.requestOptions?.reasoningEffort || "",
+      thinkingBudgetTokens: model.requestOptions?.thinkingBudgetTokens ?? 1024,
+      thinkingBudget: model.requestOptions?.thinkingBudget ?? 0,
+      thinkingLevel: model.requestOptions?.thinkingLevel || "",
+      enableThinking: model.requestOptions?.enableThinking ?? false,
+      clearThinking: model.requestOptions?.clearThinking ?? false,
     },
     shared: model.shared || false,
   };
@@ -126,8 +138,14 @@ export default function ModelSettingsPanel({
       systemPromptRole: providerDefinition?.defaultSystemPromptRole || "system",
       supportsSystemRole: providerDefinition?.supportsSystemRole !== false,
       supportsMultimodal: providerDefinition?.supportsMultimodal !== false,
+      supportsThinking: providerDefinition?.supportsThinking !== false,
       requestOptions: {
         reasoningEffort: providerDefinition?.defaultRequestOptions?.reasoningEffort || "",
+        thinkingBudgetTokens: providerDefinition?.defaultRequestOptions?.thinkingBudgetTokens ?? 1024,
+        thinkingBudget: providerDefinition?.defaultRequestOptions?.thinkingBudget ?? 0,
+        thinkingLevel: providerDefinition?.defaultRequestOptions?.thinkingLevel || "",
+        enableThinking: providerDefinition?.defaultRequestOptions?.enableThinking ?? false,
+        clearThinking: providerDefinition?.defaultRequestOptions?.clearThinking ?? false,
       },
     });
   };
@@ -149,9 +167,15 @@ export default function ModelSettingsPanel({
       supportsStreaming: draft.supportsStreaming,
       supportsSystemRole: draft.supportsSystemRole,
       supportsMultimodal: draft.supportsMultimodal,
+      supportsThinking: draft.supportsThinking,
       systemPromptRole: draft.systemPromptRole,
       requestOptions: {
         reasoningEffort: draft.requestOptions?.reasoningEffort || undefined,
+        thinkingBudgetTokens: Number(draft.requestOptions?.thinkingBudgetTokens) || 1024,
+        thinkingBudget: Number(draft.requestOptions?.thinkingBudget) || 0,
+        thinkingLevel: draft.requestOptions?.thinkingLevel || undefined,
+        enableThinking: draft.requestOptions?.enableThinking ?? false,
+        clearThinking: draft.requestOptions?.clearThinking ?? false,
       },
       shared: draft.shared,
     };
@@ -239,9 +263,30 @@ export default function ModelSettingsPanel({
           <div className="settings-form-header">
             <div>
               <div className="settings-eyebrow">{mode === "create" ? "Create" : "Edit"}</div>
-              <h3 className="settings-panel-title">
-                {mode === "create" ? "新增模型" : selectedModel?.label || "模型详情"}
-              </h3>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <h3 className="settings-panel-title" style={{ marginBottom: 0 }}>
+                  {mode === "create" ? "新增模型" : selectedModel?.label || "模型详情"}
+                </h3>
+                <div className="reasoning-info-trigger" tabIndex={0} role="button" aria-label="推理参数说明">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 16v-4" />
+                    <path d="M12 8h.01" />
+                  </svg>
+                  <div className="reasoning-info-tooltip">
+                    <div className="reasoning-info-tooltip-inner">
+                      <h4>推理参数边界处理说明</h4>
+                      <ul>
+                        <li><strong>选择空值/关闭</strong>：不发送任何推理参数，模型按默认行为输出</li>
+                        <li><strong>GLM clear_thinking</strong>：仅在勾选时发送 clear_thinking = true，用于清除推理缓存</li>
+                        <li><strong>KIMI Budget 为 0</strong>：视为「自动」模式，不发送 thinking_budget</li>
+                        <li><strong>Qwen 关闭开关</strong>：不发送 enable_thinking，模型按默认行为输出</li>
+                        <li><strong>切换 Provider</strong>：推理控制参数自动重置为新厂商的默认值</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
             {mode === "edit" && selectedModel ? (
               <span className={`settings-status-pill ${selectedModel.credentialStatus}`}>
@@ -313,27 +358,129 @@ export default function ModelSettingsPanel({
               </select>
             </label>
 
-            <label className="settings-field">
-              <span>Reasoning</span>
-              <select
-                value={draft.requestOptions?.reasoningEffort || ""}
-                onChange={(event) =>
-                  handleDraftChange({
-                    requestOptions: {
-                      ...draft.requestOptions,
-                      reasoningEffort: event.target.value,
-                    },
-                  })
-                }
-                disabled={!activeProviderDefinition?.supportsReasoningEffort}
-              >
-                <option value="">默认</option>
-                <option value="minimal">minimal</option>
-                <option value="low">low</option>
-                <option value="medium">medium</option>
-                <option value="high">high</option>
-              </select>
-            </label>
+            {draft.supportsThinking && (activeProviderDefinition?.reasoningControlType === "effort" || activeProviderDefinition?.supportsReasoningEffort) ? (
+              <label className="settings-field">
+                <span>Reasoning Effort</span>
+                <select
+                  value={draft.requestOptions?.reasoningEffort || ""}
+                  onChange={(event) =>
+                    handleDraftChange({
+                      requestOptions: {
+                        ...draft.requestOptions,
+                        reasoningEffort: event.target.value,
+                      },
+                    })
+                  }
+                >
+                  <option value="">默认（关闭）</option>
+                  {(activeProviderDefinition?.reasoningLevels || []).map((level) => (
+                    <option key={level} value={level}>{level}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            {draft.supportsThinking && activeProviderDefinition?.reasoningControlType === "level" ? (
+              <label className="settings-field">
+                <span>Thinking Level</span>
+                <select
+                  value={draft.requestOptions?.thinkingLevel || ""}
+                  onChange={(event) =>
+                    handleDraftChange({
+                      requestOptions: {
+                        ...draft.requestOptions,
+                        thinkingLevel: event.target.value,
+                      },
+                    })
+                  }
+                >
+                  <option value="">默认（关闭）</option>
+                  {(activeProviderDefinition?.reasoningLevels || []).map((level) => (
+                    <option key={level} value={level}>{level}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            {draft.supportsThinking && activeProviderDefinition?.reasoningControlType === "budget" ? (
+              <label className="settings-field">
+                <span>Thinking Budget (tokens)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={128}
+                  placeholder="0 = 自动"
+                  value={draft.requestOptions?.thinkingBudget ?? 0}
+                  onChange={(event) =>
+                    handleDraftChange({
+                      requestOptions: {
+                        ...draft.requestOptions,
+                        thinkingBudget: Number(event.target.value) || 0,
+                      },
+                    })
+                  }
+                />
+              </label>
+            ) : null}
+
+            {draft.supportsThinking && activeProviderDefinition?.reasoningControlType === "switch+budget" ? (
+              <>
+                <label className="settings-toggle-row settings-field-wide" style={{ marginTop: "0.25rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={draft.requestOptions?.enableThinking ?? false}
+                    onChange={(event) =>
+                      handleDraftChange({
+                        requestOptions: {
+                          ...draft.requestOptions,
+                          enableThinking: event.target.checked,
+                        },
+                      })
+                    }
+                  />
+                  <span>启用 Thinking 推理输出</span>
+                </label>
+
+                {draft.requestOptions?.enableThinking ? (
+                  <label className="settings-field">
+                    <span>Thinking Budget (tokens)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={128}
+                      placeholder="0 = 自动"
+                      value={draft.requestOptions?.thinkingBudget ?? 0}
+                      onChange={(event) =>
+                        handleDraftChange({
+                          requestOptions: {
+                            ...draft.requestOptions,
+                            thinkingBudget: Number(event.target.value) || 0,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                ) : null}
+              </>
+            ) : null}
+
+            {draft.supportsThinking && activeProviderDefinition?.key === "glm" ? (
+              <label className="settings-toggle-row settings-field-wide" style={{ marginTop: "0.25rem" }}>
+                <input
+                  type="checkbox"
+                  checked={draft.requestOptions?.clearThinking ?? false}
+                  onChange={(event) =>
+                    handleDraftChange({
+                      requestOptions: {
+                        ...draft.requestOptions,
+                        clearThinking: event.target.checked,
+                      },
+                    })
+                  }
+                />
+                <span>清除 Thinking 缓存（clear_thinking）</span>
+              </label>
+            ) : null}
           </div>
 
           <div className="settings-provider-hint">
@@ -439,6 +586,15 @@ export default function ModelSettingsPanel({
                 onChange={(event) => handleDraftChange({ supportsMultimodal: event.target.checked })}
               />
               API 支持多模态（图片）
+            </label>
+
+            <label className="settings-toggle-row">
+              <input
+                type="checkbox"
+                checked={draft.supportsThinking ?? false}
+                onChange={(event) => handleDraftChange({ supportsThinking: event.target.checked })}
+              />
+              支持推理/思考输出
             </label>
 
             {isAdmin ? (

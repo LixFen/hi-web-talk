@@ -43,12 +43,36 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
       options.systemInstruction = { parts: [{ text: systemText }] };
     }
 
+    const opts = modelConfig.requestOptions ?? {};
+    const thinkingLevel = opts.thinkingLevel;
+    if (thinkingLevel && thinkingLevel !== "") {
+      options.generationConfig = {
+        ...(options.generationConfig ?? {}),
+        thinkingConfig: {
+          includeThoughts: true,
+          thinkingLevel,
+        },
+      };
+    }
+
     const result = await client.models.generateContent(options);
 
-    const reply = result.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const candidate = result.candidates?.[0];
+    const parts = candidate?.content?.parts ?? [];
+    let reply = "";
+    let reasoning = "";
+
+    for (const part of parts) {
+      if (part.thought) {
+        reasoning += part.text ?? "";
+      } else {
+        reply += part.text ?? "";
+      }
+    }
 
     return {
       reply: reply || "",
+      reasoning: reasoning.trim() || "",
       usage: formatTokenUsage({
         input_tokens: result.usageMetadata?.promptTokenCount,
         output_tokens: result.usageMetadata?.candidatesTokenCount,
@@ -73,17 +97,42 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
       options.systemInstruction = { parts: [{ text: systemText }] };
     }
 
+    const opts = modelConfig.requestOptions ?? {};
+    const thinkingLevel = opts.thinkingLevel;
+    if (thinkingLevel && thinkingLevel !== "") {
+      options.generationConfig = {
+        ...(options.generationConfig ?? {}),
+        thinkingConfig: {
+          includeThoughts: true,
+          thinkingLevel,
+        },
+      };
+    }
+
     const streamResult = await client.models.generateContentStream(options);
 
     let reply = "";
+    let reasoning = "";
     let usage = { input: 0, output: 0, total: 0 };
 
     for await (const chunk of streamResult) {
-      const text = chunk.text ?? "";
+      const candidates = chunk.candidates ?? [];
 
-      if (text) {
-        reply += text;
-        await onChunk?.(text);
+      for (const candidate of candidates) {
+        const parts = candidate.content?.parts ?? [];
+
+        for (const part of parts) {
+          const text = part.text ?? "";
+          if (!text) continue;
+
+          if (part.thought) {
+            reasoning += text;
+            await onChunk?.({ delta: "", reasoningDelta: text });
+          } else {
+            reply += text;
+            await onChunk?.({ delta: text });
+          }
+        }
       }
 
       if (chunk.usageMetadata) {
@@ -97,6 +146,7 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
 
     return {
       reply: reply.trim() || "",
+      reasoning: reasoning.trim() || "",
       usage,
       provider: modelConfig.providerType,
       providerType: modelConfig.providerType,

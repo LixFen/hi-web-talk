@@ -46,8 +46,19 @@ export function createOpenAIResponsesAdapter(modelConfig, credential) {
   async function call({ messages }) {
     const result = await client.responses.create(buildRequestOptions(messages));
 
+    let reasoning = "";
+    const reasoningItems = result.output?.filter((item) => item.type === "reasoning") ?? [];
+    for (const item of reasoningItems) {
+      if (item.summary) {
+        reasoning += item.summary;
+      } else if (item.text) {
+        reasoning += item.text;
+      }
+    }
+
     return {
       reply: result.output_text?.trim() || "",
+      reasoning: reasoning.trim() || "",
       usage: formatTokenUsage(result.usage),
       provider: modelConfig.providerType,
       providerType: modelConfig.providerType,
@@ -63,6 +74,7 @@ export function createOpenAIResponsesAdapter(modelConfig, credential) {
     });
 
     let reply = "";
+    let reasoning = "";
     let usage = { input: 0, output: 0, total: 0 };
     let responseId = null;
 
@@ -72,7 +84,18 @@ export function createOpenAIResponsesAdapter(modelConfig, credential) {
       if (event?.type === "response.output_text.delta") {
         const delta = event.delta ?? "";
         reply += delta;
-        await onChunk?.(delta);
+        await onChunk?.({ delta });
+      }
+
+      if (event?.type === "response.reasoning_part.added" && event.part?.text) {
+        reasoning += event.part.text;
+        await onChunk?.({ delta: "", reasoningDelta: event.part.text });
+      }
+
+      if (event?.type === "response.reasoning_text.delta") {
+        const reasoningDelta = event.delta ?? "";
+        reasoning += reasoningDelta;
+        await onChunk?.({ delta: "", reasoningDelta });
       }
 
       if (
@@ -85,6 +108,7 @@ export function createOpenAIResponsesAdapter(modelConfig, credential) {
 
     return {
       reply: reply.trim() || "",
+      reasoning: reasoning.trim() || "",
       usage,
       provider: modelConfig.providerType,
       providerType: modelConfig.providerType,

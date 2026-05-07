@@ -446,8 +446,82 @@ function areRowPropsEqual(prevProps, nextProps) {
   return (
     prevProps.msg.id === nextProps.msg.id &&
     prevProps.msg.text === nextProps.msg.text &&
+    prevProps.msg.reasoning === nextProps.msg.reasoning &&
     prevProps.isFocused === nextProps.isFocused &&
     prevProps.isLoading === nextProps.isLoading
+  );
+}
+
+function ReasoningIcon({ isOpen }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{
+        transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+        transition: "transform 0.2s var(--ease-out-expo)",
+      }}
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+function ReasoningPanel({ reasoning, defaultOpen = false }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const normalizedReasoning = normalizeMarkdownMath(reasoning);
+
+  if (!reasoning || reasoning.trim().length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="reasoning-panel">
+      <button
+        className="reasoning-panel-header"
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+      >
+        <span className="reasoning-panel-title">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="reasoning-panel-icon"
+          >
+            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z" />
+            <path d="M12 16v-4" />
+            <path d="M12 8h.01" />
+          </svg>
+          推理过程
+        </span>
+        <ReasoningIcon isOpen={isOpen} />
+      </button>
+      {isOpen ? (
+        <div className="reasoning-panel-content">
+          <div className="markdown-body reasoning-markdown">
+            <ReactMarkdown
+              remarkPlugins={markdownRemarkPlugins}
+              rehypePlugins={markdownRehypePlugins}
+            >
+              {normalizedReasoning}
+            </ReactMarkdown>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -488,6 +562,7 @@ const MemoMessageRow = React.memo(({
   const normalizedMessageText = normalizeMarkdownMath(msg.text);
   const normalizedPreviousBranchFlowText = normalizeMarkdownMath(previousBranchFlowText);
   const normalizedNextBranchFlowText = normalizeMarkdownMath(nextBranchFlowText);
+  const isStreaming = msg.id === "pending-assistant-message";
 
   const handleContextMenu = (event) => {
     if (msg.role !== "assistant" || !msg.blockSHA1) return;
@@ -527,6 +602,8 @@ const MemoMessageRow = React.memo(({
 
           <div className="message-bubble">
             <div className="message-assistant-body">
+              <ReasoningPanel reasoning={msg.reasoning} defaultOpen={isStreaming} />
+
               <div className="markdown-body">
                 <ReactMarkdown
                   remarkPlugins={markdownRemarkPlugins}
@@ -772,6 +849,8 @@ const MessageList = forwardRef(({
   const notifyRafRef = useRef(0);
   const lastScrollTopRef = useRef(0);
   const scrollDirectionRef = useRef("none");
+  const prevScrollHeightRef = useRef(0);
+  const userWasNearBottomRef = useRef(false);
 
   const closeContextMenu = useCallback(() => {
     setContextMenu((prev) => (prev.visible ? { visible: false, x: 0, y: 0, msg: null } : prev));
@@ -907,7 +986,7 @@ const MessageList = forwardRef(({
     [scheduleNotifyLatestReadBlock],
   );
 
-  function scrollToBottom(behavior = "auto") {
+  const scrollToBottom = useCallback((behavior = "auto") => {
     const element = containerRef.current;
 
     if (!element) {
@@ -920,7 +999,7 @@ const MessageList = forwardRef(({
     });
 
     scheduleNotifyLatestReadBlock();
-  }
+  }, [scheduleNotifyLatestReadBlock]);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -985,33 +1064,6 @@ const MessageList = forwardRef(({
   }, [clearNotifyRaf, messages, scheduleNotifyLatestReadBlock]);
 
   useEffect(() => {
-    const element = containerRef.current;
-
-    if (!element) {
-      return undefined;
-    }
-
-    const handleScroll = () => {
-      const currentScrollTop = element.scrollTop;
-
-      if (currentScrollTop > lastScrollTopRef.current) {
-        scrollDirectionRef.current = "down";
-      } else if (currentScrollTop < lastScrollTopRef.current) {
-        scrollDirectionRef.current = "up";
-      }
-
-      lastScrollTopRef.current = currentScrollTop;
-      scheduleNotifyLatestReadBlock();
-    };
-
-    element.addEventListener("scroll", handleScroll, { passive: true });
-
-    return () => {
-      element.removeEventListener("scroll", handleScroll);
-    };
-  }, [scheduleNotifyLatestReadBlock]);
-
-  useEffect(() => {
     if (!scrollRequest?.id || lastHandledScrollRequestIdRef.current === scrollRequest.id) {
       return;
     }
@@ -1024,6 +1076,92 @@ const MessageList = forwardRef(({
     scrollToBottom(scrollRequest.behavior ?? "auto");
     onScrollRequestHandled?.(scrollRequest.id);
   }, [scrollRequest, scrollToBlock]);
+
+  const streamingScrollRafRef = useRef(0);
+
+  useEffect(() => {
+    if (!isLoading) {
+      prevScrollHeightRef.current = 0;
+      userWasNearBottomRef.current = true;
+      return;
+    }
+
+    const element = containerRef.current;
+    if (element) {
+      userWasNearBottomRef.current = true;
+      prevScrollHeightRef.current = element.scrollHeight;
+      element.scrollTo({ top: element.scrollHeight, behavior: "auto" });
+    }
+
+    function tick() {
+      streamingScrollRafRef.current = requestAnimationFrame(() => {
+        streamingScrollRafRef.current = 0;
+
+        const element = containerRef.current;
+        if (!element) {
+          return;
+        }
+
+        const currentScrollHeight = element.scrollHeight;
+        const currentScrollTop = element.scrollTop;
+        const clientHeight = element.clientHeight;
+        const distanceFromBottom = currentScrollHeight - currentScrollTop - clientHeight;
+
+        if (prevScrollHeightRef.current > 0 && currentScrollHeight > prevScrollHeightRef.current) {
+          if (userWasNearBottomRef.current) {
+            element.scrollTo({
+              top: element.scrollHeight,
+              behavior: "auto",
+            });
+          }
+        }
+
+        prevScrollHeightRef.current = currentScrollHeight;
+        userWasNearBottomRef.current = (element.scrollHeight - element.scrollTop - clientHeight) < 150;
+
+        tick();
+      });
+    }
+
+    tick();
+
+    return () => {
+      if (streamingScrollRafRef.current) {
+        cancelAnimationFrame(streamingScrollRafRef.current);
+        streamingScrollRafRef.current = 0;
+      }
+    };
+  }, [isLoading]);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) {
+      return undefined;
+    }
+
+    const handleScroll = () => {
+      const currentScrollTop = element.scrollTop;
+      const currentScrollHeight = element.scrollHeight;
+      const clientHeight = element.clientHeight;
+      const distanceFromBottom = currentScrollHeight - currentScrollTop - clientHeight;
+
+      if (currentScrollTop > lastScrollTopRef.current) {
+        scrollDirectionRef.current = "down";
+      } else if (currentScrollTop < lastScrollTopRef.current) {
+        scrollDirectionRef.current = "up";
+      }
+
+      lastScrollTopRef.current = currentScrollTop;
+      userWasNearBottomRef.current = distanceFromBottom < 150;
+      scheduleNotifyLatestReadBlock();
+    };
+
+    element.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      element.removeEventListener("scroll", handleScroll);
+    };
+  }, [scheduleNotifyLatestReadBlock]);
 
   useImperativeHandle(ref, () => ({
     scrollToBottom,
