@@ -186,9 +186,11 @@ function parseModelPayload(body = {}) {
     supportsStreaming: body.supportsStreaming,
     supportsSystemRole: body.supportsSystemRole,
     supportsMultimodal: body.supportsMultimodal,
+    supportsThinking: body.supportsThinking,
     systemPromptRole: body.systemPromptRole,
     requestOptions: body.requestOptions,
     isPreset: body.isPreset,
+    shared: body.shared,
     meta: body.meta,
   };
 }
