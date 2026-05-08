@@ -14,7 +14,7 @@ export function normalizeMarkdownMath(value = "") {
 
   return segments
     .map((segment) => {
-      if (segment.startsWith("```")) {
+      if (segment.startsWith("`")) {
         return segment;
       }
 
@@ -33,6 +33,9 @@ export function normalizeMarkdownMath(value = "") {
 
       // KaTeX errors on stray '$' inside math; escape them in math segments.
       result = escapeDollarInsideMath(result);
+
+      // Escape unmatched math delimiters so they stay as plain text.
+      result = escapeUnpairedMathDelimiters(result);
 
       return result;
     })
@@ -92,6 +95,114 @@ function escapeDollarInsideMath(input = "") {
 
     output += `${"$".repeat(delimiterLength)}${content}${"$".repeat(delimiterLength)}`;
     index = end + delimiterLength;
+  }
+
+  return output;
+}
+
+function escapeUnpairedMathDelimiters(input = "") {
+  const dollarEscapes = new Set();
+  const inlineStack = [];
+  const blockStack = [];
+
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+
+    if (char === "\\") {
+      index += 1;
+      continue;
+    }
+
+    if (char !== "$") {
+      continue;
+    }
+
+    const isBlock = input[index + 1] === "$";
+
+    if (isBlock) {
+      if (blockStack.length > 0) {
+        blockStack.pop();
+      } else {
+        blockStack.push(index);
+      }
+      index += 1;
+      continue;
+    }
+
+    if (inlineStack.length > 0) {
+      inlineStack.pop();
+    } else {
+      inlineStack.push(index);
+    }
+  }
+
+  for (const index of inlineStack) {
+    dollarEscapes.add(index);
+  }
+
+  for (const index of blockStack) {
+    dollarEscapes.add(index);
+    dollarEscapes.add(index + 1);
+  }
+
+  const output = [];
+  for (let index = 0; index < input.length; index += 1) {
+    if (dollarEscapes.has(index)) {
+      output.push("\\$");
+      continue;
+    }
+    output.push(input[index]);
+  }
+
+  return escapeUnpairedBracketDelimiters(output.join(""));
+}
+
+function escapeUnpairedBracketDelimiters(input = "") {
+  return escapeUnpairedBackslashPairs(input, "(", ")");
+}
+
+function escapeUnpairedBackslashPairs(input, openChar, closeChar) {
+  const openStack = [];
+  const openIndexesToEscape = new Set();
+  const closeIndexesToEscape = new Set();
+
+  for (let index = 0; index < input.length - 1; index += 1) {
+    if (input[index] !== "\\") {
+      continue;
+    }
+
+    const nextChar = input[index + 1];
+    if (nextChar === openChar) {
+      openStack.push(index);
+      index += 1;
+      continue;
+    }
+
+    if (nextChar === closeChar) {
+      if (openStack.length > 0) {
+        openStack.pop();
+      } else {
+        closeIndexesToEscape.add(index);
+      }
+      index += 1;
+    }
+  }
+
+  for (const index of openStack) {
+    openIndexesToEscape.add(index);
+  }
+
+  if (openIndexesToEscape.size === 0 && closeIndexesToEscape.size === 0) {
+    return input;
+  }
+
+  let output = "";
+  for (let index = 0; index < input.length; index += 1) {
+    if ((openIndexesToEscape.has(index) || closeIndexesToEscape.has(index)) && input[index] === "\\") {
+      output += "\\\\";
+      continue;
+    }
+    output += input[index];
   }
 
   return output;
