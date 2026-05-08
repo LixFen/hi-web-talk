@@ -91,7 +91,8 @@ function escapeDollarInsideMath(input = "") {
 
     const content = input
       .slice(start, end)
-      .replace(/(^|[^\\])\$/g, (_match, prefix) => `${prefix}\\$`);
+      .replace(/(^|[^\\])\$/g, (_match, prefix) => `${prefix}\\$`)
+      .replace(/(^|[^\\])#/g, (_match, prefix) => `${prefix}\\#`);
 
     output += `${"$".repeat(delimiterLength)}${content}${"$".repeat(delimiterLength)}`;
     index = end + delimiterLength;
@@ -158,7 +159,8 @@ function escapeUnpairedMathDelimiters(input = "") {
 }
 
 function escapeUnpairedBracketDelimiters(input = "") {
-  return escapeUnpairedBackslashPairs(input, "(", ")");
+  const afterParen = escapeUnpairedBackslashPairs(input, "(", ")");
+  return escapeUnpairedBackslashPairs(afterParen, "[", "]");
 }
 
 function escapeUnpairedBackslashPairs(input, openChar, closeChar) {
