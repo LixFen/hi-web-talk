@@ -187,6 +187,7 @@ function parseModelPayload(body = {}) {
     supportsSystemRole: body.supportsSystemRole,
     supportsMultimodal: body.supportsMultimodal,
     supportsThinking: body.supportsThinking,
+    thinkingDisable: body.thinkingDisable,
     systemPromptRole: body.systemPromptRole,
     requestOptions: body.requestOptions,
     isPreset: body.isPreset,

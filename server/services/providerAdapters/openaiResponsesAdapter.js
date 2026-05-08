@@ -47,14 +47,12 @@ export function createOpenAIResponsesAdapter(modelConfig, credential) {
     const result = await client.responses.create(buildRequestOptions(messages));
 
     let reasoning = "";
-    if (modelConfig.supportsThinking !== false) {
-      const reasoningItems = result.output?.filter((item) => item.type === "reasoning") ?? [];
-      for (const item of reasoningItems) {
-        if (item.summary) {
-          reasoning += item.summary;
-        } else if (item.text) {
-          reasoning += item.text;
-        }
+    const reasoningItems = result.output?.filter((item) => item.type === "reasoning") ?? [];
+    for (const item of reasoningItems) {
+      if (item.summary) {
+        reasoning += item.summary;
+      } else if (item.text) {
+        reasoning += item.text;
       }
     }
 
@@ -89,12 +87,12 @@ export function createOpenAIResponsesAdapter(modelConfig, credential) {
         await onChunk?.({ delta });
       }
 
-      if (event?.type === "response.reasoning_part.added" && event.part?.text && modelConfig.supportsThinking !== false) {
+      if (event?.type === "response.reasoning_part.added" && event.part?.text) {
         reasoning += event.part.text;
         await onChunk?.({ delta: "", reasoningDelta: event.part.text });
       }
 
-      if (event?.type === "response.reasoning_text.delta" && modelConfig.supportsThinking !== false) {
+      if (event?.type === "response.reasoning_text.delta") {
         const reasoningDelta = event.delta ?? "";
         reasoning += reasoningDelta;
         await onChunk?.({ delta: "", reasoningDelta });

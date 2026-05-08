@@ -31,7 +31,68 @@ export function normalizeMarkdownMath(value = "") {
         (_match, formula) => `$${formula.trim()}$`,
       );
 
+      // KaTeX errors on stray '$' inside math; escape them in math segments.
+      result = escapeDollarInsideMath(result);
+
       return result;
     })
     .join("");
+}
+
+function escapeDollarInsideMath(input = "") {
+  let output = "";
+  let index = 0;
+
+  while (index < input.length) {
+    const char = input[index];
+
+    if (char === "\\") {
+      output += input.slice(index, index + 2);
+      index += 2;
+      continue;
+    }
+
+    if (char !== "$") {
+      output += char;
+      index += 1;
+      continue;
+    }
+
+    const isBlock = input[index + 1] === "$";
+    const delimiterLength = isBlock ? 2 : 1;
+    const start = index + delimiterLength;
+    let end = start;
+
+    while (end < input.length) {
+      if (input[end] === "\\") {
+        end += 2;
+        continue;
+      }
+
+      if (isBlock && input[end] === "$" && input[end + 1] === "$") {
+        break;
+      }
+
+      if (!isBlock && input[end] === "$") {
+        break;
+      }
+
+      end += 1;
+    }
+
+    if (end >= input.length) {
+      output += char;
+      index += 1;
+      continue;
+    }
+
+    const content = input
+      .slice(start, end)
+      .replace(/(^|[^\\])\$/g, (_match, prefix) => `${prefix}\\$`);
+
+    output += `${"$".repeat(delimiterLength)}${content}${"$".repeat(delimiterLength)}`;
+    index = end + delimiterLength;
+  }
+
+  return output;
 }

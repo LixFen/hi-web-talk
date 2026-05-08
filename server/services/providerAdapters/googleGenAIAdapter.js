@@ -65,9 +65,9 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
     let reasoning = "";
 
     for (const part of parts) {
-      if (part.thought && modelConfig.supportsThinking !== false) {
+      if (part.thought) {
         reasoning += part.text ?? "";
-      } else if (!part.thought) {
+      } else {
         reply += part.text ?? "";
       }
     }
@@ -129,10 +129,10 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
           const text = part.text ?? "";
           if (!text) continue;
 
-          if (part.thought && modelConfig.supportsThinking !== false) {
+          if (part.thought) {
             reasoning += text;
             await onChunk?.({ delta: "", reasoningDelta: text });
-          } else if (!part.thought) {
+          } else {
             reply += text;
             await onChunk?.({ delta: text });
           }

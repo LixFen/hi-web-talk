@@ -16,7 +16,11 @@ function buildEmptyDraft(providerDefinitions) {
     supportsStreaming: true,
     supportsSystemRole: firstProvider?.supportsSystemRole !== false,
     supportsMultimodal: firstProvider?.supportsMultimodal !== false,
-    supportsThinking: firstProvider?.supportsThinking !== false,
+    thinkingDisableKey: getThinkingDisableKey(firstProvider?.thinkingDisableConfig ?? null),
+    supportsThinking: resolveSupportsThinking(
+      getThinkingDisableKey(firstProvider?.thinkingDisableConfig ?? null),
+      firstProvider?.supportsThinking !== false,
+    ),
     systemPromptRole: firstProvider?.defaultSystemPromptRole || "system",
     requestOptions: {
       reasoningEffort: firstProvider?.defaultRequestOptions?.reasoningEffort || "",
@@ -43,6 +47,7 @@ function mapModelToDraft(model) {
     supportsStreaming: model.supportsStreaming !== false,
     supportsSystemRole: model.supportsSystemRole !== false,
     supportsMultimodal: model.supportsMultimodal !== false,
+    thinkingDisableKey: getThinkingDisableKey(model.thinkingDisable ?? null),
     supportsThinking: model.supportsThinking !== false,
     systemPromptRole: model.systemPromptRole || "system",
     requestOptions: {
@@ -69,6 +74,27 @@ function getCredentialText(model) {
   return model.credentialStatus === "configured"
     ? `读取环境变量 ${model.apiKeyEnvName}`
     : `缺少环境变量 ${model.apiKeyEnvName}`;
+}
+
+const THINKING_DISABLE_OPTIONS = [
+  { key: "", label: "不发送（使用模型默认行为）", config: null, enablesThinking: null },
+  { key: "enable_thinking:true", label: 'enable_thinking = true（extra_body={"enable_thinking":true}）', config: { param: "enable_thinking", value: true }, enablesThinking: true },
+  { key: "enable_thinking:false", label: 'enable_thinking = false（extra_body={"enable_thinking":false}）', config: { param: "enable_thinking", value: false }, enablesThinking: false },
+  { key: "thinking.type:enabled", label: 'thinking.type = enabled（extra_body={"thinking":{"type":"enabled"}}）', config: { param: "thinking", value: { type: "enabled" } }, enablesThinking: true },
+  { key: "thinking.type:disabled", label: 'thinking.type = disabled（extra_body={"thinking":{"type":"disabled"}}）', config: { param: "thinking", value: { type: "disabled" } }, enablesThinking: false },
+];
+
+function getThinkingDisableKey(cfg) {
+  if (!cfg || !cfg.param) return "";
+  if (cfg.param === "enable_thinking") return `enable_thinking:${cfg.value}`;
+  if (cfg.param === "thinking" && cfg.value?.type) return `thinking.type:${cfg.value.type}`;
+  return "";
+}
+
+function resolveSupportsThinking(key, providerDefault) {
+  const opt = THINKING_DISABLE_OPTIONS.find((o) => o.key === key);
+  if (!opt || opt.enablesThinking === null) return providerDefault;
+  return opt.enablesThinking;
 }
 
 export default function ModelSettingsPanel({
@@ -105,7 +131,13 @@ export default function ModelSettingsPanel({
     const selectedModel = models.find((model) => model.alias === nextSelectedAlias);
 
     if (selectedModel) {
-      setDraft(mapModelToDraft(selectedModel));
+      const draft = mapModelToDraft(selectedModel);
+      const pd = providerDefinitions.find((d) => d.key === selectedModel.providerType);
+      draft.supportsThinking = resolveSupportsThinking(
+        draft.thinkingDisableKey,
+        pd?.supportsThinking !== false,
+      );
+      setDraft(draft);
       setClearStoredApiKey(false);
     }
   }, [open, mode, models, providerDefinitions, selectedAlias]);
@@ -138,7 +170,11 @@ export default function ModelSettingsPanel({
       systemPromptRole: providerDefinition?.defaultSystemPromptRole || "system",
       supportsSystemRole: providerDefinition?.supportsSystemRole !== false,
       supportsMultimodal: providerDefinition?.supportsMultimodal !== false,
-      supportsThinking: providerDefinition?.supportsThinking !== false,
+      thinkingDisableKey: getThinkingDisableKey(providerDefinition?.thinkingDisableConfig ?? null),
+      supportsThinking: resolveSupportsThinking(
+        getThinkingDisableKey(providerDefinition?.thinkingDisableConfig ?? null),
+        providerDefinition?.supportsThinking !== false,
+      ),
       requestOptions: {
         reasoningEffort: providerDefinition?.defaultRequestOptions?.reasoningEffort || "",
         thinkingBudgetTokens: providerDefinition?.defaultRequestOptions?.thinkingBudgetTokens ?? 1024,
@@ -177,6 +213,9 @@ export default function ModelSettingsPanel({
         enableThinking: draft.requestOptions?.enableThinking ?? false,
         clearThinking: draft.requestOptions?.clearThinking ?? false,
       },
+      thinkingDisable: draft.thinkingDisableKey
+        ? THINKING_DISABLE_OPTIONS.find((o) => o.key === draft.thinkingDisableKey)?.config ?? null
+        : null,
       shared: draft.shared,
     };
 
@@ -358,7 +397,7 @@ export default function ModelSettingsPanel({
               </select>
             </label>
 
-            {draft.supportsThinking && (activeProviderDefinition?.reasoningControlType === "effort" || activeProviderDefinition?.supportsReasoningEffort) ? (
+            {draft.supportsThinking && draft.thinkingDisableKey === "" && (activeProviderDefinition?.reasoningControlType === "effort" || activeProviderDefinition?.supportsReasoningEffort) ? (
               <label className="settings-field">
                 <span>Reasoning Effort</span>
                 <select
@@ -380,7 +419,7 @@ export default function ModelSettingsPanel({
               </label>
             ) : null}
 
-            {draft.supportsThinking && activeProviderDefinition?.reasoningControlType === "level" ? (
+            {draft.supportsThinking && draft.thinkingDisableKey === "" && activeProviderDefinition?.reasoningControlType === "level" ? (
               <label className="settings-field">
                 <span>Thinking Level</span>
                 <select
@@ -402,7 +441,7 @@ export default function ModelSettingsPanel({
               </label>
             ) : null}
 
-            {draft.supportsThinking && activeProviderDefinition?.reasoningControlType === "budget" ? (
+            {draft.supportsThinking && draft.thinkingDisableKey === "" && activeProviderDefinition?.reasoningControlType === "budget" ? (
               <label className="settings-field">
                 <span>Thinking Budget (tokens)</span>
                 <input
@@ -423,7 +462,7 @@ export default function ModelSettingsPanel({
               </label>
             ) : null}
 
-            {draft.supportsThinking && activeProviderDefinition?.reasoningControlType === "switch+budget" ? (
+            {draft.supportsThinking && draft.thinkingDisableKey === "" && activeProviderDefinition?.reasoningControlType === "switch+budget" ? (
               <>
                 <label className="settings-toggle-row settings-field-wide" style={{ marginTop: "0.25rem" }}>
                   <input
@@ -464,7 +503,7 @@ export default function ModelSettingsPanel({
               </>
             ) : null}
 
-            {draft.supportsThinking && activeProviderDefinition?.key === "glm" ? (
+            {draft.supportsThinking && draft.thinkingDisableKey === "" && activeProviderDefinition?.key === "glm" ? (
               <label className="settings-toggle-row settings-field-wide" style={{ marginTop: "0.25rem" }}>
                 <input
                   type="checkbox"
@@ -481,6 +520,37 @@ export default function ModelSettingsPanel({
                 <span>清除 Thinking 缓存（clear_thinking）</span>
               </label>
             ) : null}
+          </div>
+
+          <div className="settings-thinking-disable">
+            <div className="settings-eyebrow">推理控制（extra_body）</div>
+            <label className="settings-field settings-field-wide">
+              <span>发送参数</span>
+              <select
+                value={draft.thinkingDisableKey ?? ""}
+                onChange={(event) => {
+                  const key = event.target.value;
+                  const pd = providerDefinitions.find((d) => d.key === draft.providerType);
+                  handleDraftChange({
+                    thinkingDisableKey: key,
+                    supportsThinking: resolveSupportsThinking(
+                      key,
+                      pd?.supportsThinking !== false,
+                    ),
+                  });
+                }}
+              >
+                {THINKING_DISABLE_OPTIONS.map((opt) => (
+                  <option key={opt.key} value={opt.key}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="settings-hint" style={{ marginTop: "0.3rem", color: "var(--muted)" }}>
+              选择具体参数则由下拉框接管 <code>extra_body</code>，下方详细控件不生效。
+              选择「不发送」则走 Provider 原生逻辑，详细控件可用。
+            </p>
           </div>
 
           <div className="settings-provider-hint">
@@ -586,15 +656,6 @@ export default function ModelSettingsPanel({
                 onChange={(event) => handleDraftChange({ supportsMultimodal: event.target.checked })}
               />
               API 支持多模态（图片）
-            </label>
-
-            <label className="settings-toggle-row">
-              <input
-                type="checkbox"
-                checked={draft.supportsThinking ?? false}
-                onChange={(event) => handleDraftChange({ supportsThinking: event.target.checked })}
-              />
-              支持推理/思考输出
             </label>
 
             {isAdmin ? (

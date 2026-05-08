@@ -224,6 +224,8 @@ async function normalizeModelRecord(record = {}, index = 0) {
       record.supportsMultimodal ?? providerDefinition.supportsMultimodal ?? true,
     supportsThinking:
       record.supportsThinking ?? providerDefinition.supportsThinking ?? false,
+    thinkingDisable:
+      record.thinkingDisable ?? providerDefinition.thinkingDisableConfig ?? null,
     requestOptions: buildDefaultRequestOptions(providerType, record),
     isPreset: Boolean(record.isPreset ?? false),
     shared: Boolean(record.shared ?? false),
@@ -251,6 +253,7 @@ function serializePublicModel(model, { configured = false } = {}) {
     supportsSystemRole: model.supportsSystemRole,
     supportsMultimodal: model.supportsMultimodal,
     supportsThinking: model.supportsThinking ?? false,
+    thinkingDisable: model.thinkingDisable,
     requestOptions: model.requestOptions,
     isPreset: model.isPreset,
     shared: model.shared,

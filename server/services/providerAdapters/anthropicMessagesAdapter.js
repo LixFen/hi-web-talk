@@ -54,9 +54,7 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
     const textBlocks = result.content?.filter((block) => block.type === "text") ?? [];
     const reply = textBlocks.map((block) => block.text).join("");
 
-    const thinkingBlocks = modelConfig.supportsThinking !== false
-      ? (result.content?.filter((block) => block.type === "thinking") ?? [])
-      : [];
+    const thinkingBlocks = result.content?.filter((block) => block.type === "thinking") ?? [];
     const reasoning = thinkingBlocks.map((block) => block.thinking).join("\n");
 
     return {
@@ -95,8 +93,7 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
 
       if (
         chunk.type === "content_block_delta" &&
-        chunk.delta?.type === "thinking_delta" &&
-        modelConfig.supportsThinking !== false
+        chunk.delta?.type === "thinking_delta"
       ) {
         const reasoningDelta = chunk.delta.thinking ?? "";
         reasoning += reasoningDelta;
