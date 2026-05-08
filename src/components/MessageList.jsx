@@ -8,17 +8,9 @@
   useRef,
   useState,
 } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import rehypeHighlight from "rehype-highlight";
-import { normalizeMarkdownMath } from "../lib/markdown";
+import SafeMarkdown from "./SafeMarkdown";
 import { getAttachmentUrl } from "../lib/chatApi";
 import ContextMenu from "./ContextMenu";
-
-const markdownRemarkPlugins = [remarkMath, remarkGfm];
-const markdownRehypePlugins = [[rehypeKatex, { strict: "ignore" }], rehypeHighlight];
 
 const READ_MARKER_SELECTOR = "[data-read-block-sha1]";
 const READ_MARKER_ROOT_MARGIN = "0px 0px -35% 0px";
@@ -475,7 +467,6 @@ function ReasoningIcon({ isOpen }) {
 
 function ReasoningPanel({ reasoning, defaultOpen = false }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  const normalizedReasoning = normalizeMarkdownMath(reasoning);
 
   if (!reasoning || reasoning.trim().length === 0) {
     return null;
@@ -511,14 +502,9 @@ function ReasoningPanel({ reasoning, defaultOpen = false }) {
       </button>
       {isOpen ? (
         <div className="reasoning-panel-content">
-          <div className="markdown-body reasoning-markdown">
-            <ReactMarkdown
-              remarkPlugins={markdownRemarkPlugins}
-              rehypePlugins={markdownRehypePlugins}
-            >
-              {normalizedReasoning}
-            </ReactMarkdown>
-          </div>
+          <SafeMarkdown className="reasoning-markdown">
+            {reasoning}
+          </SafeMarkdown>
         </div>
       ) : null}
     </div>
@@ -559,9 +545,6 @@ const MemoMessageRow = React.memo(({
     graphBlockMap,
     msg.text,
   );
-  const normalizedMessageText = normalizeMarkdownMath(msg.text);
-  const normalizedPreviousBranchFlowText = normalizeMarkdownMath(previousBranchFlowText);
-  const normalizedNextBranchFlowText = normalizeMarkdownMath(nextBranchFlowText);
   const isStreaming = msg.id === "pending-assistant-message";
 
   const handleContextMenu = (event) => {
@@ -588,14 +571,9 @@ const MemoMessageRow = React.memo(({
                 title="上一分支"
               >
                 <span className="message-side-branch-kicker">上一分支</span>
-                <div className="markdown-body message-side-branch-text">
-                  <ReactMarkdown
-                    remarkPlugins={markdownRemarkPlugins}
-                    rehypePlugins={markdownRehypePlugins}
-                  >
-                    {normalizedPreviousBranchFlowText}
-                  </ReactMarkdown>
-                </div>
+                <SafeMarkdown className="message-side-branch-text">
+                  {previousBranchFlowText}
+                </SafeMarkdown>
               </button>
             </aside>
           ) : null}
@@ -604,14 +582,9 @@ const MemoMessageRow = React.memo(({
             <div className="message-assistant-body">
               <ReasoningPanel reasoning={msg.reasoning} defaultOpen={isStreaming} />
 
-              <div className="markdown-body">
-                <ReactMarkdown
-                  remarkPlugins={markdownRemarkPlugins}
-                  rehypePlugins={markdownRehypePlugins}
-                >
-                  {normalizedMessageText}
-                </ReactMarkdown>
-              </div>
+              <SafeMarkdown>
+                {msg.text}
+              </SafeMarkdown>
 
               {summaryInfo?.status === "completed" && summaryInfo.summary ? (
                 <div className="summary-panel">
@@ -765,14 +738,9 @@ const MemoMessageRow = React.memo(({
                 title="下一分支"
               >
                 <span className="message-side-branch-kicker">下一分支</span>
-                <div className="markdown-body message-side-branch-text">
-                  <ReactMarkdown
-                    remarkPlugins={markdownRemarkPlugins}
-                    rehypePlugins={markdownRehypePlugins}
-                  >
-                    {normalizedNextBranchFlowText}
-                  </ReactMarkdown>
-                </div>
+                <SafeMarkdown className="message-side-branch-text">
+                  {nextBranchFlowText}
+                </SafeMarkdown>
               </button>
             </aside>
           ) : null}

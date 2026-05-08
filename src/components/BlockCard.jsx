@@ -1,13 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import rehypeHighlight from "rehype-highlight";
-import { normalizeMarkdownMath } from "../lib/markdown";
-
-const markdownRemarkPlugins = [remarkMath, remarkGfm];
-const markdownRehypePlugins = [[rehypeKatex, { strict: "ignore" }], rehypeHighlight];
+import SafeMarkdown from "./SafeMarkdown";
 
 function ReasoningIcon({ isOpen }) {
   return (
@@ -32,7 +24,6 @@ function ReasoningIcon({ isOpen }) {
 
 function ReasoningPanel({ reasoning, defaultOpen = false }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  const normalizedReasoning = normalizeMarkdownMath(reasoning);
 
   if (!reasoning || reasoning.trim().length === 0) {
     return null;
@@ -68,14 +59,9 @@ function ReasoningPanel({ reasoning, defaultOpen = false }) {
       </button>
       {isOpen ? (
         <div className="reasoning-panel-content">
-          <div className="markdown-body reasoning-markdown">
-            <ReactMarkdown
-              remarkPlugins={markdownRemarkPlugins}
-              rehypePlugins={markdownRehypePlugins}
-            >
-              {normalizedReasoning}
-            </ReactMarkdown>
-          </div>
+          <SafeMarkdown className="reasoning-markdown">
+            {reasoning}
+          </SafeMarkdown>
         </div>
       ) : null}
     </div>
@@ -183,7 +169,6 @@ export default function BlockCard({
   const adaptationInfo = block.adaptationInfo ?? null;
   const summaryInfo = block.summaryInfo ?? null;
   const isSystemBlock = block.blockType === "system";
-  const normalizedBlockResponse = normalizeMarkdownMath(block.response || "暂无内容");
 
   async function handleCopy() {
     try {
@@ -246,14 +231,9 @@ export default function BlockCard({
         {!isSystemBlock ? (
           <section className="block-card-section">
             <div className="block-card-section-title">AI 回复</div>
-            <div className="markdown-body block-card-response">
-              <ReactMarkdown
-                remarkPlugins={markdownRemarkPlugins}
-                rehypePlugins={markdownRehypePlugins}
-              >
-                {normalizedBlockResponse}
-              </ReactMarkdown>
-            </div>
+            <SafeMarkdown className="block-card-response">
+              {block.response || "暂无内容"}
+            </SafeMarkdown>
           </section>
         ) : null}
 

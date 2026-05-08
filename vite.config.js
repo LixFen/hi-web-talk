@@ -8,7 +8,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           "react-vendor": ["react", "react-dom"],
-          markdown: ["react-markdown", "remark-gfm", "remark-math", "rehype-katex", "rehype-highlight"],
+          markdown: ["marked", "marked-highlight"],
           katex: ["katex"],
         },
       },
