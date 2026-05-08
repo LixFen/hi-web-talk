@@ -18,7 +18,7 @@ import { getAttachmentUrl } from "../lib/chatApi";
 import ContextMenu from "./ContextMenu";
 
 const markdownRemarkPlugins = [remarkMath, remarkGfm];
-const markdownRehypePlugins = [rehypeKatex, rehypeHighlight];
+const markdownRehypePlugins = [[rehypeKatex, { strict: "ignore" }], rehypeHighlight];
 
 const READ_MARKER_SELECTOR = "[data-read-block-sha1]";
 const READ_MARKER_ROOT_MARGIN = "0px 0px -35% 0px";

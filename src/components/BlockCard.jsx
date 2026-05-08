@@ -7,7 +7,7 @@ import rehypeHighlight from "rehype-highlight";
 import { normalizeMarkdownMath } from "../lib/markdown";
 
 const markdownRemarkPlugins = [remarkMath, remarkGfm];
-const markdownRehypePlugins = [rehypeKatex, rehypeHighlight];
+const markdownRehypePlugins = [[rehypeKatex, { strict: "ignore" }], rehypeHighlight];
 
 function ReasoningIcon({ isOpen }) {
   return (
@@ -110,6 +110,28 @@ function buildCopyText(block) {
   return `用户\n${block.prompt}\n\n助手\n${block.response}`;
 }
 
+function buildRawText(block) {
+  if (block.blockType === "system") {
+    return block.prompt || "";
+  }
+
+  const parts = [];
+
+  if (block.prompt) {
+    parts.push(block.prompt);
+  }
+
+  if (block.reasoning) {
+    parts.push(block.reasoning);
+  }
+
+  if (block.response) {
+    parts.push(block.response);
+  }
+
+  return parts.join("\n\n");
+}
+
 function renderFlagSummary(block) {
   const activeFlags = Object.entries(block.flags ?? {})
     .filter(([, enabled]) => Boolean(enabled))
@@ -134,6 +156,7 @@ export default function BlockCard({
   isFocused = false,
 }) {
   const [copyState, setCopyState] = useState("idle");
+  const [rawCopyState, setRawCopyState] = useState("idle");
 
   useEffect(() => {
     if (copyState !== "done") {
@@ -143,6 +166,15 @@ export default function BlockCard({
     const timerId = window.setTimeout(() => setCopyState("idle"), 1600);
     return () => window.clearTimeout(timerId);
   }, [copyState]);
+
+  useEffect(() => {
+    if (rawCopyState !== "done") {
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => setRawCopyState("idle"), 1600);
+    return () => window.clearTimeout(timerId);
+  }, [rawCopyState]);
 
   const toolbarDefinitions = adaptationDefinitions.filter(
     (definition) => definition.ui?.placement === "message-toolbar",
@@ -159,6 +191,15 @@ export default function BlockCard({
       setCopyState("done");
     } catch {
       setCopyState("failed");
+    }
+  }
+
+  async function handleCopyRaw() {
+    try {
+      await navigator.clipboard.writeText(buildRawText(block));
+      setRawCopyState("done");
+    } catch {
+      setRawCopyState("failed");
     }
   }
 
@@ -255,6 +296,13 @@ export default function BlockCard({
         <div className="block-card-actions">
           <button className="message-action-btn" type="button" onClick={handleCopy}>
             {copyState === "done" ? "已复制" : copyState === "failed" ? "复制失败" : "复制内容"}
+          </button>
+          <button className="message-action-btn" type="button" onClick={handleCopyRaw}>
+            {rawCopyState === "done"
+              ? "已复制"
+              : rawCopyState === "failed"
+                ? "复制失败"
+                : "复制原文"}
           </button>
           {!block.graphInfo?.isActiveBlock ? (
             <button
