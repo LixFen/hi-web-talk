@@ -577,7 +577,7 @@ const MemoMessageRow = React.memo(({
           ) : null}
 
           <div className="message-bubble">
-            <div className="message-assistant-body">
+            <div className="message-assistant-body" id={`msg-body-${msg.id}`}>
               <ReasoningPanel reasoning={msg.reasoning} defaultOpen={isStreaming} isStreaming={isStreaming} />
 
               <SafeMarkdown>
@@ -1176,6 +1176,26 @@ const MessageList = forwardRef(({
     const items = [];
     const branchInfo = msg.branchInfo;
     const adaptationInfo = msg.adaptationInfo;
+
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    if (isMobileUA) {
+      items.push({
+        key: "select-copy",
+        label: "选择复制",
+        onClick: () => {
+          const bodyEl = document.getElementById(`msg-body-${msg.id}`);
+          if (bodyEl) {
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(bodyEl);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+        },
+      });
+      items.push({ key: "sep-mobile-copy", separator: true });
+    }
 
     if (branchInfo) {
       items.push({
