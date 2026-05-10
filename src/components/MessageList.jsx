@@ -465,7 +465,7 @@ function ReasoningIcon({ isOpen }) {
   );
 }
 
-function ReasoningPanel({ reasoning, defaultOpen = false }) {
+function ReasoningPanel({ reasoning, defaultOpen = false, isStreaming = false }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   if (!reasoning || reasoning.trim().length === 0) {
@@ -481,6 +481,7 @@ function ReasoningPanel({ reasoning, defaultOpen = false }) {
         aria-expanded={isOpen}
       >
         <span className="reasoning-panel-title">
+          <ReasoningIcon isOpen={isOpen} />
           <svg
             width="14"
             height="14"
@@ -490,15 +491,12 @@ function ReasoningPanel({ reasoning, defaultOpen = false }) {
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="reasoning-panel-icon"
           >
-            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z" />
-            <path d="M12 16v-4" />
-            <path d="M12 8h.01" />
+            <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z" />
+            <path d="M9 21h6" />
           </svg>
-          推理过程
+          {isStreaming ? "思考中..." : "已深度思考"}
         </span>
-        <ReasoningIcon isOpen={isOpen} />
       </button>
       {isOpen ? (
         <div className="reasoning-panel-content">
@@ -580,7 +578,7 @@ const MemoMessageRow = React.memo(({
 
           <div className="message-bubble">
             <div className="message-assistant-body">
-              <ReasoningPanel reasoning={msg.reasoning} defaultOpen={isStreaming} />
+              <ReasoningPanel reasoning={msg.reasoning} defaultOpen={isStreaming} isStreaming={isStreaming} />
 
               <SafeMarkdown>
                 {msg.text}

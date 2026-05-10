@@ -570,10 +570,10 @@
 }
 
 .reasoning-panel {
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-hover) 60%, transparent), color-mix(in srgb, var(--bg-secondary) 40%, transparent));
-  box-shadow: var(--shadow-inset);
+  border-radius: var(--radius-md);
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  background: transparent;
   overflow: hidden;
 }
 
@@ -676,45 +676,51 @@
 .reasoning-panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0.55rem 0.85rem;
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
+  gap: 0.5rem;
+  width: fit-content;
+  padding: 0.4rem 0.6rem;
+  background: color-mix(in srgb, var(--bg-hover) 30%, transparent);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
   cursor: pointer;
-  transition: background-color var(--duration-fast), color var(--duration-fast);
+  transition: all var(--duration-fast);
+  user-select: none;
 }
 
 .reasoning-panel-header:hover {
-  background: color-mix(in srgb, var(--bg-hover) 50%, transparent);
+  background: color-mix(in srgb, var(--bg-hover) 70%, transparent);
   color: var(--text-primary);
+  border-color: var(--border-light);
 }
 
 .reasoning-panel-title {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: inherit;
 }
 
 .reasoning-panel-icon {
   opacity: 0.8;
+  width: 1em;
+  height: 1em;
 }
 
 .reasoning-panel-content {
-  padding: 0.5rem 0.85rem 0.65rem;
-  border-top: 1px solid var(--border-light);
+  margin-top: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid var(--border-light);
+  margin-left: 0.4rem;
 }
 
 .reasoning-markdown {
   font-size: 0.85rem;
   line-height: 1.6;
-  color: var(--text-secondary);
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .reasoning-markdown p,
