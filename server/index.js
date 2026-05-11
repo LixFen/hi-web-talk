@@ -1296,24 +1296,6 @@ app.post("/api/chat", async (request, response) => {
 
 const isProduction = process.env.NODE_ENV === "production";
 
-if (isProduction) {
-  const distDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
-
-  app.use(express.static(distDir, {
-    maxAge: "7d",
-    etag: true,
-    lastModified: true,
-  }));
-
-  app.get("*", (_request, response, next) => {
-    response.sendFile(path.join(distDir, "index.html"), (err) => {
-      if (err) {
-        next(err);
-      }
-    });
-  });
-}
-
 function validateEnvironment() {
   const errors = [];
 

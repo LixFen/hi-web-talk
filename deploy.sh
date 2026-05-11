@@ -122,6 +122,9 @@ deploy_mode="${deploy_mode:-1}"
 PORT=$(grep "^OPENAI_PORT=" .env 2>/dev/null | cut -d= -f2)
 PORT="${PORT:-8787}"
 
+# Docker 模式下导出前端静态产物到宿主机的目录
+STATIC_EXPORT_DIR="${STATIC_EXPORT_DIR:-./release/dist}"
+
 # ---------- 4. 执行部署 ----------
 echo ""
 echo -e "${YELLOW}[4/4]${NC} 开始部署..."
@@ -173,10 +176,12 @@ if [ "$deploy_mode" = "1" ]; then
 
     # 等待健康检查
     echo -n "  等待服务就绪"
+    HEALTHY=0
     for i in $(seq 1 30); do
         if curl -sf "http://localhost:${PORT}/api/health" &>/dev/null; then
             echo ""
             echo -e "${GREEN}  服务已就绪！${NC}"
+            HEALTHY=1
             break
         fi
         echo -n "."
@@ -186,6 +191,21 @@ if [ "$deploy_mode" = "1" ]; then
             echo -e "${YELLOW}  服务启动超时，请检查日志: ${COMPOSE_CMD} logs${NC}"
         fi
     done
+
+    if [ "$HEALTHY" = "1" ]; then
+        echo "  清理并导出前端静态产物到 ${STATIC_EXPORT_DIR}..."
+        rm -rf "$STATIC_EXPORT_DIR"
+        mkdir -p "$STATIC_EXPORT_DIR"
+
+        CONTAINER_ID=$($COMPOSE_CMD ps -q hi-web-talk | head -n 1)
+        if [ -z "$CONTAINER_ID" ]; then
+            echo -e "${RED}  未找到运行中的容器，无法导出静态产物${NC}"
+            exit 1
+        fi
+
+        docker cp "${CONTAINER_ID}:/app/dist/." "$STATIC_EXPORT_DIR/"
+        echo -e "${GREEN}  已导出到: ${STATIC_EXPORT_DIR}${NC}"
+    fi
 
     # 显示结果
     echo ""
