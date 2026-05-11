@@ -3,7 +3,7 @@ import {
   getProviderDefinitionByType,
   resolveModelCredential,
 } from "./modelConfigService.js";
-import { getAdapter } from "./providerAdapters/adapterFactory.js";
+import { getAdapter, clearAdapterCache } from "./providerAdapters/adapterFactory.js";
 
 export async function callProviderModel({ modelConfig, provider, model, messages }) {
   const resolvedModelConfig = modelConfig ?? createLegacyModelConfig(provider, model);
@@ -61,4 +61,8 @@ export async function streamProviderModel({ modelConfig, provider, model, messag
 
   const adapter = getAdapter(resolvedModelConfig, credential);
   return adapter.stream({ messages, onChunk });
+}
+
+export function invalidateModelAdapterCache() {
+  clearAdapterCache();
 }

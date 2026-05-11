@@ -10,6 +10,7 @@ function getAdapterCacheKey(modelConfig, credential) {
     providerType: modelConfig.providerType,
     baseURL: modelConfig.baseURL || "",
     apiKeyHash: credential.apiKey ? credential.apiKey.slice(-8) : "",
+    alias: modelConfig.alias,
   });
 }
 
@@ -44,4 +45,13 @@ export function getAdapter(modelConfig, credential) {
   }
 
   return adapterCache.get(cacheKey);
+}
+
+export function invalidateAdapterCache(modelConfig, credential) {
+  const cacheKey = getAdapterCacheKey(modelConfig, credential);
+  adapterCache.delete(cacheKey);
+}
+
+export function clearAdapterCache() {
+  adapterCache.clear();
 }

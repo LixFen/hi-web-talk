@@ -27,7 +27,7 @@ import {
   appendErrorLog,
   listErrorLogs,
 } from "./services/errorLogService.js";
-import { callProviderModel, streamProviderModel } from "./services/llmProviderService.js";
+import { callProviderModel, streamProviderModel, invalidateModelAdapterCache } from "./services/llmProviderService.js";
 import { streamSessionManager } from "./services/streamSessionManager.js";
 import { saveAttachment, readAttachment, updateAttachmentBlockSHA1 } from "./services/attachmentService.js";
 import { resolveAttachmentMessages } from "./services/providerAdapters/attachmentResolver.js";
@@ -344,6 +344,7 @@ app.post("/api/models", authenticateToken, async (request, response) => {
 app.put("/api/models/:alias", authenticateToken, async (request, response) => {
   try {
     const model = await updateModel(request.params.alias, parseModelPayload(request.body), request.user.id, request.user.role);
+    invalidateModelAdapterCache();
     const models = await listModels(request.user.id, request.user.role);
     response.json({
       model: models.find((item) => item.alias === model.alias) ?? null,
