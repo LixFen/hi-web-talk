@@ -122,8 +122,8 @@ deploy_mode="${deploy_mode:-1}"
 PORT=$(grep "^OPENAI_PORT=" .env 2>/dev/null | cut -d= -f2)
 PORT="${PORT:-8787}"
 
-# Docker 模式下导出前端静态产物到宿主机的目录
-STATIC_EXPORT_DIR="${STATIC_EXPORT_DIR:-./release/dist}"
+# Docker 模式下导出前端静态产物到公共目录
+STATIC_EXPORT_DIR="${STATIC_EXPORT_DIR:-/var/www/hi-web-talk/dist}"
 
 # ---------- 4. 执行部署 ----------
 echo ""
