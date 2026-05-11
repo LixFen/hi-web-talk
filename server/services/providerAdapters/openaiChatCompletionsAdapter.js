@@ -106,7 +106,7 @@ export function createOpenAIChatCompletionsAdapter(modelConfig, credential) {
 
     const extraBody = buildExtraBody(modelConfig);
     if (extraBody) {
-      requestBody.extra_body = extraBody;
+      Object.assign(requestBody, extraBody);
     }
 
     const completion = await client.chat.completions.create(requestBody);
@@ -134,7 +134,7 @@ export function createOpenAIChatCompletionsAdapter(modelConfig, credential) {
 
     const extraBody = buildExtraBody(modelConfig);
     if (extraBody) {
-      requestBody.extra_body = extraBody;
+      Object.assign(requestBody, extraBody);
     }
 
     const stream = await client.chat.completions.create(requestBody);
