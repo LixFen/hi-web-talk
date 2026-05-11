@@ -194,8 +194,8 @@ if [ "$deploy_mode" = "1" ]; then
 
     if [ "$HEALTHY" = "1" ]; then
         echo "  清理并导出前端静态产物到 ${STATIC_EXPORT_DIR}..."
-        rm -rf "$STATIC_EXPORT_DIR"
-        mkdir -p "$STATIC_EXPORT_DIR"
+        sudo rm -rf "$STATIC_EXPORT_DIR"
+        sudo mkdir -p "$STATIC_EXPORT_DIR"
 
         CONTAINER_ID=$($COMPOSE_CMD ps -q hi-web-talk | head -n 1)
         if [ -z "$CONTAINER_ID" ]; then
