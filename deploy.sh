@@ -124,6 +124,7 @@ PORT="${PORT:-8787}"
 
 # Docker 模式下导出前端静态产物到公共目录
 STATIC_EXPORT_DIR="${STATIC_EXPORT_DIR:-/var/www/hi-web-talk/dist}"
+STATIC_EXPORT_WORKDIR="${STATIC_EXPORT_WORKDIR:-/tmp/hi-web-talk-dist-export}"
 
 # ---------- 4. 执行部署 ----------
 echo ""
@@ -195,7 +196,8 @@ if [ "$deploy_mode" = "1" ]; then
     if [ "$HEALTHY" = "1" ]; then
         echo "  清理并导出前端静态产物到 ${STATIC_EXPORT_DIR}..."
         sudo rm -rf "$STATIC_EXPORT_DIR"
-        sudo mkdir -p "$STATIC_EXPORT_DIR"
+        rm -rf "$STATIC_EXPORT_WORKDIR"
+        mkdir -p "$STATIC_EXPORT_WORKDIR"
 
         CONTAINER_ID=$($COMPOSE_CMD ps -q hi-web-talk | head -n 1)
         if [ -z "$CONTAINER_ID" ]; then
@@ -203,7 +205,12 @@ if [ "$deploy_mode" = "1" ]; then
             exit 1
         fi
 
-        docker cp "${CONTAINER_ID}:/app/dist/." "$STATIC_EXPORT_DIR/"
+        docker cp "${CONTAINER_ID}:/app/dist/." "$STATIC_EXPORT_WORKDIR/"
+        sudo mkdir -p "$STATIC_EXPORT_DIR"
+        sudo cp -a "$STATIC_EXPORT_WORKDIR"/. "$STATIC_EXPORT_DIR"/
+        sudo find "$STATIC_EXPORT_DIR" -type d -exec chmod 755 {} \;
+        sudo find "$STATIC_EXPORT_DIR" -type f -exec chmod 644 {} \;
+        rm -rf "$STATIC_EXPORT_WORKDIR"
         echo -e "${GREEN}  已导出到: ${STATIC_EXPORT_DIR}${NC}"
     fi
 
