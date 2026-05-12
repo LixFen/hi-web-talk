@@ -145,7 +145,7 @@ export default function App() {
   const drawerSwipeDetectedRef = useRef(false);
 
   const layoutMode = resolveLayoutMode(viewportWidth);
-  const showSidebarMenuButton = layoutMode !== "desktop";
+  const showSidebarMenuButton = layoutMode === "mobile";
 
   function handleLogin(user, token) {
     setToken(token);
@@ -1337,12 +1337,12 @@ export default function App() {
     }
 
     if (!activeConversation) {
-      return <ChatHero />;
+      return <ChatHero hasModels={enabledModels.length > 0} onOpenSettings={() => setOpenSettingsPanel("models")} />;
     }
 
     if (currentViewMode === "chat") {
       if (!hasStartedConversation) {
-        return <ChatHero />;
+        return <ChatHero hasModels={enabledModels.length > 0} onOpenSettings={() => setOpenSettingsPanel("models")} />;
       }
 
       return (
@@ -1433,13 +1433,13 @@ export default function App() {
           onToggleCollapse={handleToggleSidebarMenu}
           onOpenSettings={() => setIsSettingsMenuOpen(true)}
           className={layoutMode === "tablet" ? "sidebar-rail" : ""}
-          showHeaderToggle={layoutMode === "desktop"}
+          showHeaderToggle={layoutMode !== "mobile"}
           currentUser={currentUser}
           onLogout={handleLogout}
         />
       ) : null}
 
-      {showSidebarMenuButton ? (
+      {layoutMode !== "desktop" ? (
         <>
           <div
             className={`sidebar-drawer-backdrop ${isSidebarDrawerOpen ? "open" : ""}`.trim()}
@@ -1508,29 +1508,16 @@ export default function App() {
             </div>
           ) : null}
 
-          {(error || enabledModels.length === 0) && (
+          {error && (
             <div className="global-toast-container">
-              {enabledModels.length === 0 ? (
-                <div className="toast-message warning">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                  <span>当前没有启用模型，请先在"模型设置"里新增或启用一个模型。</span>
-                </div>
-              ) : null}
-
-              {error ? (
-                <div className="toast-message error">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                  <span>{error}</span>
-                </div>
-              ) : null}
+              <div className="toast-message error">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span>{error}</span>
+              </div>
             </div>
           )}
         </div>
