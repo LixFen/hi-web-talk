@@ -524,7 +524,7 @@ export async function getSessionDetail(sessionHash, cachedData = null, viewMode 
       })
     : currentSession;
   const chainBlocks = resolvedActiveBlockSHA1
-    ? await getChainBlocks(sessionHash, resolvedActiveBlockSHA1)
+    ? await getChainBlocks(sessionHash, resolvedActiveBlockSHA1, allBlocks)
     : [];
   const summaryMap = buildSummaryMap(summaryRecords);
   const activeChainSHA1Set = new Set(chainBlocks.map((block) => block.sha1));

@@ -149,12 +149,19 @@ export async function listBlocks(sessionHash) {
   return sortBlocksByCreatedAt(listBlockRecords(sessionHash));
 }
 
-export async function getChainBlocks(sessionHash, activeBlockSHA1) {
+export async function getChainBlocks(sessionHash, activeBlockSHA1, preloadedBlocks = null) {
+  if (!activeBlockSHA1) {
+    return [];
+  }
+
+  const allBlocks = preloadedBlocks ?? await listBlocks(sessionHash);
+  const blockMap = new Map(allBlocks.map((block) => [block.sha1, block]));
+
   const chain = [];
   let currentSHA1 = activeBlockSHA1;
 
   while (currentSHA1) {
-    const block = await readBlock(sessionHash, currentSHA1);
+    const block = blockMap.get(currentSHA1);
 
     if (!block) {
       throw new Error(`找不到 block: ${currentSHA1}`);

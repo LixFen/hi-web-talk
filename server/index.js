@@ -837,9 +837,6 @@ app.post("/api/blocks/reply", authenticateToken, async (request, response) => {
     });
 
     const attachmentIds = extractAttachmentIds(normalizedPrompt);
-    if (attachmentIds.length > 0) {
-      await Promise.all(attachmentIds.map((id) => updateAttachmentBlockSHA1(sessionHash, id, block.sha1)));
-    }
 
     await updateSession(sessionHash, {
       title: getSuggestedSessionTitle(
@@ -850,7 +847,11 @@ app.post("/api/blocks/reply", authenticateToken, async (request, response) => {
       activeBlockSHA1: block.sha1,
     });
 
-    const detail = await getSessionDetail(sessionHash, { summaries: context.summaries, adaptationMap: context.adaptationMap });
+    const attachmentPromise = attachmentIds.length > 0
+      ? Promise.all(attachmentIds.map((id) => updateAttachmentBlockSHA1(sessionHash, id, block.sha1)))
+      : Promise.resolve();
+    const detailPromise = getSessionDetail(sessionHash, { summaries: context.summaries, adaptationMap: context.adaptationMap });
+    const [detail] = await Promise.all([detailPromise, attachmentPromise]);
     response.status(201).json(detail);
   } catch (error) {
     await tryAppendErrorLog({
@@ -1012,9 +1013,6 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
     });
 
     const streamAttachmentIds = extractAttachmentIds(normalizedPrompt);
-    if (streamAttachmentIds.length > 0) {
-      await Promise.all(streamAttachmentIds.map((id) => updateAttachmentBlockSHA1(sessionHash, id, block.sha1)));
-    }
 
     await updateSession(sessionHash, {
       title: getSuggestedSessionTitle(promptPreview, session.title),
@@ -1023,7 +1021,11 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
     });
     logStream("session-updated", { sessionHash, blockSHA1: block.sha1 });
 
-    const detail = await getSessionDetail(sessionHash, { summaries: context.summaries, adaptationMap: context.adaptationMap });
+    const attachmentPromise = streamAttachmentIds.length > 0
+      ? Promise.all(streamAttachmentIds.map((id) => updateAttachmentBlockSHA1(sessionHash, id, block.sha1)))
+      : Promise.resolve();
+    const detailPromise = getSessionDetail(sessionHash, { summaries: context.summaries, adaptationMap: context.adaptationMap });
+    const [detail] = await Promise.all([detailPromise, attachmentPromise]);
     logStream("detail-ready", {
       sessionHash,
       messageCount: detail.messages.length,
