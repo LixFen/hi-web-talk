@@ -2674,6 +2674,7 @@
   box-shadow: var(--shadow-md);
   transition: box-shadow var(--duration-fast), border-color var(--duration-fast), transform var(--duration-fast);
   cursor: pointer;
+  overflow: hidden;
 }
 
 .graph-node:hover {
@@ -2743,9 +2744,26 @@
   font-weight: 500;
 }
 
+.graph-node-title-row {
+  overflow: hidden;
+  min-width: 0;
+}
+
 .graph-node-type,
 .graph-node-sha {
   font-family: var(--font-mono);
+}
+
+.graph-node-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.graph-node-sha {
+  flex-shrink: 0;
 }
 
 .graph-node-content {
