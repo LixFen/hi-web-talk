@@ -443,17 +443,27 @@ export async function deleteBlockTree(sessionHash, blockSHA1) {
   };
 }
 
-export async function setActiveBlock(sessionHash, blockSHA1) {
+export async function setActiveBlock(sessionHash, blockSHA1, focusedBlockSHA1) {
   const targetBlock = await readBlock(sessionHash, blockSHA1);
 
   if (!targetBlock) {
     throw new Error(`找不到目标 block: ${blockSHA1}`);
   }
 
-  await updateSession(sessionHash, {
+  const updateFields = {
     activeBlockSHA1: blockSHA1,
     updatedAt: new Date().toISOString(),
-  });
+  };
+
+  if (focusedBlockSHA1) {
+    const currentSession = await getSessionOrThrow(sessionHash);
+    updateFields.viewState = {
+      ...(currentSession.viewState ?? {}),
+      focusedBlockSHA1,
+    };
+  }
+
+  await updateSession(sessionHash, updateFields);
 
   return getSessionDetail(sessionHash);
 }

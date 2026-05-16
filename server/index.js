@@ -565,7 +565,7 @@ app.patch("/api/sessions/:sessionHash/focused-block", authenticateToken, require
 });
 
 app.post("/api/sessions/:sessionHash/active-block", authenticateToken, requireSessionOwnership(), async (request, response) => {
-  const { blockSHA1 } = request.body ?? {};
+  const { blockSHA1, focusedBlockSHA1 } = request.body ?? {};
 
   if (!blockSHA1) {
     response.status(400).json({ error: "blockSHA1 不能为空。" });
@@ -573,7 +573,7 @@ app.post("/api/sessions/:sessionHash/active-block", authenticateToken, requireSe
   }
 
   try {
-    const detail = await setActiveBlock(request.params.sessionHash, blockSHA1);
+    const detail = await setActiveBlock(request.params.sessionHash, blockSHA1, focusedBlockSHA1);
     response.json(detail);
   } catch (error) {
     response.status(404).json({
@@ -764,7 +764,7 @@ app.post("/api/blocks/:blockSHA1/branch", authenticateToken, async (request, res
   }
 
   try {
-    const detail = await setActiveBlock(sessionHash, request.params.blockSHA1);
+    const detail = await setActiveBlock(sessionHash, request.params.blockSHA1, request.params.blockSHA1);
     response.json(detail);
   } catch (error) {
     response.status(404).json({

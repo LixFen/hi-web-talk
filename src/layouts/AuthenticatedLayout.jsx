@@ -52,7 +52,6 @@ export default function AuthenticatedLayout() {
     activeBlockSHA1,
     currentViewMode,
     isLoading: sessionLoading,
-    isSwitchingView,
     isBootstrapping: sessionBootstrapping,
     error: sessionError,
     selectBlock,
@@ -292,16 +291,8 @@ export default function AuthenticatedLayout() {
           </div>
         </header>
 
-        <div
-          className={`main-panel-content ${isSwitchingView ? "switching-view" : ""}`.trim()}
-        >
+        <div className="main-panel-content">
           <Outlet />
-
-          {isSwitchingView ? (
-            <div className="view-switching-overlay" aria-hidden="true">
-              <span className="view-switching-spinner" />
-            </div>
-          ) : null}
 
           {displayError && (
             <div className="global-toast-container">

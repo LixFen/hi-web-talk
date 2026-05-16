@@ -46,7 +46,7 @@ function resolveFocusedBlockSHA1(detail, fallback = "") {
 }
 
 const SESSION_DETAIL_CACHE = new Map();
-const SESSION_CACHE_MAX = 3;
+const SESSION_CACHE_MAX = 10;
 const SESSION_CACHE_TTL = 5 * 60 * 1000;
 
 function getFromCache(sessionHash) {
@@ -81,7 +81,6 @@ export function SessionProvider({ children }) {
   const [activeSessionDetail, setActiveSessionDetail] = useState(null);
   const [viewMode, setViewMode] = useState("chat");
   const [isLoading, setIsLoading] = useState(false);
-  const [isSwitchingView, setIsSwitchingView] = useState(false);
   const [error, setError] = useState("");
   const [chatNavigationRequest, setChatNavigationRequest] = useState(null);
   const [focusedBlockSHA1State, setFocusedBlockSHA1State] = useState("");
@@ -356,12 +355,8 @@ export function SessionProvider({ children }) {
       const previousMode = currentViewMode;
       setViewMode(nextMode);
       setError("");
-      setIsSwitchingView(true);
       const sessionHash = activeSessionDetail?.session?.sessionHash;
-      if (!sessionHash) {
-        setIsSwitchingView(false);
-        return;
-      }
+      if (!sessionHash) return;
       const version = ++viewSwitchVersionRef.current;
       updateSessionViewState(sessionHash, nextMode)
         .then((detail) => {
@@ -377,11 +372,6 @@ export function SessionProvider({ children }) {
           setError(
             err instanceof Error ? err.message : "切换视图失败，请稍后再试。",
           );
-        })
-        .finally(() => {
-          if (version === viewSwitchVersionRef.current) {
-            setIsSwitchingView(false);
-          }
         });
     },
     [currentViewMode, activeSessionDetail, applySessionDetail],
@@ -394,8 +384,7 @@ export function SessionProvider({ children }) {
       setError("");
       setFocusedBlockSHA1State(blockSHA1);
       try {
-        await setFocusedBlock(sessionHash, blockSHA1);
-        const detail = await setActiveBlock(sessionHash, blockSHA1);
+        const detail = await setActiveBlock(sessionHash, blockSHA1, blockSHA1);
         applySessionDetail(detail, {
           reason: "activate-block",
           behavior: "auto",
@@ -423,7 +412,6 @@ export function SessionProvider({ children }) {
           reason: "branch-from-block",
           behavior: "auto",
         });
-        await setFocusedBlock(sessionHash, blockSHA1);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "创建分支失败，请稍后再试。",
@@ -669,7 +657,6 @@ export function SessionProvider({ children }) {
       viewMode,
       currentViewMode,
       isLoading,
-      isSwitchingView,
       isBootstrapping,
       error,
       streamingReply,
@@ -715,7 +702,6 @@ export function SessionProvider({ children }) {
       viewMode,
       currentViewMode,
       isLoading,
-      isSwitchingView,
       isBootstrapping,
       error,
       streamingReply,

@@ -332,10 +332,10 @@ export function branchFromBlock({ sessionHash, blockSHA1 }) {
   });
 }
 
-export function setActiveBlock(sessionHash, blockSHA1) {
+export function setActiveBlock(sessionHash, blockSHA1, focusedBlockSHA1) {
   return requestJson(`/api/sessions/${sessionHash}/active-block`, {
     method: "POST",
-    body: JSON.stringify({ blockSHA1 }),
+    body: JSON.stringify({ blockSHA1, focusedBlockSHA1 }),
   });
 }
 
