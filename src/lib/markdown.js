@@ -25,6 +25,62 @@ marked.use(
 
 marked.setOptions({ gfm: true, breaks: false });
 
+marked.use({
+  renderer: {
+    code(token) {
+      const { text, lang, raw } = token;
+      const escaped = token.escaped;
+
+      const langCode = (lang || "").match(/^\S*/)[0];
+
+      let title = "";
+      if (langCode) {
+        title = langCode.charAt(0).toUpperCase() + langCode.slice(1);
+        if (raw) {
+          const firstLine = raw.split("\n")[0];
+          const afterLang = firstLine.replace(/^```[\w-]*\s*/, "").trim();
+          if (afterLang) {
+            title = afterLang;
+          }
+        }
+      }
+
+      const langClass = langCode
+        ? ` language-${escapeHtml(langCode)}`
+        : "";
+      const content = escaped
+        ? text.replace(/\n$/, "")
+        : highlightCode(text, langCode);
+
+      if (langCode && title) {
+        return (
+          `<div class="code-block" data-lang="${escapeHtml(langCode)}">` +
+          `<div class="code-block-title">${escapeHtml(title)}</div>` +
+          `<pre><code class="hljs${langClass}">${content}</code></pre>` +
+          `</div>`
+        );
+      }
+
+      return `<pre><code class="hljs${langClass}">${content}</code></pre>`;
+    },
+  },
+});
+
+function highlightCode(code, lang) {
+  if (lang && hljs.getLanguage(lang)) {
+    try {
+      return hljs.highlight(code, { language: lang }).value;
+    } catch {
+      /* fall through */
+    }
+  }
+  try {
+    return hljs.highlightAuto(code).value;
+  } catch {
+    return escapeHtml(code);
+  }
+}
+
 function escapeHtml(text) {
   const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
   return String(text).replace(/[&<>"]/g, (ch) => map[ch]);
