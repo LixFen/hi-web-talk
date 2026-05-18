@@ -42,6 +42,7 @@ export default function AuthenticatedLayout() {
     changeTitleModel,
     changeSummaryModel,
     error: appError,
+    toast,
   } = useApp();
   const {
     activeConversation,
@@ -310,6 +311,14 @@ export default function AuthenticatedLayout() {
                   <line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
                 <span>{displayError}</span>
+              </div>
+            </div>
+          )}
+
+          {toast.message && (
+            <div className="global-toast-container">
+              <div className={`toast-message ${toast.type}`}>
+                <span>{toast.message}</span>
               </div>
             </div>
           )}

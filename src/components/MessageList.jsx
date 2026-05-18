@@ -11,6 +11,7 @@
 import SafeMarkdown from "./SafeMarkdown";
 import { getAttachmentUrl } from "../lib/chatApi";
 import ContextMenu from "./ContextMenu";
+import { useApp } from "../contexts/AppContext";
 
 const READ_MARKER_SELECTOR = "[data-read-block-sha1]";
 const READ_MARKER_ROOT_MARGIN = "0px 0px -35% 0px";
@@ -546,7 +547,10 @@ const MemoMessageRow = React.memo(({
   const isStreaming = msg.id === "pending-assistant-message";
 
   const handleContextMenu = (event) => {
-    if (msg.role !== "assistant" || !msg.blockSHA1) return;
+    const hasSelection = window.getSelection()?.toString().length > 0;
+    if (msg.role !== "assistant" || !msg.blockSHA1) {
+      if (!hasSelection) return;
+    }
     event.preventDefault();
     onContextMenu(msg, event.clientX, event.clientY);
   };
@@ -805,6 +809,7 @@ const MessageList = forwardRef(({
 }, ref) => {
   const containerRef = useRef(null);
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, msg: null });
+  const { showToast } = useApp();
   const hasInitializedRef = useRef(false);
   const lastHandledScrollRequestIdRef = useRef(0);
   const visibleReadBlockSHA1sRef = useRef(new Set());
@@ -1177,6 +1182,19 @@ const MessageList = forwardRef(({
     const branchInfo = msg.branchInfo;
     const adaptationInfo = msg.adaptationInfo;
 
+    const selectedText = window.getSelection()?.toString();
+    if (selectedText?.length > 0) {
+      items.push({
+        key: "copy-selection",
+        label: "复制",
+        onClick: () => {
+          navigator.clipboard.writeText(selectedText).then(() => {
+            showToast("已复制");
+          });
+        },
+      });
+    }
+
     const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     if (isMobileUA) {
@@ -1264,7 +1282,7 @@ const MessageList = forwardRef(({
     }
 
     return items;
-  }, [contextMenu.msg, isLoading, visibleToolbarDefinitions, onBranchFromBlock, onActivateBlock, onRegenerate, onToggleAdaptation, onRunAdaptation]);
+  }, [contextMenu.msg, isLoading, visibleToolbarDefinitions, onBranchFromBlock, onActivateBlock, onRegenerate, onToggleAdaptation, onRunAdaptation, showToast]);
 
   return (
     <div className="messages-container" ref={containerRef}>

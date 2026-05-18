@@ -50,6 +50,7 @@ export function AppProvider({ children }) {
   const [isModelSaving, setIsModelSaving] = useState(false);
   const [isAppearanceSaving, setIsAppearanceSaving] = useState(false);
   const [isInteractionSaving, setIsInteractionSaving] = useState(false);
+  const [toast, setToast] = useState({ message: "", type: "info" });
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -330,6 +331,17 @@ export function AppProvider({ children }) {
     [updateInteractionSettings],
   );
 
+  const showToast = useCallback((message, type = "info") => {
+    setToast({ message, type });
+  }, []);
+
+  useEffect(() => {
+    if (!toast.message) return undefined;
+    if (toast.type === "error") return undefined;
+    const timer = setTimeout(() => setToast({ message: "", type: "info" }), 2000);
+    return () => clearTimeout(timer);
+  }, [toast.message, toast.type]);
+
   const value = useMemo(
     () => ({
       modelOptions,
@@ -341,11 +353,13 @@ export function AppProvider({ children }) {
       selectedModel,
       isBootstrapping,
       error,
+      toast,
       isModelSaving,
       isAppearanceSaving,
       isInteractionSaving,
       setSelectedModelId,
       setError,
+      showToast,
       createModel: handleCreateModel,
       updateModel: handleUpdateModel,
       deleteModel: handleDeleteModel,
@@ -368,6 +382,7 @@ export function AppProvider({ children }) {
       selectedModel,
       isBootstrapping,
       error,
+      toast,
       isModelSaving,
       isAppearanceSaving,
       isInteractionSaving,
@@ -382,6 +397,7 @@ export function AppProvider({ children }) {
       handleToggleSingleChatAdaptationButton,
       handleChangeTitleModel,
       handleChangeSummaryModel,
+      showToast,
     ],
   );
 
