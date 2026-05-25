@@ -10,9 +10,12 @@ import {
   deleteBlockRecords,
   deleteSessionRecord,
   ensureDatabase,
-  listSessionRecords,
+  listSessionRecordsWithCount,
   readSessionRecord,
   upsertSessionRecord,
+  deleteSummaryRecordsForBlocks,
+  deleteErrorRecordsForBlocks,
+  deleteAdaptationRecordsForBlocks,
 } from "../lib/database.js";
 import { ensureDir } from "../lib/fileStore.js";
 import {
@@ -291,35 +294,56 @@ export async function createSession(userId) {
   await ensureDataLayout();
 
   const sessionHash = createSessionHash();
-  const appSettings = await getAppSettings(userId);
-  const systemPrompt = appSettings.defaultSystemPrompt || DEFAULT_SYSTEM_PROMPT;
-  const rootBlock = await createSystemRootBlock(sessionHash, systemPrompt);
   const now = new Date().toISOString();
 
-  const session = {
-    sessionHash,
-    title: DEFAULT_SESSION_TITLE,
-    createdAt: now,
-    updatedAt: now,
-    rootBlockSHA1: rootBlock.sha1,
-    activeBlockSHA1: rootBlock.sha1,
-    viewState: {
-      mode: "chat",
-      focusedBlockSHA1: rootBlock.sha1,
-    },
-    userId,
-  };
+  try {
+    await upsertSessionRecord({
+      sessionHash,
+      title: DEFAULT_SESSION_TITLE,
+      createdAt: now,
+      updatedAt: now,
+      rootBlockSHA1: null,
+      activeBlockSHA1: null,
+      viewState: { mode: "chat", focusedBlockSHA1: null },
+      userId,
+    });
 
-  await ensureSessionArtifacts(sessionHash);
-  await upsertSessionRecord(session);
+    const appSettings = await getAppSettings(userId);
+    const systemPrompt = appSettings.defaultSystemPrompt || DEFAULT_SYSTEM_PROMPT;
+    const rootBlock = await createSystemRootBlock(sessionHash, systemPrompt);
 
-  return getSessionDetail(sessionHash);
+    await upsertSessionRecord({
+      sessionHash,
+      title: DEFAULT_SESSION_TITLE,
+      createdAt: now,
+      updatedAt: now,
+      rootBlockSHA1: rootBlock.sha1,
+      activeBlockSHA1: rootBlock.sha1,
+      viewState: {
+        mode: "chat",
+        focusedBlockSHA1: rootBlock.sha1,
+      },
+      userId,
+    });
+
+    await ensureSessionArtifacts(sessionHash);
+
+    return getSessionDetail(sessionHash);
+  } catch (error) {
+    try {
+      deleteBlockRecords(sessionHash);
+      deleteSessionRecord(sessionHash);
+      await fs.rm(getSessionDir(sessionHash), { recursive: true, force: true });
+    } catch {
+      // Preserve the original failure; best-effort cleanup only.
+    }
+    throw error;
+  }
 }
 
-export async function listSessions(userId = null) {
+export async function listSessions(userId = null, options = {}) {
   await ensureDataLayout();
-
-  return listSessionRecords(userId);
+  return listSessionRecordsWithCount(userId, options);
 }
 
 export async function readSession(sessionHash) {
@@ -397,6 +421,15 @@ export async function updateSessionTitle(sessionHash, title) {
 export async function deleteSession(sessionHash) {
   const session = await getSessionOrThrow(sessionHash);
   const targetDir = assertSessionDirSafe(sessionHash);
+
+  // Soft delete does not trigger FK CASCADE, so manual cleanup of child tables is required.
+  // CASCADE only fires on hard DELETE FROM sessions, serving as a safety net for accidental deletes.
+  await Promise.all([
+    deleteSummariesForBlocks(sessionHash),
+    deleteAdaptationRecordsForBlocks(sessionHash),
+    deleteErrorRecordsForBlocks(sessionHash),
+    deleteAttachmentsForBlocks(sessionHash),
+  ]);
 
   deleteSessionRecord(sessionHash);
   deleteBlockRecords(sessionHash);
@@ -495,17 +528,25 @@ export async function updateSessionViewState(sessionHash, partialViewState, view
 
 export async function getSessionDetail(sessionHash, cachedData = null, viewMode = "chat") {
   const currentSession = await getSessionOrThrow(sessionHash);
-  const [allBlocks, summaryRecords, adaptationMap] = cachedData
-    ? await Promise.all([
-        listBlocks(sessionHash),
-        Promise.resolve(cachedData.summaries ?? await listSummaries(sessionHash)),
-        Promise.resolve(cachedData.adaptationMap ?? await getSessionAdaptationMap(sessionHash)),
-      ])
-    : await Promise.all([
-        listBlocks(sessionHash),
-        listSummaries(sessionHash),
-        getSessionAdaptationMap(sessionHash),
-      ]);
+
+  let summaryRecords;
+  let adaptationMap;
+
+  if (cachedData) {
+    [summaryRecords, adaptationMap] = await Promise.all([
+      Promise.resolve(cachedData.summaries ?? (await listSummaries(sessionHash)).summaries),
+      Promise.resolve(cachedData.adaptationMap ?? await getSessionAdaptationMap(sessionHash)),
+    ]);
+  } else {
+    const [summariesResult, adaptationMapResult] = await Promise.all([
+      listSummaries(sessionHash),
+      getSessionAdaptationMap(sessionHash),
+    ]);
+    summaryRecords = summariesResult.summaries;
+    adaptationMap = adaptationMapResult;
+  }
+
+  const allBlocks = await listBlocks(sessionHash);
 
   const resolvedActiveBlockSHA1 = resolveActiveBlockSHA1(currentSession, allBlocks);
   const resolvedFocusedBlockSHA1 = resolveFocusedBlockSHA1(

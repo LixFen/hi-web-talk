@@ -141,8 +141,8 @@ export function listAdaptationDefinitions() {
   return requestJson("/api/adaptation-definitions");
 }
 
-export function listSessions() {
-  return requestJson("/api/sessions");
+export function listSessions(page = 1, pageSize = 50) {
+  return requestJson(`/api/sessions?page=${page}&pageSize=${pageSize}`);
 }
 
 export function createSession() {

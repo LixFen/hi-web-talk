@@ -1,7 +1,7 @@
 ﻿import { DEFAULT_SYSTEM_PROMPT } from "../constants.js";
 import {
   deleteSummaryRecordsForBlocks,
-  listSummaryRecords,
+  listSummaryRecordsWithCount,
   readSummaryRecord,
   upsertSummaryRecord,
 } from "../lib/database.js";
@@ -60,8 +60,8 @@ async function syncSummaryAdaptation(sessionHash, blockSHA1, partialRecord) {
   });
 }
 
-export async function listSummaries(sessionHash) {
-  return listSummaryRecords(sessionHash);
+export async function listSummaries(sessionHash, options = {}) {
+  return listSummaryRecordsWithCount(sessionHash, options);
 }
 
 export async function getSummaryByBlockSHA1(sessionHash, blockSHA1) {
@@ -71,7 +71,7 @@ export async function getSummaryByBlockSHA1(sessionHash, blockSHA1) {
     return summary;
   }
 
-  const summaries = await listSummaries(sessionHash);
+  const { summaries } = await listSummaries(sessionHash);
   return summaries.find((record) => record.blockSHA1 === blockSHA1) ?? null;
 }
 

@@ -2,11 +2,11 @@
 import {
   deleteErrorRecordsForBlocks,
   insertErrorRecord,
-  listErrorRecords,
+  listErrorRecordsWithCount,
 } from "../lib/database.js";
 
-export async function listErrorLogs(sessionHash) {
-  return listErrorRecords(sessionHash);
+export async function listErrorLogs(sessionHash, options = {}) {
+  return listErrorRecordsWithCount(sessionHash, options);
 }
 
 export async function appendErrorLog({
@@ -23,7 +23,6 @@ export async function appendErrorLog({
     return null;
   }
 
-  const logs = await listErrorLogs(sessionHash);
   const logEntry = {
     logId: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
@@ -58,8 +57,8 @@ export async function deleteErrorLogsForBlocks(sessionHash, blockSHA1s = []) {
     return 0;
   }
 
-  const beforeCount = listErrorRecords(sessionHash).length;
+  const { total: beforeCount } = await listErrorLogs(sessionHash);
   deleteErrorRecordsForBlocks(sessionHash, targetSHA1s);
-  const afterCount = listErrorRecords(sessionHash).length;
+  const { total: afterCount } = await listErrorLogs(sessionHash);
   return beforeCount - afterCount;
 }

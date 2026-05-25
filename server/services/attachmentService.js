@@ -142,7 +142,15 @@ export async function deleteAttachmentsForBlocks(sessionHash, blockSHA1s = []) {
 
     const attachmentIds = rows.map((row) => row.attachmentId);
     await deleteAttachments(sessionHash, attachmentIds);
+    return;
   }
+
+  const rows = db.prepare(`
+    SELECT attachmentId FROM attachments WHERE sessionHash = ?
+  `).all(sessionHash);
+
+  const attachmentIds = rows.map((row) => row.attachmentId);
+  await deleteAttachments(sessionHash, attachmentIds);
 }
 
 export async function updateAttachmentBlockSHA1(sessionHash, attachmentId, blockSHA1) {

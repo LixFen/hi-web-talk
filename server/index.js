@@ -10,6 +10,35 @@ import rateLimit from "express-rate-limit";
 import { DEFAULT_SYSTEM_PROMPT, JWT_SECRET, JWT_EXPIRES_IN } from "./constants.js";
 import { getDatabase } from "./lib/database.js";
 import { authenticateToken, authenticateTokenOrQuery, authenticateCookieOrBearer, requireSessionOwnership } from "./middleware/auth.js";
+import { validateBody, validateParams, validateQuery } from "./middleware/validate.js";
+import {
+  registerSchema,
+  loginSchema,
+  appSettingsSchema,
+  modelCreateSchema,
+  modelUpdateSchema,
+  attachmentUploadSchema,
+  blockReplySchema,
+  blockReplyStreamSchema,
+  blockBranchSchema,
+  blockRegenerateSchema,
+  sessionUpdateSchema,
+  sessionRegenerateTitleSchema,
+  sessionViewStateSchema,
+  sessionFocusedBlockSchema,
+  sessionActiveBlockSchema,
+  blockAdaptationUpsertSchema,
+  blockAdaptationRunSchema,
+  summaryUpdateSchema,
+  summaryGenerateSchema,
+  chatSchema,
+  pathSessionHashSchema,
+  pathBlockSHA1Schema,
+  pathModelAliasSchema,
+  pathAdaptationKeySchema,
+  pathAttachmentIdSchema,
+  paginationQuerySchema,
+} from "./lib/validation.js";
 import { loginUser, registerUser, getUserById } from "./services/userService.js";
 import { readSessionRecord } from "./lib/database.js";
 import {
@@ -113,9 +142,9 @@ const authLimiter = rateLimit({
 app.use("/api", apiLimiter);
 app.use(express.json({ limit: "1mb" }));
 
-app.post("/api/auth/register", authLimiter, async (request, response) => {
+app.post("/api/auth/register", authLimiter, validateBody(registerSchema), async (request, response) => {
   try {
-    const { username, password } = request.body ?? {};
+    const { username, password } = request.body;
     const result = await registerUser(username, password);
     response.cookie("auth_token", result.token, {
       httpOnly: true,
@@ -132,9 +161,9 @@ app.post("/api/auth/register", authLimiter, async (request, response) => {
   }
 });
 
-app.post("/api/auth/login", authLimiter, async (request, response) => {
+app.post("/api/auth/login", authLimiter, validateBody(loginSchema), async (request, response) => {
   try {
-    const { username, password } = request.body ?? {};
+    const { username, password } = request.body;
     const result = await loginUser(username, password);
     response.cookie("auth_token", result.token, {
       httpOnly: true,
@@ -310,9 +339,9 @@ app.get("/api/app-settings", authenticateToken, async (request, response) => {
   response.json({ settings: await getAppSettings(request.user.id) });
 });
 
-app.patch("/api/app-settings", authenticateToken, async (request, response) => {
+app.patch("/api/app-settings", authenticateToken, validateBody(appSettingsSchema), async (request, response) => {
   try {
-    const settings = await updateAppSettings(request.body ?? {}, request.user.id);
+    const settings = await updateAppSettings(request.body, request.user.id);
     response.json({ settings });
   } catch (error) {
     response.status(error?.status || 500).json({
@@ -326,7 +355,7 @@ app.get("/api/models", authenticateToken, async (request, response) => {
   response.json({ models });
 });
 
-app.post("/api/models", authenticateToken, async (request, response) => {
+app.post("/api/models", authenticateToken, validateBody(modelCreateSchema), async (request, response) => {
   try {
     const model = await createModel(parseModelPayload(request.body), request.user.id, request.user.role);
     const models = await listModels(request.user.id, request.user.role);
@@ -341,7 +370,7 @@ app.post("/api/models", authenticateToken, async (request, response) => {
   }
 });
 
-app.put("/api/models/:alias", authenticateToken, async (request, response) => {
+app.put("/api/models/:alias", authenticateToken, validateParams(pathModelAliasSchema), validateBody(modelUpdateSchema), async (request, response) => {
   try {
     const model = await updateModel(request.params.alias, parseModelPayload(request.body), request.user.id, request.user.role);
     invalidateModelAdapterCache();
@@ -357,7 +386,7 @@ app.put("/api/models/:alias", authenticateToken, async (request, response) => {
   }
 });
 
-app.delete("/api/models/:alias", authenticateToken, async (request, response) => {
+app.delete("/api/models/:alias", authenticateToken, validateParams(pathModelAliasSchema), async (request, response) => {
   try {
     const deleted = await deleteModel(request.params.alias, request.user.id, request.user.role);
     const models = await listModels(request.user.id, request.user.role);
@@ -372,14 +401,9 @@ app.delete("/api/models/:alias", authenticateToken, async (request, response) =>
   }
 });
 
-app.post("/api/attachments", authenticateToken, async (request, response) => {
+app.post("/api/attachments", authenticateToken, validateBody(attachmentUploadSchema), async (request, response) => {
   try {
-    const { sessionHash, fileName, mimeType, base64Data } = request.body ?? {};
-
-    if (!sessionHash || !base64Data || !mimeType) {
-      response.status(400).json({ error: "缺少必要参数。" });
-      return;
-    }
+    const { sessionHash, fileName, mimeType, base64Data } = request.body;
 
     const session = readSessionRecord(sessionHash);
 
@@ -422,7 +446,7 @@ app.post("/api/attachments", authenticateToken, async (request, response) => {
   }
 });
 
-app.get("/api/attachments/:attachmentId", authenticateCookieOrBearer, async (request, response) => {
+app.get("/api/attachments/:attachmentId", authenticateCookieOrBearer, validateParams(pathAttachmentIdSchema), async (request, response) => {
   try {
     const attachment = await readAttachment(request.params.attachmentId);
 
@@ -452,9 +476,20 @@ app.get("/api/adaptation-definitions", (_request, response) => {
   response.json({ definitions: listAdaptationDefinitions() });
 });
 
-app.get("/api/sessions", authenticateToken, async (request, response) => {
-  const sessions = await listSessions(request.user.id);
-  response.json({ sessions });
+app.get("/api/sessions", authenticateToken, validateQuery(paginationQuerySchema), async (request, response) => {
+  const { page, pageSize } = request.query;
+  const offset = (page - 1) * pageSize;
+
+  const { sessions, total } = await listSessions(request.user.id, { limit: pageSize, offset });
+  response.json({
+    sessions,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    },
+  });
 });
 
 app.post("/api/sessions", authenticateToken, async (request, response) => {
@@ -462,12 +497,24 @@ app.post("/api/sessions", authenticateToken, async (request, response) => {
   response.status(201).json(detail);
 });
 
-app.delete("/api/sessions/:sessionHash", authenticateToken, requireSessionOwnership(), async (request, response) => {
+app.delete("/api/sessions/:sessionHash", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateQuery(paginationQuerySchema), async (request, response) => {
   try {
     const result = await deleteSession(request.params.sessionHash);
+    const { page, pageSize } = request.query;
+    const { total } = await listSessions(request.user.id, { limit: pageSize, offset: 0 });
+    const totalPages = total > 0 ? Math.ceil(total / pageSize) : 0;
+    const nextPage = totalPages === 0 ? 1 : Math.min(page, totalPages);
+    const offset = (nextPage - 1) * pageSize;
+    const { sessions } = await listSessions(request.user.id, { limit: pageSize, offset });
     response.json({
       ...result,
-      sessions: await listSessions(request.user.id),
+      sessions,
+      pagination: {
+        page: nextPage,
+        pageSize,
+        total,
+        totalPages,
+      },
     });
   } catch (error) {
     response.status(error?.status || 404).json({
@@ -476,7 +523,7 @@ app.delete("/api/sessions/:sessionHash", authenticateToken, requireSessionOwners
   }
 });
 
-app.get("/api/sessions/:sessionHash", authenticateToken, requireSessionOwnership(), async (request, response) => {
+app.get("/api/sessions/:sessionHash", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), async (request, response) => {
   try {
     const detail = await getSessionDetail(request.params.sessionHash);
     response.json(detail);
@@ -487,16 +534,9 @@ app.get("/api/sessions/:sessionHash", authenticateToken, requireSessionOwnership
   }
 });
 
-app.patch("/api/sessions/:sessionHash", authenticateToken, requireSessionOwnership(), async (request, response) => {
-  const title = `${request.body?.title ?? ""}`.trim();
-
-  if (!title) {
-    response.status(400).json({ error: "session title 不能为空。" });
-    return;
-  }
-
+app.patch("/api/sessions/:sessionHash", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateBody(sessionUpdateSchema), async (request, response) => {
   try {
-    const detail = await updateSessionTitle(request.params.sessionHash, title);
+    const detail = await updateSessionTitle(request.params.sessionHash, request.body.title);
     response.json(detail);
   } catch (error) {
     response.status(error?.status || 404).json({
@@ -505,10 +545,10 @@ app.patch("/api/sessions/:sessionHash", authenticateToken, requireSessionOwnersh
   }
 });
 
-app.post("/api/sessions/:sessionHash/regenerate-title", authenticateToken, requireSessionOwnership(), async (request, response) => {
+app.post("/api/sessions/:sessionHash/regenerate-title", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateBody(sessionRegenerateTitleSchema), async (request, response) => {
   try {
-    const mode = request.body?.mode === "important" ? "important" : "default";
-    const useChain = request.body?.useChain !== false;
+    const mode = request.body.mode === "important" ? "important" : "default";
+    const useChain = request.body.useChain !== false;
     const detail = await generateTitleForSession(request.params.sessionHash, { mode, useChain, role: request.user.role });
     response.json(detail);
   } catch (error) {
@@ -518,16 +558,16 @@ app.post("/api/sessions/:sessionHash/regenerate-title", authenticateToken, requi
   }
 });
 
-app.patch("/api/sessions/:sessionHash/view-state", authenticateToken, requireSessionOwnership(), async (request, response) => {
+app.patch("/api/sessions/:sessionHash/view-state", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateBody(sessionViewStateSchema), async (request, response) => {
   try {
     const partialViewState = {};
 
-    if (Object.prototype.hasOwnProperty.call(request.body ?? {}, "mode")) {
-      partialViewState.mode = request.body?.mode;
+    if (Object.prototype.hasOwnProperty.call(request.body, "mode")) {
+      partialViewState.mode = request.body.mode;
     }
 
-    if (Object.prototype.hasOwnProperty.call(request.body ?? {}, "focusedBlockSHA1")) {
-      partialViewState.focusedBlockSHA1 = request.body?.focusedBlockSHA1;
+    if (Object.prototype.hasOwnProperty.call(request.body, "focusedBlockSHA1")) {
+      partialViewState.focusedBlockSHA1 = request.body.focusedBlockSHA1;
     }
 
     const detail = await updateSessionViewState(
@@ -543,18 +583,11 @@ app.patch("/api/sessions/:sessionHash/view-state", authenticateToken, requireSes
   }
 });
 
-app.patch("/api/sessions/:sessionHash/focused-block", authenticateToken, requireSessionOwnership(), async (request, response) => {
-  const { focusedBlockSHA1 } = request.body ?? {};
-
-  if (!focusedBlockSHA1) {
-    response.status(400).json({ error: "focusedBlockSHA1 不能为空。" });
-    return;
-  }
-
+app.patch("/api/sessions/:sessionHash/focused-block", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateBody(sessionFocusedBlockSchema), async (request, response) => {
   try {
     const result = await updateSessionFocusedBlock(
       request.params.sessionHash,
-      focusedBlockSHA1,
+      request.body.focusedBlockSHA1,
     );
     response.json(result);
   } catch (error) {
@@ -564,13 +597,8 @@ app.patch("/api/sessions/:sessionHash/focused-block", authenticateToken, require
   }
 });
 
-app.post("/api/sessions/:sessionHash/active-block", authenticateToken, requireSessionOwnership(), async (request, response) => {
-  const { blockSHA1, focusedBlockSHA1 } = request.body ?? {};
-
-  if (!blockSHA1) {
-    response.status(400).json({ error: "blockSHA1 不能为空。" });
-    return;
-  }
+app.post("/api/sessions/:sessionHash/active-block", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateBody(sessionActiveBlockSchema), async (request, response) => {
+  const { blockSHA1, focusedBlockSHA1 } = request.body;
 
   try {
     const detail = await setActiveBlock(request.params.sessionHash, blockSHA1, focusedBlockSHA1);
@@ -582,18 +610,28 @@ app.post("/api/sessions/:sessionHash/active-block", authenticateToken, requireSe
   }
 });
 
-app.get("/api/sessions/:sessionHash/adaptations", authenticateToken, requireSessionOwnership(), async (request, response) => {
+app.get("/api/sessions/:sessionHash/adaptations", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateQuery(paginationQuerySchema), async (request, response) => {
   try {
-    const adaptations = await listSessionAdaptations(request.params.sessionHash);
-    response.json({ adaptations });
+    const { page, pageSize } = request.query;
+    const offset = (page - 1) * pageSize;
+    const { adaptations, total } = await listSessionAdaptations(request.params.sessionHash, { limit: pageSize, offset });
+    response.json({
+      adaptations,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    });
   } catch (error) {
-    response.status(404).json({
+    response.status(error?.status || 500).json({
       error: error instanceof Error ? error.message : "读取适配项失败。",
     });
   }
 });
 
-app.get("/api/sessions/:sessionHash/blocks/:blockSHA1/adaptations", authenticateToken, requireSessionOwnership(), async (request, response) => {
+app.get("/api/sessions/:sessionHash/blocks/:blockSHA1/adaptations", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), async (request, response) => {
   try {
     const adaptations = await listBlockAdaptations(
       request.params.sessionHash,
@@ -607,19 +645,19 @@ app.get("/api/sessions/:sessionHash/blocks/:blockSHA1/adaptations", authenticate
   }
 });
 
-app.put("/api/sessions/:sessionHash/blocks/:blockSHA1/adaptations/:key", authenticateToken, requireSessionOwnership(), async (request, response) => {
+app.put("/api/sessions/:sessionHash/blocks/:blockSHA1/adaptations/:key", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateBody(blockAdaptationUpsertSchema), async (request, response) => {
   try {
     const adaptation = await upsertBlockAdaptation(
       request.params.sessionHash,
       request.params.blockSHA1,
       request.params.key,
       {
-        enabled: request.body?.enabled,
-        status: request.body?.status,
-        source: request.body?.source ?? "user",
-        config: request.body?.config ?? {},
-        payload: request.body?.payload ?? {},
-        meta: request.body?.meta ?? {},
+        enabled: request.body.enabled,
+        status: request.body.status,
+        source: request.body.source ?? "user",
+        config: request.body.config ?? {},
+        payload: request.body.payload ?? {},
+        meta: request.body.meta ?? {},
       },
     );
     const detail = await getSessionDetail(request.params.sessionHash);
@@ -632,8 +670,8 @@ app.put("/api/sessions/:sessionHash/blocks/:blockSHA1/adaptations/:key", authent
   }
 });
 
-app.post("/api/sessions/:sessionHash/blocks/:blockSHA1/adaptations/:key/run", authenticateToken, requireSessionOwnership(), async (request, response) => {
-  const { modelAlias } = request.body ?? {};
+app.post("/api/sessions/:sessionHash/blocks/:blockSHA1/adaptations/:key/run", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateBody(blockAdaptationRunSchema), async (request, response) => {
+  const { modelAlias } = request.body;
 
   try {
     if (request.params.key !== "summary.generate") {
@@ -672,12 +710,28 @@ app.post("/api/sessions/:sessionHash/blocks/:blockSHA1/adaptations/:key/run", au
   }
 });
 
-app.get("/api/sessions/:sessionHash/summaries", authenticateToken, requireSessionOwnership(), async (request, response) => {
-  const summaries = await listSummaries(request.params.sessionHash);
-  response.json({ summaries });
+app.get("/api/sessions/:sessionHash/summaries", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateQuery(paginationQuerySchema), async (request, response) => {
+  try {
+    const { page, pageSize } = request.query;
+    const offset = (page - 1) * pageSize;
+    const { summaries, total } = await listSummaries(request.params.sessionHash, { limit: pageSize, offset });
+    response.json({
+      summaries,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    });
+  } catch (error) {
+    response.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "读取摘要失败。",
+    });
+  }
 });
 
-app.get("/api/sessions/:sessionHash/summaries/:blockSHA1", authenticateToken, requireSessionOwnership(), async (request, response) => {
+app.get("/api/sessions/:sessionHash/summaries/:blockSHA1", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), async (request, response) => {
   const summary = await getSummaryByBlockSHA1(
     request.params.sessionHash,
     request.params.blockSHA1,
@@ -691,8 +745,8 @@ app.get("/api/sessions/:sessionHash/summaries/:blockSHA1", authenticateToken, re
   response.json({ summary });
 });
 
-app.patch("/api/sessions/:sessionHash/summaries/:blockSHA1", authenticateToken, requireSessionOwnership(), async (request, response) => {
-  const { status, summary, errorMessage, modelAlias } = request.body ?? {};
+app.patch("/api/sessions/:sessionHash/summaries/:blockSHA1", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateBody(summaryUpdateSchema), async (request, response) => {
+  const { status, summary, errorMessage, modelAlias } = request.body;
   const nextSummary = await updateSummaryStatus(request.params.sessionHash, request.params.blockSHA1, {
     status,
     summary,
@@ -704,8 +758,8 @@ app.patch("/api/sessions/:sessionHash/summaries/:blockSHA1", authenticateToken, 
   response.json({ summary: nextSummary });
 });
 
-app.post("/api/sessions/:sessionHash/summaries/:blockSHA1/generate", authenticateToken, requireSessionOwnership(), async (request, response) => {
-  const { modelAlias } = request.body ?? {};
+app.post("/api/sessions/:sessionHash/summaries/:blockSHA1/generate", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateBody(summaryGenerateSchema), async (request, response) => {
+  const { modelAlias } = request.body;
 
   try {
     const summary = await generateSummaryForBlock(
@@ -738,18 +792,30 @@ app.post("/api/sessions/:sessionHash/summaries/:blockSHA1/generate", authenticat
   }
 });
 
-app.get("/api/sessions/:sessionHash/errors", authenticateToken, requireSessionOwnership(), async (request, response) => {
-  const errors = await listErrorLogs(request.params.sessionHash);
-  response.json({ errors });
+app.get("/api/sessions/:sessionHash/errors", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateQuery(paginationQuerySchema), async (request, response) => {
+  try {
+    const { page, pageSize } = request.query;
+    const offset = (page - 1) * pageSize;
+
+    const { errors, total } = await listErrorLogs(request.params.sessionHash, { limit: pageSize, offset });
+    response.json({
+      errors,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    });
+  } catch (error) {
+    response.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "读取错误日志失败。",
+    });
+  }
 });
 
-app.post("/api/blocks/:blockSHA1/branch", authenticateToken, async (request, response) => {
-  const { sessionHash } = request.body ?? {};
-
-  if (!sessionHash) {
-    response.status(400).json({ error: "sessionHash 不能为空。" });
-    return;
-  }
+app.post("/api/blocks/:blockSHA1/branch", authenticateToken, validateParams(pathBlockSHA1Schema), validateBody(blockBranchSchema), async (request, response) => {
+  const { sessionHash } = request.body;
 
   const session = readSessionRecord(sessionHash);
 
@@ -773,13 +839,8 @@ app.post("/api/blocks/:blockSHA1/branch", authenticateToken, async (request, res
   }
 });
 
-app.post("/api/blocks/reply", authenticateToken, async (request, response) => {
-  const { sessionHash, prompt, modelAlias } = request.body ?? {};
-
-  if (!sessionHash || !isValidPrompt(prompt)) {
-    response.status(400).json({ error: "sessionHash 和 prompt 不能为空。" });
-    return;
-  }
+app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema), async (request, response) => {
+  const { sessionHash, prompt, modelAlias } = request.body;
 
   const session = readSessionRecord(sessionHash);
 
@@ -876,13 +937,8 @@ app.post("/api/blocks/reply", authenticateToken, async (request, response) => {
   }
 });
 
-app.post("/api/blocks/reply/stream", authenticateToken, async (request, response) => {
-  const { sessionHash, prompt, modelAlias } = request.body ?? {};
-
-  if (!sessionHash || !isValidPrompt(prompt)) {
-    response.status(400).json({ error: "sessionHash 和 prompt 不能为空。" });
-    return;
-  }
+app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyStreamSchema), async (request, response) => {
+  const { sessionHash, prompt, modelAlias } = request.body;
 
   const session = readSessionRecord(sessionHash);
 
@@ -1081,7 +1137,7 @@ app.post("/api/blocks/reply/stream", authenticateToken, async (request, response
   }
 });
 
-app.get("/api/sessions/:sessionHash/stream", authenticateToken, requireSessionOwnership(), async (request, response) => {
+app.get("/api/sessions/:sessionHash/stream", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), async (request, response) => {
   const { sessionHash } = request.params;
   const streamSession = streamSessionManager.get(sessionHash);
 
@@ -1142,13 +1198,8 @@ app.get("/api/sessions/:sessionHash/stream", authenticateToken, requireSessionOw
   });
 });
 
-app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, async (request, response) => {
-  const { sessionHash, modelAlias } = request.body ?? {};
-
-  if (!sessionHash) {
-    response.status(400).json({ error: "sessionHash 不能为空。" });
-    return;
-  }
+app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(pathBlockSHA1Schema), validateBody(blockRegenerateSchema), async (request, response) => {
+  const { sessionHash, modelAlias } = request.body;
 
   const session = readSessionRecord(sessionHash);
 
@@ -1256,13 +1307,8 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, async (request,
   }
 });
 
-app.post("/api/chat", async (request, response) => {
-  const { messages, provider = "openai", model } = request.body ?? {};
-
-  if (!Array.isArray(messages) || messages.length === 0) {
-    response.status(400).json({ error: "messages 不能为空。" });
-    return;
-  }
+app.post("/api/chat", validateBody(chatSchema), async (request, response) => {
+  const { messages, provider = "openai", model } = request.body;
 
   const safeMessages = messages
     .filter((message) => message?.role === "user" || message?.role === "assistant")

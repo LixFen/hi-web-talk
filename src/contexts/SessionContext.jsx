@@ -73,6 +73,28 @@ function setToCache(sessionHash, detail) {
   SESSION_DETAIL_CACHE.set(sessionHash, { detail, timestamp: Date.now() });
 }
 
+async function loadAllSessions() {
+  const pageSize = 100;
+  let page = 1;
+  let collectedSessions = [];
+  let total = 0;
+
+  while (true) {
+    const result = await listSessions(page, pageSize);
+    const sessions = result.sessions ?? [];
+    collectedSessions = collectedSessions.concat(sessions);
+    total = Number(result.pagination?.total ?? collectedSessions.length);
+
+    if (sessions.length === 0 || collectedSessions.length >= total) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return collectedSessions;
+}
+
 export function SessionProvider({ children }) {
   const { isAuthenticated } = useAuth();
   const { selectedModel } = useApp();
@@ -260,8 +282,8 @@ export function SessionProvider({ children }) {
       setIsLoading(true);
       setError("");
       try {
-        const result = await deleteSession(conversation.id);
-        const remainingSessions = result.sessions ?? [];
+        await deleteSession(conversation.id);
+        const remainingSessions = await loadAllSessions();
         setSessionSummaries(remainingSessions);
         let nextHash = null;
         if (activeSessionDetail?.session?.sessionHash === conversation.id) {
@@ -534,7 +556,7 @@ export function SessionProvider({ children }) {
       setIsBootstrapping(true);
       setError("");
       try {
-        const { sessions } = await listSessions();
+        const sessions = await loadAllSessions();
         if (isCancelled) return;
         setSessionSummaries(sessions);
 

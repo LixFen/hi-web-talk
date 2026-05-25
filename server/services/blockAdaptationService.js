@@ -2,6 +2,7 @@
 import {
   deleteAdaptationRecordsForBlocks,
   listAdaptationRecords,
+  listAdaptationRecordsWithCount,
   readAdaptationRecord,
   upsertAdaptationRecord,
 } from "../lib/database.js";
@@ -139,8 +140,9 @@ export function listAdaptationDefinitions() {
   return [...BUILTIN_ADAPTATION_DEFINITIONS].sort((left, right) => left.ui.order - right.ui.order);
 }
 
-export async function listSessionAdaptations(sessionHash) {
-  return sortAdaptations(listAdaptationRecords(sessionHash));
+export async function listSessionAdaptations(sessionHash, options = {}) {
+  const { adaptations, total } = listAdaptationRecordsWithCount(sessionHash, options);
+  return { adaptations: sortAdaptations(adaptations), total };
 }
 
 export async function getBlockAdaptation(sessionHash, blockSHA1, key) {
@@ -149,13 +151,13 @@ export async function getBlockAdaptation(sessionHash, blockSHA1, key) {
     return record;
   }
 
-  const records = await listSessionAdaptations(sessionHash);
-  return records.find((item) => item.blockSHA1 === blockSHA1 && item.key === key) ?? null;
+  const { adaptations } = await listSessionAdaptations(sessionHash);
+  return adaptations.find((item) => item.blockSHA1 === blockSHA1 && item.key === key) ?? null;
 }
 
 export async function listBlockAdaptations(sessionHash, blockSHA1) {
-  const records = await listSessionAdaptations(sessionHash);
-  return records.filter((record) => record.blockSHA1 === blockSHA1);
+  const { adaptations } = await listSessionAdaptations(sessionHash);
+  return adaptations.filter((record) => record.blockSHA1 === blockSHA1);
 }
 
 export async function upsertBlockAdaptation(sessionHash, blockSHA1, key, partialRecord = {}) {
@@ -183,10 +185,10 @@ export async function upsertBlockAdaptation(sessionHash, blockSHA1, key, partial
 }
 
 export async function getSessionAdaptationMap(sessionHash) {
-  const records = await listSessionAdaptations(sessionHash);
+  const { adaptations } = await listSessionAdaptations(sessionHash);
   const map = new Map();
 
-  for (const record of records) {
+  for (const record of adaptations) {
     const current = map.get(record.blockSHA1) ?? [];
     current.push(record);
     map.set(record.blockSHA1, current);

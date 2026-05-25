@@ -24,7 +24,8 @@ function createDatabaseSchema(db) {
       activeBlockSHA1 TEXT,
       viewState TEXT NOT NULL,
       deletedAt TEXT,
-      userId INTEGER
+      userId INTEGER,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_sessions_updatedAt
@@ -44,7 +45,8 @@ function createDatabaseSchema(db) {
       parentBlockSHA1 TEXT,
       flags TEXT NOT NULL,
       meta TEXT NOT NULL,
-      PRIMARY KEY (sessionHash, sha1)
+      PRIMARY KEY (sessionHash, sha1),
+      FOREIGN KEY (sessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE
     );
 
     CREATE INDEX IF NOT EXISTS idx_blocks_session_createdAt
@@ -66,7 +68,8 @@ function createDatabaseSchema(db) {
       source TEXT NOT NULL,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
-      PRIMARY KEY (sessionHash, blockSHA1)
+      PRIMARY KEY (sessionHash, blockSHA1),
+      FOREIGN KEY (sessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE
     );
 
     CREATE INDEX IF NOT EXISTS idx_summaries_session_createdAt
@@ -83,7 +86,8 @@ function createDatabaseSchema(db) {
       modelAlias TEXT NOT NULL,
       errorMessage TEXT NOT NULL,
       rawError TEXT NOT NULL,
-      meta TEXT NOT NULL
+      meta TEXT NOT NULL,
+      FOREIGN KEY (sessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE
     );
 
     CREATE INDEX IF NOT EXISTS idx_errors_session_createdAt
@@ -107,7 +111,8 @@ function createDatabaseSchema(db) {
       meta TEXT NOT NULL,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
-      UNIQUE (sessionHash, blockSHA1, key)
+      UNIQUE (sessionHash, blockSHA1, key),
+      FOREIGN KEY (sessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE
     );
 
     CREATE INDEX IF NOT EXISTS idx_adaptations_session_block
@@ -120,12 +125,165 @@ function createDatabaseSchema(db) {
       fileName TEXT NOT NULL,
       mimeType TEXT NOT NULL,
       size INTEGER NOT NULL,
-      createdAt TEXT NOT NULL
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY (sessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE
     );
 
     CREATE INDEX IF NOT EXISTS idx_attachments_session
       ON attachments(sessionHash, createdAt);
   `);
+}
+
+function addForeignKeysToExistingTables(db) {
+  const childTables = ["blocks", "summaries", "errors", "adaptations", "attachments"];
+  const tablesMissingForeignKeys = childTables.filter((table) => {
+    const fks = db.prepare(`PRAGMA foreign_key_list(${table})`).all();
+    return fks.length === 0;
+  });
+
+  if (tablesMissingForeignKeys.length === 0) {
+    return;
+  }
+
+  const tableDefs = [
+    {
+      name: "blocks",
+      ddl: `CREATE TABLE blocks_new (
+        sessionHash TEXT NOT NULL,
+        sha1 TEXT NOT NULL,
+        blockType TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        modelAlias TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        response TEXT NOT NULL,
+        reasoning TEXT NOT NULL DEFAULT '',
+        tokenUsage TEXT NOT NULL,
+        contextLength INTEGER NOT NULL,
+        parentBlockSHA1 TEXT,
+        flags TEXT NOT NULL,
+        meta TEXT NOT NULL,
+        PRIMARY KEY (sessionHash, sha1),
+        FOREIGN KEY (sessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE
+      )`,
+      indexes: [
+        `CREATE INDEX idx_blocks_session_createdAt ON blocks(sessionHash, createdAt, sha1)`,
+        `CREATE INDEX idx_blocks_session_parent ON blocks(sessionHash, parentBlockSHA1, createdAt, sha1)`,
+      ],
+    },
+    {
+      name: "summaries",
+      ddl: `CREATE TABLE summaries_new (
+        sessionHash TEXT NOT NULL,
+        blockSHA1 TEXT NOT NULL,
+        status TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        errorMessage TEXT NOT NULL,
+        modelAlias TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        model TEXT NOT NULL,
+        responseId TEXT,
+        source TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        PRIMARY KEY (sessionHash, blockSHA1),
+        FOREIGN KEY (sessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE
+      )`,
+      indexes: [
+        `CREATE INDEX idx_summaries_session_createdAt ON summaries(sessionHash, createdAt, blockSHA1)`,
+      ],
+    },
+    {
+      name: "errors",
+      ddl: `CREATE TABLE errors_new (
+        logId TEXT PRIMARY KEY,
+        sessionHash TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        operation TEXT NOT NULL,
+        parentBlockSHA1 TEXT,
+        blockSHA1 TEXT,
+        prompt TEXT NOT NULL,
+        modelAlias TEXT NOT NULL,
+        errorMessage TEXT NOT NULL,
+        rawError TEXT NOT NULL,
+        meta TEXT NOT NULL,
+        FOREIGN KEY (sessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE
+      )`,
+      indexes: [
+        `CREATE INDEX idx_errors_session_createdAt ON errors(sessionHash, createdAt DESC, logId)`,
+      ],
+    },
+    {
+      name: "adaptations",
+      ddl: `CREATE TABLE adaptations_new (
+        adaptationId TEXT PRIMARY KEY,
+        sessionHash TEXT NOT NULL,
+        blockSHA1 TEXT NOT NULL,
+        key TEXT NOT NULL,
+        label TEXT NOT NULL,
+        shortLabel TEXT NOT NULL,
+        category TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        description TEXT NOT NULL,
+        enabled INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        source TEXT NOT NULL,
+        config TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        meta TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        UNIQUE (sessionHash, blockSHA1, key),
+        FOREIGN KEY (sessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE
+      )`,
+      indexes: [
+        `CREATE INDEX idx_adaptations_session_block ON adaptations(sessionHash, blockSHA1, key)`,
+      ],
+    },
+    {
+      name: "attachments",
+      ddl: `CREATE TABLE attachments_new (
+        attachmentId TEXT PRIMARY KEY,
+        sessionHash TEXT NOT NULL,
+        blockSHA1 TEXT,
+        fileName TEXT NOT NULL,
+        mimeType TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (sessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE
+      )`,
+      indexes: [
+        `CREATE INDEX idx_attachments_session ON attachments(sessionHash, createdAt)`,
+      ],
+    },
+  ];
+
+  const tableDefMap = new Map(tableDefs.map((table) => [table.name, table]));
+
+  db.exec("BEGIN");
+
+  try {
+    for (const tableName of tablesMissingForeignKeys) {
+      const table = tableDefMap.get(tableName);
+
+      if (!table) {
+        continue;
+      }
+
+      db.exec(table.ddl);
+      db.exec(`INSERT INTO ${table.name}_new SELECT * FROM ${table.name}`);
+      db.exec(`DROP TABLE ${table.name}`);
+      db.exec(`ALTER TABLE ${table.name}_new RENAME TO ${table.name}`);
+
+      for (const indexDdl of table.indexes) {
+        db.exec(indexDdl);
+      }
+    }
+
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 function runMigrations(db) {
@@ -155,6 +313,8 @@ function runMigrations(db) {
   if (indexes.length === 0) {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_userId_updatedAt ON sessions(userId, updatedAt DESC)`);
   }
+
+  addForeignKeysToExistingTables(db);
 }
 
 export function getDatabase() {
@@ -174,6 +334,12 @@ export function getDatabase() {
 export async function ensureDatabase() {
   await ensureDir(DATA_DIR);
   getDatabase();
+}
+
+function paginateClause(options = {}) {
+  const { limit, offset } = options;
+  if (limit == null) return { sql: "", params: [] };
+  return { sql: " LIMIT ? OFFSET ?", params: [limit, offset ?? 0] };
 }
 
 export function sessionRowToRecord(row) {
@@ -263,18 +429,60 @@ export function isSessionDeleted(sessionHash) {
   return Boolean(row?.deletedAt);
 }
 
-export function listSessionRecords(userId = null) {
+export function listSessionRecords(userId = null, options = {}) {
   const db = getDatabase();
+  const { sql: pageSql, params: pageParams } = paginateClause(options);
 
   if (userId != null) {
-    const rows = db
-      .prepare(`SELECT * FROM sessions WHERE deletedAt IS NULL AND userId = ? ORDER BY updatedAt DESC`)
-      .all(userId);
-    return rows.map(sessionRowToRecord).filter(Boolean);
+    return db
+      .prepare(
+        `SELECT * FROM sessions WHERE deletedAt IS NULL AND userId = ? ORDER BY updatedAt DESC${pageSql}`,
+      )
+      .all(userId, ...pageParams)
+      .map(sessionRowToRecord)
+      .filter(Boolean);
   }
 
-  const rows = db.prepare(`SELECT * FROM sessions WHERE deletedAt IS NULL ORDER BY updatedAt DESC`).all();
-  return rows.map(sessionRowToRecord).filter(Boolean);
+  return db
+    .prepare(
+      `SELECT * FROM sessions WHERE deletedAt IS NULL ORDER BY updatedAt DESC${pageSql}`,
+    )
+    .all(...pageParams)
+    .map(sessionRowToRecord)
+    .filter(Boolean);
+}
+
+export function listSessionRecordsWithCount(userId = null, options = {}) {
+  const db = getDatabase();
+  const { limit, offset } = options;
+  const countRow = userId != null
+    ? db.prepare(`SELECT COUNT(*) AS count FROM sessions WHERE deletedAt IS NULL AND userId = ?`).get(userId)
+    : db.prepare(`SELECT COUNT(*) AS count FROM sessions WHERE deletedAt IS NULL`).get();
+  const total = Number(countRow?.count ?? 0);
+
+  if (limit != null) {
+    const whereClause = userId != null
+      ? `WHERE deletedAt IS NULL AND userId = ?`
+      : `WHERE deletedAt IS NULL`;
+    const params = userId != null ? [userId, limit, offset ?? 0] : [limit, offset ?? 0];
+
+    const rows = db.prepare(`
+      SELECT *, COUNT(*) OVER() AS _total
+      FROM sessions ${whereClause}
+      ORDER BY updatedAt DESC
+      LIMIT ? OFFSET ?
+    `).all(...params);
+
+    const total = rows.length > 0 ? rows[0]._total : 0;
+    const sessions = rows.map((row) => {
+      const { _total, ...rest } = row;
+      return sessionRowToRecord(rest);
+    }).filter(Boolean);
+    return { sessions, total };
+  }
+
+  const sessions = listSessionRecords(userId);
+  return { sessions, total };
 }
 
 export function deleteSessionRecord(sessionHash) {
@@ -315,6 +523,10 @@ export function blockRowToRecord(row) {
     return null;
   }
 
+  const parentBlockSHA1 = row.parentBlockSHA1 && /^[a-f0-9]{40}$/i.test(row.parentBlockSHA1)
+    ? row.parentBlockSHA1
+    : null;
+
   return {
     sha1: row.sha1,
     sessionHash: row.sessionHash,
@@ -324,11 +536,11 @@ export function blockRowToRecord(row) {
     prompt: parseMaybeContent(row.prompt),
     response: parseMaybeContent(row.response),
     reasoning: parseMaybeContent(row.reasoning ?? ""),
-    tokenUsage: JSON.parse(row.tokenUsage),
+    tokenUsage: parseMaybeJson(row.tokenUsage, {}),
     contextLength: Number(row.contextLength ?? 0),
-    parentBlockSHA1: row.parentBlockSHA1 ?? null,
-    flags: JSON.parse(row.flags),
-    meta: JSON.parse(row.meta),
+    parentBlockSHA1,
+    flags: parseMaybeJson(row.flags, {}),
+    meta: parseMaybeJson(row.meta, {}),
   };
 }
 
@@ -449,7 +661,11 @@ function parseMaybeJson(value, fallbackValue) {
     return fallbackValue;
   }
 
-  return JSON.parse(value);
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallbackValue;
+  }
 }
 
 export function summaryRowToRecord(row) {
@@ -539,12 +755,42 @@ export function upsertSummaryRecord(sessionHash, blockSHA1, record) {
   return summaryRowToRecord(row);
 }
 
-export function listSummaryRecords(sessionHash) {
+export function listSummaryRecords(sessionHash, options = {}) {
   const db = getDatabase();
-  const rows = db
-    .prepare(`SELECT * FROM summaries WHERE sessionHash = ? ORDER BY createdAt, blockSHA1`)
-    .all(sessionHash);
-  return rows.map(summaryRowToRecord);
+  const { sql: pageSql, params: pageParams } = paginateClause(options);
+
+  return db
+    .prepare(
+      `SELECT * FROM summaries WHERE sessionHash = ? ORDER BY createdAt, blockSHA1${pageSql}`,
+    )
+    .all(sessionHash, ...pageParams)
+    .map(summaryRowToRecord);
+}
+
+export function listSummaryRecordsWithCount(sessionHash, options = {}) {
+  const db = getDatabase();
+  const { limit, offset } = options;
+  const countRow = db.prepare(`SELECT COUNT(*) AS count FROM summaries WHERE sessionHash = ?`).get(sessionHash);
+  const total = Number(countRow?.count ?? 0);
+
+  if (limit != null) {
+    const rows = db.prepare(`
+      SELECT *, COUNT(*) OVER() AS _total
+      FROM summaries WHERE sessionHash = ?
+      ORDER BY createdAt, blockSHA1
+      LIMIT ? OFFSET ?
+    `).all(sessionHash, limit, offset ?? 0);
+
+    const total = rows.length > 0 ? rows[0]._total : 0;
+    const summaries = rows.map((row) => {
+      const { _total, ...rest } = row;
+      return summaryRowToRecord(rest);
+    });
+    return { summaries, total };
+  }
+
+  const summaries = listSummaryRecords(sessionHash);
+  return { summaries, total };
 }
 
 export function readSummaryRecord(sessionHash, blockSHA1) {
@@ -653,12 +899,52 @@ export function insertErrorRecord(entry) {
   return errorRowToRecord(row);
 }
 
-export function listErrorRecords(sessionHash) {
+export function listErrorRecords(sessionHash, options = {}) {
   const db = getDatabase();
-  const rows = db
-    .prepare(`SELECT * FROM errors WHERE sessionHash = ? ORDER BY createdAt DESC, logId DESC`)
-    .all(sessionHash);
-  return rows.map(errorRowToRecord);
+  const { sql: pageSql, params: pageParams } = paginateClause(options);
+
+  return db
+    .prepare(
+      `SELECT * FROM errors WHERE sessionHash = ? ORDER BY createdAt DESC, logId DESC${pageSql}`,
+    )
+    .all(sessionHash, ...pageParams)
+    .map(errorRowToRecord);
+}
+
+export function countErrorRecords(sessionHash) {
+  const db = getDatabase();
+  const result = db.prepare(`SELECT COUNT(*) AS count FROM errors WHERE sessionHash = ?`).get(sessionHash);
+  return result.count;
+}
+
+export function listErrorRecordsWithCount(sessionHash, options = {}) {
+  const db = getDatabase();
+  const { limit, offset } = options;
+  const countRow = db.prepare(`SELECT COUNT(*) AS count FROM errors WHERE sessionHash = ?`).get(sessionHash);
+  const total = Number(countRow?.count ?? 0);
+
+  if (limit != null) {
+    const rows = db.prepare(`
+      SELECT *, COUNT(*) OVER() AS _total
+      FROM errors WHERE sessionHash = ?
+      ORDER BY createdAt DESC, logId DESC
+      LIMIT ? OFFSET ?
+    `).all(sessionHash, limit, offset ?? 0);
+
+    const total = rows.length > 0 ? rows[0]._total : 0;
+    const errors = rows.map((row) => {
+      const { _total, ...rest } = row;
+      return errorRowToRecord(rest);
+    });
+    return { errors, total };
+  }
+
+  const rows = db.prepare(`
+    SELECT * FROM errors WHERE sessionHash = ?
+    ORDER BY createdAt DESC, logId DESC
+  `).all(sessionHash);
+  const errors = rows.map(errorRowToRecord);
+  return { errors, total };
 }
 
 export function deleteErrorRecordsForBlocks(sessionHash, blockSHA1s = []) {
@@ -786,12 +1072,42 @@ export function upsertAdaptationRecord(sessionHash, blockSHA1, key, record) {
   return adaptationRowToRecord(row);
 }
 
-export function listAdaptationRecords(sessionHash) {
+export function listAdaptationRecords(sessionHash, options = {}) {
   const db = getDatabase();
-  const rows = db
-    .prepare(`SELECT * FROM adaptations WHERE sessionHash = ? ORDER BY blockSHA1, key`)
-    .all(sessionHash);
-  return rows.map(adaptationRowToRecord);
+  const { sql: pageSql, params: pageParams } = paginateClause(options);
+
+  return db
+    .prepare(
+      `SELECT * FROM adaptations WHERE sessionHash = ? ORDER BY blockSHA1, key${pageSql}`,
+    )
+    .all(sessionHash, ...pageParams)
+    .map(adaptationRowToRecord);
+}
+
+export function listAdaptationRecordsWithCount(sessionHash, options = {}) {
+  const db = getDatabase();
+  const { limit, offset } = options;
+  const countRow = db.prepare(`SELECT COUNT(*) AS count FROM adaptations WHERE sessionHash = ?`).get(sessionHash);
+  const total = Number(countRow?.count ?? 0);
+
+  if (limit != null) {
+    const rows = db.prepare(`
+      SELECT *, COUNT(*) OVER() AS _total
+      FROM adaptations WHERE sessionHash = ?
+      ORDER BY blockSHA1, key
+      LIMIT ? OFFSET ?
+    `).all(sessionHash, limit, offset ?? 0);
+
+    const total = rows.length > 0 ? rows[0]._total : 0;
+    const adaptations = rows.map((row) => {
+      const { _total, ...rest } = row;
+      return adaptationRowToRecord(rest);
+    });
+    return { adaptations, total };
+  }
+
+  const adaptations = listAdaptationRecords(sessionHash);
+  return { adaptations, total };
 }
 
 export function readAdaptationRecord(sessionHash, blockSHA1, key) {
