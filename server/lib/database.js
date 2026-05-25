@@ -518,29 +518,59 @@ function parseMaybeContent(value) {
   }
 }
 
+const SHA1_PATTERN = /^[a-f0-9]{40}$/i;
+
+function isSha1(value) {
+  return SHA1_PATTERN.test(`${value ?? ""}`.trim());
+}
+
+function normalizeLegacyBlockRow(row) {
+  if (!row || row.blockType !== "dialogue") {
+    return row;
+  }
+
+  const isLegacyShiftedRow = !isSha1(row.parentBlockSHA1) && isSha1(row.contextLength);
+
+  if (!isLegacyShiftedRow) {
+    return row;
+  }
+
+  return {
+    ...row,
+    reasoning: row.meta ?? "",
+    tokenUsage: row.reasoning ?? "{}",
+    contextLength: row.tokenUsage ?? 0,
+    parentBlockSHA1: row.contextLength ?? null,
+    flags: row.parentBlockSHA1 ?? "{}",
+    meta: row.flags ?? "{}",
+  };
+}
+
 export function blockRowToRecord(row) {
   if (!row) {
     return null;
   }
 
-  const parentBlockSHA1 = row.parentBlockSHA1 && /^[a-f0-9]{40}$/i.test(row.parentBlockSHA1)
-    ? row.parentBlockSHA1
+  const normalizedRow = normalizeLegacyBlockRow(row);
+
+  const parentBlockSHA1 = normalizedRow.parentBlockSHA1 && isSha1(normalizedRow.parentBlockSHA1)
+    ? normalizedRow.parentBlockSHA1
     : null;
 
   return {
-    sha1: row.sha1,
-    sessionHash: row.sessionHash,
-    blockType: row.blockType,
-    createdAt: row.createdAt,
-    modelAlias: row.modelAlias,
-    prompt: parseMaybeContent(row.prompt),
-    response: parseMaybeContent(row.response),
-    reasoning: parseMaybeContent(row.reasoning ?? ""),
-    tokenUsage: parseMaybeJson(row.tokenUsage, {}),
-    contextLength: Number(row.contextLength ?? 0),
+    sha1: normalizedRow.sha1,
+    sessionHash: normalizedRow.sessionHash,
+    blockType: normalizedRow.blockType,
+    createdAt: normalizedRow.createdAt,
+    modelAlias: normalizedRow.modelAlias,
+    prompt: parseMaybeContent(normalizedRow.prompt),
+    response: parseMaybeContent(normalizedRow.response),
+    reasoning: parseMaybeContent(normalizedRow.reasoning ?? ""),
+    tokenUsage: parseMaybeJson(normalizedRow.tokenUsage, {}),
+    contextLength: Number(normalizedRow.contextLength ?? 0),
     parentBlockSHA1,
-    flags: parseMaybeJson(row.flags, {}),
-    meta: parseMaybeJson(row.meta, {}),
+    flags: parseMaybeJson(normalizedRow.flags, {}),
+    meta: parseMaybeJson(normalizedRow.meta, {}),
   };
 }
 

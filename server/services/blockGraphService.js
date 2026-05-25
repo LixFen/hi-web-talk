@@ -164,7 +164,11 @@ export async function getChainBlocks(sessionHash, activeBlockSHA1, preloadedBloc
     const block = blockMap.get(currentSHA1);
 
     if (!block) {
-      throw new Error(`找不到 block: ${currentSHA1}`);
+      if (chain.length === 0) {
+        throw new Error(`找不到 block: ${currentSHA1}`);
+      }
+
+      break;
     }
 
     chain.push(block);
