@@ -19,6 +19,16 @@ function resolveLayoutMode(viewportWidth) {
   return "desktop";
 }
 
+const SIDEBAR_COLLAPSED_KEY = "hi-web-talk:isSidebarCollapsed";
+
+function getStoredSidebarCollapsed() {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
 export default function AuthenticatedLayout() {
   const { isAdmin: isAdminUser } = useAuth();
   const {
@@ -61,7 +71,9 @@ export default function AuthenticatedLayout() {
     uploadAttachment,
     abortControllerRef,
   } = useSession();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() =>
+    getStoredSidebarCollapsed(),
+  );
   const [isSidebarDrawerOpen, setIsSidebarDrawerOpen] = useState(false);
   const [isComposerCollapsed, setIsComposerCollapsed] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
@@ -87,12 +99,20 @@ export default function AuthenticatedLayout() {
 
   useEffect(() => {
     if (layoutMode === "desktop") {
-      setIsSidebarCollapsed(false);
       setIsSidebarDrawerOpen(false);
-      return;
     }
-    setIsSidebarCollapsed(true);
   }, [layoutMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        SIDEBAR_COLLAPSED_KEY,
+        isSidebarCollapsed ? "true" : "false",
+      );
+    } catch {
+      // ignore
+    }
+  }, [isSidebarCollapsed]);
 
   useEffect(() => {
     function handleOpenSettings(event) {
