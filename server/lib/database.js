@@ -270,7 +270,48 @@ function addForeignKeysToExistingTables(db) {
       }
 
       db.exec(table.ddl);
-      db.exec(`INSERT INTO ${table.name}_new SELECT * FROM ${table.name}`);
+
+      if (table.name === "blocks") {
+        const rows = db.prepare(`SELECT * FROM blocks`).all();
+        const insertBlock = db.prepare(`
+          INSERT INTO blocks_new (
+            sessionHash,
+            sha1,
+            blockType,
+            createdAt,
+            modelAlias,
+            prompt,
+            response,
+            reasoning,
+            tokenUsage,
+            contextLength,
+            parentBlockSHA1,
+            flags,
+            meta
+          ) VALUES (
+            @sessionHash,
+            @sha1,
+            @blockType,
+            @createdAt,
+            @modelAlias,
+            @prompt,
+            @response,
+            @reasoning,
+            @tokenUsage,
+            @contextLength,
+            @parentBlockSHA1,
+            @flags,
+            @meta
+          )
+        `);
+
+        for (const row of rows) {
+          insertBlock.run(recordToBlockRow(blockRowToRecord(row), row.sessionHash));
+        }
+      } else {
+        db.exec(`INSERT INTO ${table.name}_new SELECT * FROM ${table.name}`);
+      }
+
       db.exec(`DROP TABLE ${table.name}`);
       db.exec(`ALTER TABLE ${table.name}_new RENAME TO ${table.name}`);
 
