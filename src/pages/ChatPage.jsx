@@ -16,7 +16,7 @@ export default function ChatPage() {
   const { appSettings, enabledModels, adaptationDefinitions } = useApp();
 
   const urlView = searchParams.get("view") || "chat";
-  const prevSessionHashRef = useRef("");
+  const loadingSessionHashRef = useRef("");
   const redirectTimerRef = useRef(0);
   const sessionMethodsRef = useRef(null);
   sessionMethodsRef.current = {
@@ -28,9 +28,13 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!sessionHash) return;
-    if (prevSessionHashRef.current === sessionHash) return;
+    if (session.activeConversation?.sessionHash === sessionHash) {
+      loadingSessionHashRef.current = "";
+      return;
+    }
+    if (loadingSessionHashRef.current === sessionHash) return;
 
-    prevSessionHashRef.current = sessionHash;
+    loadingSessionHashRef.current = sessionHash;
     const methods = sessionMethodsRef.current;
     let cancelled = false;
 
@@ -70,12 +74,13 @@ export default function ChatPage() {
 
     return () => {
       cancelled = true;
+      loadingSessionHashRef.current = "";
       if (redirectTimerRef.current) {
         clearTimeout(redirectTimerRef.current);
         redirectTimerRef.current = 0;
       }
     };
-  }, [sessionHash]);
+  }, [sessionHash, session.activeConversation?.sessionHash]);
 
   useEffect(() => {
     const methods = sessionMethodsRef.current;
@@ -108,6 +113,14 @@ export default function ChatPage() {
   );
 
   if (session.isBootstrapping) {
+    return (
+      <div className="empty-state">
+        <h2 className="hero-title">正在加载会话...</h2>
+      </div>
+    );
+  }
+
+  if (sessionHash && session.activeConversation?.sessionHash !== sessionHash) {
     return (
       <div className="empty-state">
         <h2 className="hero-title">正在加载会话...</h2>

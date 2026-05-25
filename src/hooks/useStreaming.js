@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   createSession,
   sendReply,
@@ -14,6 +15,7 @@ export default function useStreaming({
   onSetLoading,
   onSetError,
 }) {
+  const navigate = useNavigate();
   const [streamingReply, setStreamingReply] = useState("");
   const [streamingReasoning, setStreamingReasoning] = useState("");
   const [pendingPrompt, setPendingPrompt] = useState("");
@@ -103,8 +105,10 @@ export default function useStreaming({
       if (!sessionHash) {
         const createdDetail = await createSession();
         onApplyDetail(createdDetail);
+        sessionHash = createdDetail.session.sessionHash;
+        navigate(`/chat/${sessionHash}`);
         return uploadAttachment({
-          sessionHash: createdDetail.session.sessionHash,
+          sessionHash,
           fileName,
           mimeType,
           base64Data,
@@ -138,6 +142,7 @@ export default function useStreaming({
           const createdDetail = await createSession();
           onApplyDetail(createdDetail);
           sessionHash = createdDetail.session.sessionHash;
+          navigate(`/chat/${sessionHash}`);
         }
 
         const prompt = isArray ? rawContent : rawContent.trim();

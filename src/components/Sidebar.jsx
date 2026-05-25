@@ -19,7 +19,7 @@ const Sidebar = ({
   const {
     sessionSummaries,
     activeConversation,
-    newChat,
+    startNewChatDraft,
     deleteConversation,
     renameConversation,
     regenerateTitle,
@@ -44,14 +44,12 @@ const Sidebar = ({
 
   const activeConversationId = activeConversation?.sessionHash;
 
-  const handleNewChat = async () => {
+  const handleNewChat = () => {
     if (toggleVariant === "close") {
       onToggleCollapse?.();
     }
-    const detail = await newChat();
-    if (detail?.session?.sessionHash) {
-      navigate(`/chat/${detail.session.sessionHash}`);
-    }
+    startNewChatDraft();
+    navigate("/");
   };
 
   const handleSelectConversation = (sessionHash) => {

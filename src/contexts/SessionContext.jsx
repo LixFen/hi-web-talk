@@ -7,9 +7,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { useLocation } from "react-router-dom";
 import {
   branchFromBlock,
-  createSession,
   deleteSession,
   getSession,
   listSessions,
@@ -98,6 +98,7 @@ async function loadAllSessions() {
 export function SessionProvider({ children }) {
   const { isAuthenticated } = useAuth();
   const { selectedModel } = useApp();
+  const location = useLocation();
 
   const [sessionSummaries, setSessionSummaries] = useState([]);
   const [activeSessionDetail, setActiveSessionDetail] = useState(null);
@@ -111,6 +112,16 @@ export function SessionProvider({ children }) {
   const activeSessionHashRef = useRef("");
   const viewSwitchVersionRef = useRef(0);
   const chatNavigationRequestIdRef = useRef(0);
+
+  const startNewChatDraft = useCallback(() => {
+    setError("");
+    setIsLoading(false);
+    setActiveSessionDetail(null);
+    setFocusedBlockSHA1State("");
+    setViewMode("chat");
+    activeSessionHashRef.current = "";
+    setChatNavigationRequest(null);
+  }, []);
 
   const issueChatNavigationRequest = useCallback(
     (reason, behavior = "auto", targetBlockSHA1 = "") => {
@@ -225,21 +236,6 @@ export function SessionProvider({ children }) {
     [focusedBlockSHA1, issueChatNavigationRequest],
   );
 
-  const handleNewChat = useCallback(async () => {
-    if (isLoading) return;
-    setError("");
-    try {
-      const detail = await createSession();
-      applySessionDetail(detail);
-      return detail;
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "创建会话失败，请稍后再试。",
-      );
-      return null;
-    }
-  }, [isLoading, applySessionDetail]);
-
   const loadSessionDetail = useCallback(
     async (sessionHash) => {
       const cached = getFromCache(sessionHash);
@@ -255,6 +251,7 @@ export function SessionProvider({ children }) {
     async (sessionHash) => {
       if (isLoading) return;
       setError("");
+      setIsLoading(true);
       try {
         const detail = await loadSessionDetail(sessionHash);
         applySessionDetail(detail, {
@@ -267,6 +264,8 @@ export function SessionProvider({ children }) {
           err instanceof Error ? err.message : "读取会话失败，请稍后再试。",
         );
         return null;
+      } finally {
+        setIsLoading(false);
       }
     },
     [isLoading, loadSessionDetail, applySessionDetail],
@@ -544,8 +543,7 @@ export function SessionProvider({ children }) {
   useEffect(() => {
     if (!isAuthenticated) {
       setSessionSummaries([]);
-      setActiveSessionDetail(null);
-      setViewMode("chat");
+      startNewChatDraft();
       setIsBootstrapping(false);
       return;
     }
@@ -559,21 +557,6 @@ export function SessionProvider({ children }) {
         const sessions = await loadAllSessions();
         if (isCancelled) return;
         setSessionSummaries(sessions);
-
-        if (sessions.length === 0) {
-          setActiveSessionDetail(null);
-          setViewMode("chat");
-          return;
-        }
-
-        const cached = getFromCache(sessions[0].sessionHash);
-        const detail = cached || (await getSession(sessions[0].sessionHash));
-        if (isCancelled) return;
-        applySessionDetail(detail, {
-          reason: "bootstrap",
-          behavior: "auto",
-        });
-        subscribeToStream(sessions[0].sessionHash);
       } catch (err) {
         if (!isCancelled) {
           setError(
@@ -594,7 +577,14 @@ export function SessionProvider({ children }) {
     return () => {
       isCancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, startNewChatDraft]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (location.pathname === "/") {
+      startNewChatDraft();
+    }
+  }, [isAuthenticated, location.pathname, startNewChatDraft]);
 
   const pendingUserAlreadyPersisted = useMemo(
     () =>
@@ -690,7 +680,7 @@ export function SessionProvider({ children }) {
       chatNavigationRequest,
       abortControllerRef,
       setError,
-      newChat: handleNewChat,
+      startNewChatDraft,
       selectConversation: handleSelectConversation,
       deleteConversation: handleDeleteConversation,
       renameConversation: handleRenameConversation,
@@ -734,7 +724,7 @@ export function SessionProvider({ children }) {
       hasStartedConversation,
       chatNavigationRequest,
       abortControllerRef,
-      handleNewChat,
+      startNewChatDraft,
       handleSelectConversation,
       handleDeleteConversation,
       handleRenameConversation,
