@@ -9,7 +9,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { DEFAULT_SYSTEM_PROMPT, JWT_SECRET, JWT_EXPIRES_IN } from "./constants.js";
 import { getDatabase } from "./lib/database.js";
-import { authenticateToken, authenticateTokenOrQuery, authenticateCookieOrBearer, requireSessionOwnership } from "./middleware/auth.js";
+import { authenticateToken, requireSessionOwnership } from "./middleware/auth.js";
 import { validateBody, validateParams, validateQuery } from "./middleware/validate.js";
 import {
   registerSchema,
@@ -31,7 +31,6 @@ import {
   blockAdaptationRunSchema,
   summaryUpdateSchema,
   summaryGenerateSchema,
-  chatSchema,
   pathSessionHashSchema,
   pathBlockSHA1Schema,
   pathModelAliasSchema,
@@ -99,7 +98,20 @@ const maxPortAttempts = Number(process.env.OPENAI_PORT_ATTEMPTS || 10);
 
 app.use(
   helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
+        fontSrc: ["'self'", "fonts.gstatic.com", "data:"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: ["'self'"],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
   }),
 );
 
@@ -446,7 +458,7 @@ app.post("/api/attachments", authenticateToken, validateBody(attachmentUploadSch
   }
 });
 
-app.get("/api/attachments/:attachmentId", authenticateCookieOrBearer, validateParams(pathAttachmentIdSchema), async (request, response) => {
+app.get("/api/attachments/:attachmentId", authenticateToken, validateParams(pathAttachmentIdSchema), async (request, response) => {
   try {
     const attachment = await readAttachment(request.params.attachmentId);
 
@@ -1303,42 +1315,6 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(
         error instanceof Error
           ? error.message
           : "重生成时出错了，请检查模型配置或网络。",
-    });
-  }
-});
-
-app.post("/api/chat", validateBody(chatSchema), async (request, response) => {
-  const { messages, provider = "openai", model } = request.body;
-
-  const safeMessages = messages
-    .filter((message) => message?.role === "user" || message?.role === "assistant")
-    .map((message) => ({
-      role: message.role,
-      content: message.text ?? message.content ?? "",
-    }));
-
-  try {
-    const result = await callProviderModel({
-      provider,
-      model,
-      messages: [
-        {
-          role: "system",
-          content: DEFAULT_SYSTEM_PROMPT,
-        },
-        ...safeMessages,
-      ],
-    });
-
-    response.json({
-      reply: result.reply,
-      id: result.responseId,
-      providerType: result.providerType,
-      model: result.model,
-    });
-  } catch (error) {
-    response.status(error?.status || 500).json({
-      error: error?.message || "调用模型接口时出错了，请检查 Key、模型名或网络。",
     });
   }
 });

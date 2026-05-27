@@ -1,5 +1,12 @@
+# 1.15.2
+- Change msg.content to msg.text to ensure that multimodal messages (image + text) enter the correct rendering path.
+- Removed the unauthenticated legacy `POST /api/chat` endpoint that allowed anonymous LLM calls.
+- Removed dead `authenticateTokenOrQuery` middleware and query-parameter token fallback to prevent JWT leakage in URLs.
+- Enabled Content-Security-Policy header to restrict script, style, font, and connection sources.
+- Migrated primary authentication to httpOnly cookies; frontend now sends `credentials: "same-origin"` with Bearer token as fallback.
+
 # 1.15.1
 
-- 新增「关于与版本」设置子页面，统一展示版本信息。
-- 补全前端本地化文本。
-- 更新日志从独立 Markdown 文件读取并渲染。
+- Added a new "About and Version" settings sub-page to uniformly display version information.
+- Complete the frontend localized text.
+- The update log is read and rendered from a standalone Markdown file.

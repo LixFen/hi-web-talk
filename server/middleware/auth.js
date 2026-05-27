@@ -13,30 +13,6 @@ function verifyToken(token, request, response, next) {
 }
 
 export function authenticateToken(request, response, next) {
-  const authHeader = request.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-
-  if (!token) {
-    response.status(401).json({ error: "请先登录。" });
-    return;
-  }
-
-  verifyToken(token, request, response, next);
-}
-
-export function authenticateTokenOrQuery(request, response, next) {
-  const authHeader = request.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : (request.query?.access_token || null);
-
-  if (!token) {
-    response.status(401).json({ error: "请先登录。" });
-    return;
-  }
-
-  verifyToken(token, request, response, next);
-}
-
-export function authenticateCookieOrBearer(request, response, next) {
   const cookieToken = request.cookies?.auth_token;
   if (cookieToken) {
     return verifyToken(cookieToken, request, response, next);
@@ -46,11 +22,6 @@ export function authenticateCookieOrBearer(request, response, next) {
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   if (bearerToken) {
     return verifyToken(bearerToken, request, response, next);
-  }
-
-  const queryToken = request.query?.access_token || null;
-  if (queryToken) {
-    return verifyToken(queryToken, request, response, next);
   }
 
   response.status(401).json({ error: "请先登录。" });

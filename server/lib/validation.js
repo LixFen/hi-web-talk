@@ -139,16 +139,6 @@ export const summaryGenerateSchema = z.object({
   modelAlias: z.string().optional(),
 });
 
-export const chatSchema = z.object({
-  messages: z.array(z.object({
-    role: z.enum(["user", "assistant", "system"]).optional(),
-    content: z.string().optional(),
-    text: z.string().optional(),
-  })).min(1, "messages 不能为空。"),
-  provider: z.string().optional(),
-  model: z.string().optional(),
-});
-
 const sha1Hex = z.string().regex(/^[a-f0-9]{40}$/);
 const sessionHashHex = z.string().regex(/^[a-f0-9]{24}$/);
 

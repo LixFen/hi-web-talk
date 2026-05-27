@@ -12,6 +12,7 @@ async function requestJson(path, options = {}) {
   }
 
   const response = await fetch(path, {
+    credentials: "same-origin",
     headers,
     ...options,
   });
@@ -204,6 +205,7 @@ export async function sendReplyStream({ sessionHash, prompt, modelAlias, signal,
   const token = getToken();
   const response = await fetch("/api/blocks/reply/stream", {
     method: "POST",
+    credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -402,6 +404,7 @@ export function logoutUser() {
 export async function subscribeToSessionStream(sessionHash, { signal, onEvent } = {}) {
   const token = getToken();
   const response = await fetch(`/api/sessions/${sessionHash}/stream`, {
+    credentials: "same-origin",
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },

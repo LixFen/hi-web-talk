@@ -749,9 +749,9 @@ const MemoMessageRow = React.memo(({
         </div>
       ) : (
         <div className="message-bubble">
-          {Array.isArray(msg.content) ? (
+          {Array.isArray(msg.text) ? (
             <div className="message-content-blocks">
-              {msg.content.map((block, index) => {
+              {msg.text.map((block, index) => {
                 if (block.type === "text") {
                   return <div key={index} className="message-text-block">{block.text}</div>;
                 }
