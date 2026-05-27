@@ -12,6 +12,7 @@ import SafeMarkdown from "./SafeMarkdown";
 import { getAttachmentUrl } from "../lib/chatApi";
 import ContextMenu from "./ContextMenu";
 import { useApp } from "../contexts/AppContext";
+import { extractPromptText } from "../lib/content";
 
 const READ_MARKER_SELECTOR = "[data-read-block-sha1]";
 const READ_MARKER_ROOT_MARGIN = "0px 0px -35% 0px";
@@ -137,11 +138,11 @@ function buildBranchFlowTextFromGraph(branchHeadSHA1, blockMap, fallbackReply = 
   const branchHead = branchHeadSHA1 ? blockMap.get(branchHeadSHA1) : null;
 
   if (!branchHead) {
-    const fallbackText = truncateFlowMarkdown(fallbackReply, 420);
+    const fallbackText = truncateFlowMarkdown(extractPromptText(fallbackReply), 420);
     return fallbackText ? `**AI**\n\n${fallbackText}` : "切换分支继续阅读";
   }
 
-  const userInput = normalizeFlowSnippet(branchHead.prompt || "", 160);
+  const userInput = normalizeFlowSnippet(extractPromptText(branchHead.prompt), 160);
   const assistantText = truncateFlowMarkdown(
     branchHead.response || branchHead.summaryInfo?.summary || "",
     680,

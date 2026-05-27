@@ -1,5 +1,6 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { useLocale } from "../contexts/LocaleContext";
+import { extractPromptText } from "../lib/content";
 
 export default function BlockSelector({
   blocks,
@@ -176,7 +177,7 @@ export default function BlockSelector({
                       onClick={() => handleSelect(block.sha1)}
                     >
                       <span className="block-selector-item-label">
-                        {block.summaryInfo?.summary || block.prompt?.slice(0, 40) + "..."}
+                        {block.summaryInfo?.summary || extractPromptText(block.prompt).slice(0, 40) + "..."}
                       </span>
                       {isFocused && <span className="block-selector-item-badge">{t("blockSelector.current")}</span>}
                     </button>

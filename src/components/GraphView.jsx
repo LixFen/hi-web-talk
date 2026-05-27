@@ -1,6 +1,7 @@
 ﻿import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BlockCard from "./BlockCard";
 import ContextMenu from "./ContextMenu";
+import { extractPromptText } from "../lib/content";
 
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 96;
@@ -90,10 +91,10 @@ function buildGraphLayout(blocks) {
 
 function getNodeSnippet(block) {
   if (block.blockType === "system") {
-    return block.prompt;
+    return extractPromptText(block.prompt);
   }
 
-  return block.prompt || block.response || "空内容";
+  return extractPromptText(block.prompt) || block.response || "空内容";
 }
 
 function getCommandLabel(definition, adaptationInfo) {

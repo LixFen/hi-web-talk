@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import SafeMarkdown from "./SafeMarkdown";
+import { extractPromptText } from "../lib/content";
 
 function ReasoningIcon({ isOpen }) {
   return (
@@ -90,21 +91,21 @@ function getCommandLabel(definition, adaptationInfo) {
 
 function buildCopyText(block) {
   if (block.blockType === "system") {
-    return `System\n${block.prompt}`;
+    return `System\n${extractPromptText(block.prompt)}`;
   }
 
-  return `用户\n${block.prompt}\n\n助手\n${block.response}`;
+  return `用户\n${extractPromptText(block.prompt)}\n\n助手\n${block.response}`;
 }
 
 function buildRawText(block) {
   if (block.blockType === "system") {
-    return block.prompt || "";
+    return extractPromptText(block.prompt) || "";
   }
 
   const parts = [];
 
   if (block.prompt) {
-    parts.push(block.prompt);
+    parts.push(extractPromptText(block.prompt));
   }
 
   if (block.reasoning) {
@@ -218,7 +219,7 @@ export default function BlockCard({
       <div className="block-card-body">
         <section className="block-card-section">
           <div className="block-card-section-title">用户</div>
-          <div className="block-card-prompt">{block.prompt || "暂无内容"}</div>
+          <div className="block-card-prompt">{extractPromptText(block.prompt) || "暂无内容"}</div>
         </section>
 
         {!isSystemBlock && block.reasoning ? (
