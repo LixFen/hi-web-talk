@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { useLocale } from "../contexts/LocaleContext";
 
 export default function BlockSelector({
   blocks,
@@ -7,6 +8,7 @@ export default function BlockSelector({
   onSelectBlock,
   disabled = false,
 }) {
+  const { t } = useLocale();
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const listRef = useRef(null);
@@ -159,7 +161,7 @@ export default function BlockSelector({
           <div className="block-selector-panel">
             <div className="block-selector-list" ref={listRef} role="listbox">
               {displayBlocks.length === 0 ? (
-                <div className="block-selector-empty">暂无对话块</div>
+                <div className="block-selector-empty">{t("blockSelector.empty")}</div>
               ) : (
                 displayBlocks.map((block) => {
                   const isActive = block.sha1 === activeBlockSHA1;
@@ -176,7 +178,7 @@ export default function BlockSelector({
                       <span className="block-selector-item-label">
                         {block.summaryInfo?.summary || block.prompt?.slice(0, 40) + "..."}
                       </span>
-                      {isFocused && <span className="block-selector-item-badge">当前</span>}
+                      {isFocused && <span className="block-selector-item-badge">{t("blockSelector.current")}</span>}
                     </button>
                   );
                 })

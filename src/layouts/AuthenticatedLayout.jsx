@@ -5,6 +5,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { useApp } from "../contexts/AppContext";
 import { useSession } from "../contexts/SessionContext";
+import { useLocale } from "../contexts/LocaleContext";
 import Sidebar from "../components/Sidebar";
 import ViewModeSwitcher from "../components/ViewModeSwitcher";
 import ChatComposer from "../components/ChatComposer";
@@ -31,6 +32,7 @@ function getStoredSidebarCollapsed() {
 
 export default function AuthenticatedLayout() {
   const { isAdmin: isAdminUser } = useAuth();
+  const { t } = useLocale();
   const {
     modelOptions,
     enabledModels,
@@ -275,12 +277,15 @@ export default function AuthenticatedLayout() {
         <header className="topbar">
           <div className="topbar-title-group">
             <div className="topbar-title">
-              {activeConversation?.title || "新对话"}
+              {activeConversation?.title || t("app.newConversation")}
             </div>
             <div className="topbar-subtitle">
               {(graph.blocks?.length ?? 0) > 0
-                ? `${graph.blocks.length} 个块 · 当前链 ${Math.max(activeChainBlocks.length - 1, 0)} 轮对话`
-                : "多视图对话工作台"}
+                ? t("app.sessionSubtitle", {
+                    blockCount: graph.blocks.length,
+                    roundCount: Math.max(activeChainBlocks.length - 1, 0),
+                  })
+                : t("app.multiViewWorkbench")}
             </div>
           </div>
           <div className="topbar-actions">
@@ -289,8 +294,8 @@ export default function AuthenticatedLayout() {
                 className="topbar-menu-btn"
                 type="button"
                 onClick={() => setIsSidebarDrawerOpen(true)}
-                aria-label="打开会话列表"
-                title="打开会话列表"
+                aria-label={t("app.openSidebar")}
+                title={t("app.openSidebar")}
               >
                 <svg
                   viewBox="0 0 24 24"

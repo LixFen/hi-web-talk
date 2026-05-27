@@ -1,4 +1,8 @@
-﻿export default function ChatHero({ hasModels, onOpenSettings }) {
+﻿import { useLocale } from "../contexts/LocaleContext";
+
+export default function ChatHero({ hasModels, onOpenSettings }) {
+  const { t } = useLocale();
+
   return (
     <div className="empty-state" style={{ padding: '0 2rem', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.9 }}>
       {/* Icon Graphic */}
@@ -35,7 +39,7 @@
         color: 'var(--text-primary)', 
         marginBottom: '1rem' 
       }}>
-        {hasModels ? "今天想聊点什么？" : "尚未配置可用模型"}
+        {hasModels ? t("chat.heroTitle") : t("chat.heroNoModels")}
       </h2>
       
       <p style={{ 
@@ -48,7 +52,7 @@
       }}>
         {hasModels 
           ? " " 
-          : "你需要先在设置中添加并启用至少一个模型（如 OpenAI、Anthropic 或是本地模型），然后系统方可进行对话。"}
+          : t("chat.heroNoModelsDesc")}
       </p>
       
       {!hasModels && (
@@ -85,7 +89,7 @@
             <line x1="12" y1="8" x2="12" y2="16" />
             <line x1="8" y1="12" x2="16" y2="12" />
           </svg>
-          立刻配置模型
+          {t("chat.heroConfigure")}
         </button>
       )}
     </div>

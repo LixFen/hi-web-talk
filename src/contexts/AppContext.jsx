@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -17,6 +18,7 @@ import {
   updateModelConfig,
 } from "../lib/chatApi";
 import { useAuth } from "./AuthContext";
+import { useLocale } from "./LocaleContext";
 import hljsGithubDark from "highlight.js/styles/github-dark.css?url";
 
 const AppContext = createContext(null);
@@ -34,6 +36,9 @@ function pickEnabledModelAlias(models, preferredAlias = "") {
 
 export function AppProvider({ children }) {
   const { isAuthenticated } = useAuth();
+  const { t } = useLocale();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [modelOptions, setModelOptions] = useState([]);
   const [providerDefinitions, setProviderDefinitions] = useState([]);
   const [adaptationDefinitions, setAdaptationDefinitions] = useState([]);
@@ -90,9 +95,7 @@ export function AppProvider({ children }) {
         setSelectedModelId((current) => pickEnabledModelAlias(models, current));
       } catch (err) {
         if (!isCancelled) {
-          setError(
-            err instanceof Error ? err.message : "初始化失败，请检查服务端是否已启动。",
-          );
+          setError(err instanceof Error ? err.message : tRef.current("app.error.initFailed"));
         }
       } finally {
         if (!isCancelled) {
@@ -194,7 +197,7 @@ export function AppProvider({ children }) {
         applyModels(result.models, result.model?.alias || payload.alias);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "创建模型失败，请稍后再试。",
+          err instanceof Error ? err.message : tRef.current("app.error.createModelFailed"),
         );
         throw err;
       } finally {
@@ -213,7 +216,7 @@ export function AppProvider({ children }) {
         applyModels(result.models, result.model?.alias || alias);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "更新模型失败，请稍后再试。",
+          err instanceof Error ? err.message : tRef.current("app.error.updateModelFailed"),
         );
         throw err;
       } finally {
@@ -232,7 +235,7 @@ export function AppProvider({ children }) {
         applyModels(result.models, selectedModelId === alias ? "" : selectedModelId);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "删除模型失败，请稍后再试。",
+          err instanceof Error ? err.message : tRef.current("app.error.deleteModelFailed"),
         );
         throw err;
       } finally {
@@ -250,7 +253,7 @@ export function AppProvider({ children }) {
       setAppSettings(result?.settings ?? {});
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "更新外观设置失败，请稍后再试。",
+        err instanceof Error ? err.message : tRef.current("app.error.updateAppearanceFailed"),
       );
     } finally {
       setIsAppearanceSaving(false);
@@ -265,7 +268,7 @@ export function AppProvider({ children }) {
       setAppSettings(result?.settings ?? {});
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "更新外观设置失败，请稍后再试。",
+        err instanceof Error ? err.message : tRef.current("app.error.updateAppearanceFailed"),
       );
     } finally {
       setIsAppearanceSaving(false);
@@ -280,7 +283,7 @@ export function AppProvider({ children }) {
       setAppSettings(result?.settings ?? {});
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "更新外观设置失败，请稍后再试。",
+        err instanceof Error ? err.message : tRef.current("app.error.updateAppearanceFailed"),
       );
     } finally {
       setIsAppearanceSaving(false);
@@ -295,7 +298,7 @@ export function AppProvider({ children }) {
       setAppSettings(result?.settings ?? {});
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "更新交互设置失败，请稍后再试。",
+        err instanceof Error ? err.message : tRef.current("app.error.updateInteractionFailed"),
       );
     } finally {
       setIsInteractionSaving(false);

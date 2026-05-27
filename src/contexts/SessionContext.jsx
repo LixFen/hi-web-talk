@@ -24,6 +24,7 @@ import {
 } from "../lib/chatApi";
 import { useAuth } from "./AuthContext";
 import { useApp } from "./AppContext";
+import { useLocale } from "./LocaleContext";
 import useStreaming from "../hooks/useStreaming";
 
 const SessionContext = createContext(null);
@@ -98,6 +99,9 @@ async function loadAllSessions() {
 export function SessionProvider({ children }) {
   const { isAuthenticated } = useAuth();
   const { selectedModel } = useApp();
+  const { t } = useLocale();
+  const tRef = useRef(t);
+  tRef.current = t;
   const location = useLocation();
 
   const [sessionSummaries, setSessionSummaries] = useState([]);
@@ -221,7 +225,7 @@ export function SessionProvider({ children }) {
         await setFocusedBlock(sessionHash, blockSHA1);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "更新焦点失败，请稍后再试。",
+          err instanceof Error ? err.message : tRef.current("session.focusFailed"),
         );
       }
     },
@@ -261,7 +265,7 @@ export function SessionProvider({ children }) {
         return detail;
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "读取会话失败，请稍后再试。",
+          err instanceof Error ? err.message : tRef.current("session.loadFailed"),
         );
         return null;
       } finally {
@@ -275,7 +279,9 @@ export function SessionProvider({ children }) {
     async (conversation) => {
       if (!conversation?.id || isLoading) return null;
       const confirmed = window.confirm(
-        `确认删除会话《${conversation.title || "未命名会话"}》吗？\n\n这会同时删除该会话下的 block、摘要、错误日志和适配记录，且无法撤销。`,
+        tRef.current("session.deleteConfirm", {
+          title: conversation.title || tRef.current("session.untitled"),
+        }),
       );
       if (!confirmed) return null;
       setIsLoading(true);
@@ -301,7 +307,7 @@ export function SessionProvider({ children }) {
         return { nextHash, remainingCount: remainingSessions.length };
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "删除会话失败，请稍后再试。",
+          err instanceof Error ? err.message : tRef.current("session.deleteFailed"),
         );
         return null;
       } finally {
@@ -328,7 +334,7 @@ export function SessionProvider({ children }) {
         );
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "更新会话名称失败，请稍后再试。",
+          err instanceof Error ? err.message : tRef.current("session.renameFailed"),
         );
         throw err;
       }
@@ -355,9 +361,7 @@ export function SessionProvider({ children }) {
         }
       } catch (err) {
         setError(
-          err instanceof Error
-            ? err.message
-            : "重新生成标题失败，请稍后再试。",
+          err instanceof Error ? err.message : tRef.current("session.regenerateTitleFailed"),
         );
         throw err;
       } finally {
@@ -391,7 +395,7 @@ export function SessionProvider({ children }) {
           if (version !== viewSwitchVersionRef.current) return;
           setViewMode(previousMode);
           setError(
-            err instanceof Error ? err.message : "切换视图失败，请稍后再试。",
+            err instanceof Error ? err.message : tRef.current("session.switchModeFailed"),
           );
         });
     },
@@ -412,7 +416,7 @@ export function SessionProvider({ children }) {
         });
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "切换分支失败，请稍后再试。",
+          err instanceof Error ? err.message : tRef.current("session.switchBranchFailed"),
         );
       }
     },
@@ -435,7 +439,7 @@ export function SessionProvider({ children }) {
         });
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "创建分支失败，请稍后再试。",
+          err instanceof Error ? err.message : tRef.current("session.createBranchFailed"),
         );
       }
     },
@@ -460,7 +464,7 @@ export function SessionProvider({ children }) {
         });
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "重新生成失败，请稍后再试。",
+          err instanceof Error ? err.message : tRef.current("session.regenerateFailed"),
         );
       } finally {
         setIsLoading(false);
@@ -485,7 +489,7 @@ export function SessionProvider({ children }) {
         applySessionDetail(result.detail);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "更新适配项失败，请稍后再试。",
+          err instanceof Error ? err.message : tRef.current("app.error.updateInteractionFailed"),
         );
       } finally {
         setIsLoading(false);
@@ -510,7 +514,7 @@ export function SessionProvider({ children }) {
         applySessionDetail(result.detail);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "执行适配命令失败，请稍后再试。",
+          err instanceof Error ? err.message : tRef.current("app.error.runCommandFailed"),
         );
       } finally {
         setIsLoading(false);
@@ -560,9 +564,7 @@ export function SessionProvider({ children }) {
       } catch (err) {
         if (!isCancelled) {
           setError(
-            err instanceof Error
-              ? err.message
-              : "初始化失败，请检查服务端是否已启动。",
+            err instanceof Error ? err.message : tRef.current("app.error.initFailed"),
           );
         }
       } finally {

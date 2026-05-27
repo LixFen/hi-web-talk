@@ -1,14 +1,16 @@
 ﻿import { useSearchParams } from "react-router-dom";
-
-const VIEW_OPTIONS = [
-  { id: "chat", label: "聊天视图" },
-  { id: "chain", label: "卡片链" },
-  { id: "graph", label: "网状图" },
-];
+import { useLocale } from "../contexts/LocaleContext";
 
 export default function ViewModeSwitcher() {
+  const { t } = useLocale();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentView = searchParams.get("view") || "chat";
+
+  const viewOptions = [
+    { id: "chat", label: t("view.chat") },
+    { id: "chain", label: t("view.chain") },
+    { id: "graph", label: t("view.graph") },
+  ];
 
   function handleChange(nextMode) {
     if (nextMode === currentView) return;
@@ -22,8 +24,8 @@ export default function ViewModeSwitcher() {
   }
 
   return (
-    <div className="view-mode-switcher" role="tablist" aria-label="视图切换">
-      {VIEW_OPTIONS.map((option) => (
+    <div className="view-mode-switcher" role="tablist" aria-label={t("view.switcher") }>
+      {viewOptions.map((option) => (
         <button
           key={option.id}
           type="button"

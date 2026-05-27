@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useLocale } from "../contexts/LocaleContext";
 
 export default function LoginView({ onLogin }) {
+  const { t } = useLocale();
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +30,7 @@ export default function LoginView({ onLogin }) {
       }
 
       if (!response.ok) {
-        setError(result?.error || "操作失败，请稍后再试。");
+        setError(result?.error || t("login.error.operationFailed"));
         return;
       }
 
@@ -37,7 +39,7 @@ export default function LoginView({ onLogin }) {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "网络错误，请检查服务端是否已启动。",
+          : t("login.error.network"),
       );
     } finally {
       setIsSubmitting(false);
@@ -52,13 +54,13 @@ export default function LoginView({ onLogin }) {
           <path d="M14.5 12L10 9V15L14.5 12Z" fill="var(--bg-main)"/>
         </svg>
       </div>
-      <h2 className="hero-title">{isRegister ? "创建账号" : "欢迎回来"}</h2>
+      <h2 className="hero-title">{isRegister ? t("login.createAccount") : t("login.welcomeBack")}</h2>
 
       <form className="login-form" onSubmit={handleSubmit}>
         <div className="login-field">
           <input
             type="text"
-            placeholder="用户名"
+            placeholder={t("login.username")}
             value={username}
             onChange={(event) => setUsername(event.target.value)}
             autoFocus
@@ -68,7 +70,7 @@ export default function LoginView({ onLogin }) {
         <div className="login-field">
           <input
             type="password"
-            placeholder="密码"
+            placeholder={t("login.password")}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             disabled={isSubmitting}
@@ -82,19 +84,19 @@ export default function LoginView({ onLogin }) {
           className="suggestion-card login-submit-btn"
           disabled={isSubmitting || !username.trim() || !password.trim()}
         >
-          {isSubmitting ? "请稍候..." : isRegister ? "注册" : "登录"}
+          {isSubmitting ? t("login.submitting") : isRegister ? t("login.submitRegister") : t("login.submitLogin")}
         </button>
       </form>
 
       <p className="login-switch">
-        {isRegister ? "已有账号？" : "没有账号？"}
+        {isRegister ? t("login.haveAccount") : t("login.noAccount")}
         <button
           type="button"
           className="login-switch-btn"
           onClick={() => { setError(""); setIsRegister(!isRegister); }}
           disabled={isSubmitting}
         >
-          {isRegister ? "去登录" : "去注册"}
+          {isRegister ? t("login.goLogin") : t("login.goRegister")}
         </button>
       </p>
     </div>

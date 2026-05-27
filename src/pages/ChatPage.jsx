@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useSession } from "../contexts/SessionContext";
 import { useApp } from "../contexts/AppContext";
+import { useLocale } from "../contexts/LocaleContext";
 import ChatView from "../components/ChatView";
 import ChatHero from "../components/ChatHero";
 
@@ -9,6 +10,7 @@ const ChainCardView = lazy(() => import("../components/ChainCardView"));
 const GraphView = lazy(() => import("../components/GraphView"));
 
 export default function ChatPage() {
+  const { t } = useLocale();
   const { sessionHash } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -45,7 +47,7 @@ export default function ChatPage() {
           methods.subscribeToStream(sessionHash);
         }
         if (!cancelled && !detail && !cancelled) {
-          methods.setError("该对话不存在或已被删除");
+          methods.setError(t("chat.sessionMissing"));
           redirectTimerRef.current = window.setTimeout(() => {
             const summaries = session.sessionSummaries;
             if (summaries.length > 0) {
@@ -57,7 +59,7 @@ export default function ChatPage() {
         }
       } catch {
         if (!cancelled) {
-          methods.setError("该对话不存在或已被删除");
+          methods.setError(t("chat.sessionMissing"));
           redirectTimerRef.current = window.setTimeout(() => {
             const summaries = session.sessionSummaries;
             if (summaries.length > 0) {
@@ -80,7 +82,7 @@ export default function ChatPage() {
         redirectTimerRef.current = 0;
       }
     };
-  }, [sessionHash, session.activeConversation?.sessionHash]);
+  }, [sessionHash, session.activeConversation?.sessionHash, t]);
 
   useEffect(() => {
     const methods = sessionMethodsRef.current;
@@ -115,7 +117,7 @@ export default function ChatPage() {
   if (session.isBootstrapping) {
     return (
       <div className="empty-state">
-        <h2 className="hero-title">正在加载会话...</h2>
+        <h2 className="hero-title">{t("chat.loadingSession")}</h2>
       </div>
     );
   }
@@ -123,7 +125,7 @@ export default function ChatPage() {
   if (sessionHash && session.activeConversation?.sessionHash !== sessionHash) {
     return (
       <div className="empty-state">
-        <h2 className="hero-title">正在加载会话...</h2>
+        <h2 className="hero-title">{t("chat.loadingSession")}</h2>
       </div>
     );
   }
@@ -189,7 +191,7 @@ export default function ChatPage() {
       <Suspense
         fallback={
           <div className="empty-state">
-            <h2 className="hero-title">加载中...</h2>
+            <h2 className="hero-title">{t("app.loading")}</h2>
           </div>
         }
       >
@@ -213,7 +215,7 @@ export default function ChatPage() {
     <Suspense
       fallback={
         <div className="empty-state">
-          <h2 className="hero-title">加载中...</h2>
+          <h2 className="hero-title">{t("app.loading")}</h2>
         </div>
       }
     >

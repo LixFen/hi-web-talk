@@ -1,4 +1,6 @@
 import React from "react";
+import { useLocale } from "../contexts/LocaleContext";
+import { LOCALE_OPTIONS } from "../lib/i18n";
 
 export default function AppearanceSettingsPanel({
   open,
@@ -9,6 +11,8 @@ export default function AppearanceSettingsPanel({
   onToggleHideWideScreenSideBranches,
   onToggleDarkMode,
 }) {
+  const { locale, setLocale, t } = useLocale();
+
   if (!open) {
     return null;
   }
@@ -19,41 +23,41 @@ export default function AppearanceSettingsPanel({
   const darkModeEnabled = darkMode === "dark";
 
   return (
-    <div className="settings-modal-backdrop" role="dialog" aria-modal="true" aria-label="外观设置">
+    <div className="settings-modal-backdrop" role="dialog" aria-modal="true" aria-label={t("appearance.title")}>
       <div className="settings-modal appearance-settings-modal">
         <div className="settings-sidebar">
           <div className="settings-sidebar-header">
             <div>
-              <div className="settings-eyebrow">Stage 8</div>
-              <h2 className="settings-title">外观设置</h2>
+              <div className="settings-eyebrow">{t("appearance.stage")}</div>
+              <h2 className="settings-title">{t("appearance.title")}</h2>
             </div>
             <button type="button" className="topbar-btn subtle" onClick={onClose}>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "0.35rem", verticalAlign: "-0.125rem" }}>
                 <path d="M19 12H5" />
                 <path d="M12 19l-7-7 7-7" />
               </svg>
-              返回
+              {t("settings.back")}
             </button>
           </div>
 
           <p className="appearance-settings-summary">
-            这里用于控制聊天区域的视觉细节，可根据个人阅读偏好进行开关调整。
+            {t("appearance.summary")}
           </p>
         </div>
 
         <div className="settings-form">
           <div className="settings-form-header">
             <div>
-              <div className="settings-eyebrow">Appearance</div>
-              <h3 className="settings-panel-title">聊天视图</h3>
+              <div className="settings-eyebrow">{t("settings.stageAppearance")}</div>
+              <h3 className="settings-panel-title">{t("appearance.panel")}</h3>
             </div>
           </div>
 
-          <section className="settings-appearance-card" aria-label="聊天视图焦点样式">
+          <section className="settings-appearance-card" aria-label={t("appearance.focusOutline")}>
             <div>
-              <h4 className="settings-appearance-card-title">显示聊天视图焦点轮廓</h4>
+              <h4 className="settings-appearance-card-title">{t("appearance.focusOutline")}</h4>
               <p className="settings-appearance-card-desc">
-                开启后，当前焦点消息会高亮边框和阴影，便于在长对话中快速定位。
+                {t("appearance.focusOutlineDesc")}
               </p>
             </div>
 
@@ -69,15 +73,15 @@ export default function AppearanceSettingsPanel({
               <span className="settings-switch-track" aria-hidden="true">
                 <span className="settings-switch-thumb" />
               </span>
-              <span className="settings-switch-label">{showChatFocusOutline ? "已开启" : "已关闭"}</span>
+              <span className="settings-switch-label">{showChatFocusOutline ? t("appearance.on") : t("appearance.off")}</span>
             </label>
           </section>
 
-          <section className="settings-appearance-card" aria-label="聊天侧边分支显示">
+          <section className="settings-appearance-card" aria-label={t("appearance.sideBranches")}>
             <div>
-              <h4 className="settings-appearance-card-title">宽屏端隐藏直接显示对话列表两侧分支</h4>
+              <h4 className="settings-appearance-card-title">{t("appearance.sideBranches")}</h4>
               <p className="settings-appearance-card-desc">
-                开启后将隐藏聊天列表两侧的分支预览文字，仅保留正文区域内的分支切换按钮。
+                {t("appearance.sideBranchesDesc")}
               </p>
             </div>
 
@@ -94,16 +98,16 @@ export default function AppearanceSettingsPanel({
                 <span className="settings-switch-thumb" />
               </span>
               <span className="settings-switch-label">
-                {hideWideScreenSideBranches ? "已开启" : "已关闭"}
+                {hideWideScreenSideBranches ? t("appearance.on") : t("appearance.off")}
               </span>
             </label>
           </section>
 
-          <section className="settings-appearance-card" aria-label="深色模式">
+          <section className="settings-appearance-card" aria-label={t("appearance.darkMode")}>
             <div>
-              <h4 className="settings-appearance-card-title">深色模式</h4>
+              <h4 className="settings-appearance-card-title">{t("appearance.darkMode")}</h4>
               <p className="settings-appearance-card-desc">
-                开启后强制使用深色主题，关闭后跟随系统设置。
+                {t("appearance.darkModeDesc")}
               </p>
             </div>
 
@@ -119,8 +123,27 @@ export default function AppearanceSettingsPanel({
               <span className="settings-switch-track" aria-hidden="true">
                 <span className="settings-switch-thumb" />
               </span>
-              <span className="settings-switch-label">{darkModeEnabled ? "已开启" : "跟随系统"}</span>
+              <span className="settings-switch-label">{darkModeEnabled ? t("appearance.on") : t("appearance.followSystem")}</span>
             </label>
+          </section>
+
+          <section className="settings-appearance-card" aria-label={t("settings.language")}>
+            <div>
+              <h4 className="settings-appearance-card-title">{t("settings.language")}</h4>
+            </div>
+
+            <select
+              className="composer-model-selector"
+              value={locale}
+              onChange={(event) => setLocale(event.target.value)}
+              aria-label={t("settings.language")}
+            >
+              {LOCALE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </section>
         </div>
       </div>

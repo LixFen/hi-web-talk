@@ -2,6 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useSession } from "../contexts/SessionContext";
+import { useLocale } from "../contexts/LocaleContext";
 import ContextMenu from "./ContextMenu";
 
 const Sidebar = ({
@@ -16,6 +17,7 @@ const Sidebar = ({
   onTouchEnd,
 }) => {
   const { currentUser, logout } = useAuth();
+  const { t } = useLocale();
   const {
     sessionSummaries,
     activeConversation,
@@ -72,7 +74,7 @@ const Sidebar = ({
 
   const handleRenameClick = async (conversation) => {
     const nextTitle = window.prompt(
-      "请输入新的会话名称",
+      t("sidebar.renamePrompt"),
       conversation.title || "",
     );
     if (nextTitle === null) return;
@@ -104,10 +106,10 @@ const Sidebar = ({
     return [
       {
         key: "regenerate-title",
-        label: "重新生成标题",
+        label: t("sidebar.regenerateTitle"),
         onClick: () => {
           const confirmed = window.confirm(
-            "是否根据当前活动块链来生成标题？",
+            t("sidebar.regenerateTitleConfirm"),
           );
           if (confirmed) {
             regenerateTitle(conversation, "default", true);
@@ -116,10 +118,10 @@ const Sidebar = ({
       },
       {
         key: "regenerate-title-important",
-        label: "根据重要程度生成标题",
+        label: t("sidebar.regenerateTitleByImportance"),
         onClick: () => {
           const confirmed = window.confirm(
-            "是否根据已标记的重要内容来生成标题？",
+            t("sidebar.regenerateTitleImportantConfirm"),
           );
           if (confirmed) {
             regenerateTitle(conversation, "important", true);
@@ -131,10 +133,10 @@ const Sidebar = ({
 
   const toggleAriaLabel =
     toggleVariant === "close"
-      ? "关闭会话列表"
+      ? t("sidebar.toggleClose")
       : isCollapsed
-        ? "展开会话列表"
-        : "收起会话列表";
+        ? t("sidebar.toggleExpand")
+        : t("sidebar.toggleCollapse");
 
   return (
     <div
@@ -145,7 +147,7 @@ const Sidebar = ({
     >
       <div className="sidebar-header">
         {!isCollapsed ? (
-          <div className="sidebar-project-title">hi web talk</div>
+          <div className="sidebar-project-title">{t("sidebar.project")}</div>
         ) : null}
         {showHeaderToggle ? (
           <button
@@ -202,7 +204,7 @@ const Sidebar = ({
             d="M12 4.5v15m7.5-7.5h-15"
           />
         </svg>
-        {!isCollapsed ? "开启新对话" : null}
+        {!isCollapsed ? t("sidebar.newChat") : null}
       </button>
 
       {!isCollapsed ? (
@@ -225,8 +227,8 @@ const Sidebar = ({
               <button
                 className="history-rename-btn"
                 type="button"
-                aria-label={`重命名会话 ${conversation.title}`}
-                title="重命名会话"
+                aria-label={`${t("sidebar.rename")} ${conversation.title}`}
+                title={t("sidebar.rename")}
                 onClick={(event) => {
                   event.stopPropagation();
                   handleRenameClick(conversation);
@@ -250,8 +252,8 @@ const Sidebar = ({
               <button
                 className="history-delete-btn"
                 type="button"
-                aria-label={`删除会话 ${conversation.title}`}
-                title="删除会话"
+                aria-label={`${t("sidebar.delete")} ${conversation.title}`}
+                title={t("sidebar.delete")}
                 onClick={(event) => {
                   event.stopPropagation();
                   handleDeleteConversation(conversation);
@@ -284,14 +286,14 @@ const Sidebar = ({
           </div>
           <div className="sidebar-user-name">{currentUser.username}</div>
           {currentUser.role === "admin" ? (
-            <span className="sidebar-admin-badge">admin</span>
+            <span className="sidebar-admin-badge">{t("sidebar.admin")}</span>
           ) : null}
           <button
             className="sidebar-logout-btn"
             type="button"
             onClick={logout}
-            aria-label="退出登录"
-            title="退出登录"
+            aria-label={t("sidebar.logout")}
+            title={t("sidebar.logout")}
           >
             <svg
               viewBox="0 0 24 24"
@@ -316,8 +318,8 @@ const Sidebar = ({
           className="sidebar-settings-btn"
           type="button"
           onClick={onOpenSettings}
-          aria-label="打开设置"
-          title="设置"
+          aria-label={t("sidebar.settings")}
+          title={t("sidebar.settings")}
         >
           <svg
             viewBox="0 0 24 24"
@@ -332,7 +334,7 @@ const Sidebar = ({
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9l-.33-1.82-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg>
-          {!isCollapsed ? "设置" : null}
+          {!isCollapsed ? t("sidebar.settings") : null}
         </button>
       </div>
 

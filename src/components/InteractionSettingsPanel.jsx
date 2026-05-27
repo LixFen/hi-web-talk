@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useLocale } from "../contexts/LocaleContext";
 
 const CHAT_VIEW_ADAPTATION_BUTTON_SWITCHES = [
   {
@@ -44,6 +45,7 @@ export default function InteractionSettingsPanel({
   onChangeTitleModel,
   onChangeSummaryModel,
 }) {
+  const { t } = useLocale();
   const [activeLeaf, setActiveLeaf] = useState("chat-adaptation-buttons");
   const showChatAdaptationButtons = settings.showChatAdaptationButtons !== false;
   const childSwitches = CHAT_VIEW_ADAPTATION_BUTTON_SWITCHES.map((item) => ({
@@ -58,36 +60,36 @@ export default function InteractionSettingsPanel({
   }
 
   return (
-    <div className="settings-modal-backdrop" role="dialog" aria-modal="true" aria-label="交互设置">
+    <div className="settings-modal-backdrop" role="dialog" aria-modal="true" aria-label={t("interaction.title")}>
       <div className="settings-modal appearance-settings-modal">
         <div className="settings-sidebar">
           <div className="settings-sidebar-header">
             <div>
-              <div className="settings-eyebrow">Stage 9</div>
-              <h2 className="settings-title">交互设置</h2>
+              <div className="settings-eyebrow">{t("interaction.stage")}</div>
+              <h2 className="settings-title">{t("interaction.title")}</h2>
             </div>
             <button type="button" className="topbar-btn subtle" onClick={onClose}>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "0.35rem", verticalAlign: "-0.125rem" }}>
                 <path d="M19 12H5" />
                 <path d="M12 19l-7-7 7-7" />
               </svg>
-              返回
+              {t("settings.back")}
             </button>
           </div>
 
           <p className="appearance-settings-summary">
-            管理聊天视图中交互控件的可见性与专用模型选择。
+            {t("interaction.summary")}
           </p>
 
-          <div className="settings-model-list" role="list" aria-label="交互设置三级菜单">
+          <div className="settings-model-list" role="list" aria-label={t("interaction.title")}>
             <button
               type="button"
               role="listitem"
               className={`settings-model-item ${activeLeaf === "chat-adaptation-buttons" ? "active" : ""}`.trim()}
               onClick={() => setActiveLeaf("chat-adaptation-buttons")}
             >
-              <span className="settings-model-name">聊天视图</span>
-              <span className="settings-model-meta">适配按钮显示</span>
+              <span className="settings-model-name">{t("interaction.view")}</span>
+              <span className="settings-model-meta">{t("interaction.buttonVisibility")}</span>
             </button>
             <button
               type="button"
@@ -95,8 +97,8 @@ export default function InteractionSettingsPanel({
               className={`settings-model-item ${activeLeaf === "interaction-model" ? "active" : ""}`.trim()}
               onClick={() => setActiveLeaf("interaction-model")}
             >
-              <span className="settings-model-name">交互模型配置</span>
-              <span className="settings-model-meta">标题与摘要专用模型</span>
+              <span className="settings-model-name">{t("interaction.modelConfig")}</span>
+              <span className="settings-model-meta">{t("interaction.summaryModelDesc")}</span>
             </button>
           </div>
         </div>
@@ -104,20 +106,20 @@ export default function InteractionSettingsPanel({
         <div className="settings-form">
           <div className="settings-form-header">
             <div>
-              <div className="settings-eyebrow">Interaction</div>
+              <div className="settings-eyebrow">{t("settings.stageInteraction")}</div>
               <h3 className="settings-panel-title">
-                {activeLeaf === "interaction-model" ? "交互模型配置" : "聊天视图 / 适配按钮显示"}
+                {activeLeaf === "interaction-model" ? t("interaction.modelConfig") : `${t("interaction.view")} / ${t("interaction.buttonVisibility")}`}
               </h3>
             </div>
           </div>
 
           {activeLeaf === "chat-adaptation-buttons" ? (
             <>
-              <section className="settings-appearance-card" aria-label="适配按钮总开关">
+              <section className="settings-appearance-card" aria-label={t("interaction.showChatButtons")}>
                 <div>
-                  <h4 className="settings-appearance-card-title">显示聊天适配按钮</h4>
+                  <h4 className="settings-appearance-card-title">{t("interaction.showChatButtons")}</h4>
                   <p className="settings-appearance-card-desc">
-                    关闭后，聊天视图将隐藏「忽略上下文、优先摘要、固定摘要、生成摘要、重要、待整理」按钮。
+                    {t("interaction.showChatButtonsDesc")}
                   </p>
                 </div>
 
@@ -133,9 +135,9 @@ export default function InteractionSettingsPanel({
                   <span className="settings-switch-track" aria-hidden="true">
                     <span className="settings-switch-thumb" />
                   </span>
-                  <span className="settings-switch-label">
-                    {showChatAdaptationButtons ? "已开启" : "已关闭"}
-                  </span>
+                    <span className="settings-switch-label">
+                      {showChatAdaptationButtons ? t("interaction.enabled") : t("interaction.disabled")}
+                    </span>
                 </label>
               </section>
 
@@ -144,7 +146,7 @@ export default function InteractionSettingsPanel({
                   <section
                     key={item.key}
                     className="settings-appearance-card"
-                    aria-label={`按钮开关：${item.label}`}
+                    aria-label={`${t("interaction.buttonVisibility")}：${item.label}`}
                   >
                     <div>
                       <h4 className="settings-appearance-card-title">{item.label}</h4>
@@ -165,7 +167,7 @@ export default function InteractionSettingsPanel({
                       <span className="settings-switch-track" aria-hidden="true">
                         <span className="settings-switch-thumb" />
                       </span>
-                      <span className="settings-switch-label">{item.enabled ? "显示" : "隐藏"}</span>
+                      <span className="settings-switch-label">{item.enabled ? t("interaction.show") : t("interaction.hide")}</span>
                     </label>
                   </section>
                 ))
@@ -175,11 +177,11 @@ export default function InteractionSettingsPanel({
 
           {activeLeaf === "interaction-model" ? (
             <>
-              <section className="settings-appearance-card" aria-label="标题生成模型">
+              <section className="settings-appearance-card" aria-label={t("interaction.titleModel")}>
                 <div>
-                  <h4 className="settings-appearance-card-title">标题生成模型</h4>
+                  <h4 className="settings-appearance-card-title">{t("interaction.titleModel")}</h4>
                   <p className="settings-appearance-card-desc">
-                    右键会话列表中的会话，选择「重新生成标题」或「根据重要程度生成标题」时将使用此模型。
+                    {t("interaction.titleModelDesc")}
                   </p>
                 </div>
 
@@ -190,7 +192,7 @@ export default function InteractionSettingsPanel({
                   disabled={isSaving}
                   aria-label="选择标题生成模型"
                 >
-                  <option value="">自动选择</option>
+                  <option value="">{t("interaction.autoSelect")}</option>
                   {enabledModels.map((option) => (
                     <option key={option.alias} value={option.alias}>
                       {option.label}
@@ -199,11 +201,11 @@ export default function InteractionSettingsPanel({
                 </select>
               </section>
 
-              <section className="settings-appearance-card" aria-label="摘要模型">
+              <section className="settings-appearance-card" aria-label={t("interaction.summaryModel")}>
                 <div>
-                  <h4 className="settings-appearance-card-title">摘要模型</h4>
+                  <h4 className="settings-appearance-card-title">{t("interaction.summaryModel")}</h4>
                   <p className="settings-appearance-card-desc">
-                    为对话块生成内容摘要时将使用此模型。
+                    {t("interaction.summaryModelDesc")}
                   </p>
                 </div>
 
@@ -214,7 +216,7 @@ export default function InteractionSettingsPanel({
                   disabled={isSaving}
                   aria-label="选择摘要模型"
                 >
-                  <option value="">自动选择</option>
+                  <option value="">{t("interaction.autoSelect")}</option>
                   {enabledModels.map((option) => (
                     <option key={option.alias} value={option.alias}>
                       {option.label}

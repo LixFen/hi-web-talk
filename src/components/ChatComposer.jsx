@@ -1,6 +1,7 @@
 ﻿import React, { useRef, useState, useEffect, useCallback } from 'react';
 import BlockSelector from './BlockSelector';
 import { getAttachmentUrl } from '../lib/chatApi';
+import { useLocale } from '../contexts/LocaleContext';
 
 function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
@@ -94,6 +95,7 @@ const ChatComposer = ({
   onUploadAttachment,
   sessionHash,
 }) => {
+  const { t } = useLocale();
   const MAX_ATTACHMENTS = 10;
 
   const [text, setText] = useState('');
@@ -388,9 +390,9 @@ const ChatComposer = ({
               type="button"
               onClick={onToggleCollapsed}
               aria-expanded={!isCollapsed}
-              aria-label={isCollapsed ? '展开输入框' : '收起输入框'}
+              aria-label={isCollapsed ? t('app.expandInput') : t('app.collapseInput')}
             >
-              {isCollapsed ? '展开输入框' : '收起输入框'}
+              {isCollapsed ? t('app.expandInput') : t('app.collapseInput')}
             </button>
           </div>
         ) : null}
@@ -409,7 +411,7 @@ const ChatComposer = ({
                   type="button"
                   className="composer-attachment-remove"
                   onClick={() => removeAttachment(attachment.attachmentId)}
-                  title="移除图片"
+                    title={t('app.removeImage')}
                 >
                   ×
                 </button>
@@ -422,7 +424,7 @@ const ChatComposer = ({
             ref={textareaRef}
             className="chat-textarea"
             rows={1}
-            placeholder={"消息发送给 AI..."}
+            placeholder={t('app.messagePlaceholder')}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -434,7 +436,7 @@ const ChatComposer = ({
             className="composer-attach-btn"
             onClick={handleAttachClick}
             disabled={isLoading}
-            title="上传图片"
+            title={t('app.uploadImage')}
           >
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -447,7 +449,7 @@ const ChatComposer = ({
             type="button"
             onClick={canStop ? onStop : handleSend}
             disabled={canStop ? false : (!text.trim() && !attachments.some((a) => !a.isLocal)) || isLoading}
-            aria-label={canStop ? '停止生成' : '发送消息'}
+            aria-label={canStop ? t('app.stopGenerating') : t('app.sendMessage')}
           >
             {canStop ? (
               <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -472,10 +474,10 @@ const ChatComposer = ({
               value={selectedModelId}
               onChange={(e) => onChangeModel?.(e.target.value)}
               disabled={isLoading || modelOptions.length === 0}
-              aria-label={"选择当前发送模型"}
+              aria-label={t('app.currentModel')}
             >
               {modelOptions.length === 0 ? (
-                <option value="">{"暂无可用模型"}</option>
+                <option value="">{t('app.noAvailableModel')}</option>
               ) : (
                 modelOptions.map((option) => (
                   <option key={option.alias} value={option.alias}>
@@ -493,7 +495,7 @@ const ChatComposer = ({
             />
           </div>
           <div className="chat-footer-text">
-            {"AI 可能会犯错。请核实重要信息。"}
+            {t('app.aiWarning')}
           </div>
         </div>
           </>

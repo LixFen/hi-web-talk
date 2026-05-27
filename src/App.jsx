@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { LocaleProvider, useLocale } from "./contexts/LocaleContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AppProvider } from "./contexts/AppContext";
 import { SessionProvider } from "./contexts/SessionContext";
@@ -45,12 +46,14 @@ function AppContent() {
   );
 }
 
-export default function App() {
+function AppShell() {
+  const { t } = useLocale();
+
   return (
     <Suspense
       fallback={
         <div className="empty-state">
-          <h2 className="hero-title">加载中...</h2>
+          <h2 className="hero-title">{t("app.loading")}</h2>
         </div>
       }
     >
@@ -58,5 +61,13 @@ export default function App() {
         <AppContent />
       </BrowserRouter>
     </Suspense>
+  );
+}
+
+export default function App() {
+  return (
+    <LocaleProvider>
+      <AppShell />
+    </LocaleProvider>
   );
 }
