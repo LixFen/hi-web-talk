@@ -33,7 +33,8 @@ export default function SettingsMenuPanel({ open, onClose, onSelectSection }) {
             const isAvailableEntry =
               section.key === "model" ||
               section.key === "appearance" ||
-              section.key === "behavior";
+              section.key === "behavior" ||
+              section.key === "about";
 
             return (
               <button

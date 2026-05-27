@@ -2030,6 +2030,10 @@
   width: min(1060px, 100%);
 }
 
+.about-settings-modal {
+  width: min(1020px, 100%);
+}
+
 .settings-sidebar {
   background: linear-gradient(180deg, color-mix(in srgb, var(--bg-sidebar) 92%, transparent), var(--bg-sidebar));
   border-right: 1px solid var(--border-light);
@@ -2208,6 +2212,76 @@
   font-size: 0.82rem;
   line-height: 1.5;
   color: var(--text-secondary);
+}
+
+.settings-about-card {
+  align-items: flex-start;
+}
+
+.settings-about-changelog-card {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.settings-about-version-badge {
+  margin-top: auto;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  background: var(--bg-elevated);
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  box-shadow: var(--shadow-xs);
+}
+
+.settings-about-version-badge span {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.settings-about-version-badge strong {
+  font-size: 1.35rem;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+}
+
+.settings-about-version-pill {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-full);
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  padding: 0.5rem 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  box-shadow: var(--shadow-xs);
+  white-space: nowrap;
+}
+
+.settings-about-changelog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  width: 100%;
+}
+
+.settings-about-changelog-markdown {
+  width: 100%;
+}
+
+.settings-about-changelog-markdown .markdown-body {
+  max-height: min(32vh, 18rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  background: color-mix(in srgb, var(--bg-hover) 68%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-light) 76%, transparent);
+  border-radius: var(--radius-xl);
+  padding: 0.95rem 1rem;
 }
 
 .settings-switch {

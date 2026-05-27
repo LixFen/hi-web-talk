@@ -12,6 +12,7 @@ import ChatComposer from "../components/ChatComposer";
 import ModelSettingsPanel from "../components/ModelSettingsPanel";
 import AppearanceSettingsPanel from "../components/AppearanceSettingsPanel";
 import InteractionSettingsPanel from "../components/InteractionSettingsPanel";
+import AboutSettingsPanel from "../components/AboutSettingsPanel";
 import SettingsMenuPanel from "../components/SettingsMenuPanel";
 
 function resolveLayoutMode(viewportWidth) {
@@ -82,6 +83,7 @@ export default function AuthenticatedLayout() {
   const [isModelPanelOpen, setIsModelPanelOpen] = useState(false);
   const [isAppearancePanelOpen, setIsAppearancePanelOpen] = useState(false);
   const [isInteractionPanelOpen, setIsInteractionPanelOpen] = useState(false);
+  const [isAboutPanelOpen, setIsAboutPanelOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
 
   const drawerTouchStartRef = useRef({ x: 0, y: 0, active: false });
@@ -127,6 +129,8 @@ export default function AuthenticatedLayout() {
         setIsAppearancePanelOpen(true);
       } else if (section === "behavior") {
         setIsInteractionPanelOpen(true);
+      } else if (section === "about") {
+        setIsAboutPanelOpen(true);
       }
     }
     window.addEventListener("open-settings", handleOpenSettings);
@@ -138,11 +142,13 @@ export default function AuthenticatedLayout() {
       isModelPanelOpen ||
       isAppearancePanelOpen ||
       isInteractionPanelOpen ||
+      isAboutPanelOpen ||
       isSettingsMenuOpen,
     [
       isModelPanelOpen,
       isAppearancePanelOpen,
       isInteractionPanelOpen,
+      isAboutPanelOpen,
       isSettingsMenuOpen,
     ],
   );
@@ -171,6 +177,8 @@ export default function AuthenticatedLayout() {
       setIsAppearancePanelOpen(true);
     } else if (sectionKey === "behavior") {
       setIsInteractionPanelOpen(true);
+    } else if (sectionKey === "about") {
+      setIsAboutPanelOpen(true);
     }
   }, []);
 
@@ -422,6 +430,14 @@ export default function AuthenticatedLayout() {
         }
         onChangeTitleModel={changeTitleModel}
         onChangeSummaryModel={changeSummaryModel}
+      />
+
+      <AboutSettingsPanel
+        open={isAboutPanelOpen}
+        onClose={() => {
+          setIsAboutPanelOpen(false);
+          setIsSettingsMenuOpen(true);
+        }}
       />
 
       <SettingsMenuPanel
