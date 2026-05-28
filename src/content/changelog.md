@@ -1,5 +1,6 @@
 # 1.15.4
 
+- Fix: changed enum of validation for dark mode
 - Fix: modifying a saved model's configuration (without clearing the stored API key) no longer silently wipes the encrypted key.
 - Fix: credential cache is now cleared immediately after a model update, preventing stale keys from being used.
 - Graph view detail panel now floats over the graph canvas instead of occupying a fixed side column.

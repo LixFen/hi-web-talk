@@ -22,7 +22,7 @@ export const appSettingsSchema = z.object({
   showPendingOrganizeLabelButton: z.boolean().optional(),
   titleModelAlias: z.string().optional(),
   summaryModelAlias: z.string().optional(),
-  darkMode: z.enum(["light", "dark", "auto"]).optional(),
+  darkMode: z.enum(["dark", "system"]).optional(),
 });
 
 const modelPayloadSchema = z.object({
