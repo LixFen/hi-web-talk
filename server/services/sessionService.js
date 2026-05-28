@@ -1,6 +1,4 @@
-﻿import fs from "fs/promises";
-import crypto from "crypto";
-import path from "path";
+﻿import crypto from "crypto";
 import {
   DEFAULT_SESSION_TITLE,
   DEFAULT_SYSTEM_PROMPT,
@@ -36,10 +34,6 @@ import { deleteSummariesForBlocks, listSummaries } from "./summaryService.js";
 import { deleteAttachmentsForBlocks } from "./attachmentService.js";
 import { callProviderModel } from "./llmProviderService.js";
 import { sessionDetailCache } from "../lib/cache.js";
-
-function getSessionDir(sessionHash) {
-  return path.join(SESSIONS_DIR, sessionHash);
-}
 
 function createSessionHash() {
   return crypto.randomBytes(12).toString("hex");
@@ -269,21 +263,6 @@ function buildChainChatMessages(chainBlocks, blockViewMap) {
   return messages;
 }
 
-function assertSessionDirSafe(sessionHash) {
-  const targetDir = path.resolve(getSessionDir(sessionHash));
-  const sessionsRoot = path.resolve(SESSIONS_DIR);
-
-  if (!(targetDir === sessionsRoot || targetDir.startsWith(`${sessionsRoot}${path.sep}`))) {
-    throw new Error("非法的会话目录路径。");
-  }
-
-  return targetDir;
-}
-
-async function ensureSessionArtifacts(sessionHash) {
-  await ensureDir(getSessionDir(sessionHash));
-}
-
 export async function ensureDataLayout() {
   await ensureDir(SESSIONS_DIR);
   await ensureConfigFiles();
@@ -326,14 +305,11 @@ export async function createSession(userId) {
       userId,
     });
 
-    await ensureSessionArtifacts(sessionHash);
-
     return getSessionDetail(sessionHash);
   } catch (error) {
     try {
       deleteBlockRecords(sessionHash);
       deleteSessionRecord(sessionHash);
-      await fs.rm(getSessionDir(sessionHash), { recursive: true, force: true });
     } catch {
       // Preserve the original failure; best-effort cleanup only.
     }
@@ -420,7 +396,6 @@ export async function updateSessionTitle(sessionHash, title) {
 
 export async function deleteSession(sessionHash) {
   const session = await getSessionOrThrow(sessionHash);
-  const targetDir = assertSessionDirSafe(sessionHash);
 
   // Soft delete does not trigger FK CASCADE, so manual cleanup of child tables is required.
   // CASCADE only fires on hard DELETE FROM sessions, serving as a safety net for accidental deletes.
@@ -433,7 +408,6 @@ export async function deleteSession(sessionHash) {
 
   deleteSessionRecord(sessionHash);
   deleteBlockRecords(sessionHash);
-  await fs.rm(targetDir, { recursive: true, force: false });
   sessionDetailCache.clearSession(sessionHash);
 
   return {
