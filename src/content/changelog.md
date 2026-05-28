@@ -1,3 +1,7 @@
+# 1.15.3
+
+- Now attchments can be displayed in BlockView mode.
+
 # 1.15.2
 - Change msg.content to msg.text to ensure that multimodal messages (image + text) enter the correct rendering path.
 - Removed the unauthenticated legacy `POST /api/chat` endpoint that allowed anonymous LLM calls.

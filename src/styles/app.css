@@ -2662,6 +2662,22 @@
   word-break: break-word;
 }
 
+.block-card-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 0.85rem;
+}
+
+.block-card-attachment-thumb {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-light);
+  background: var(--bg-input);
+}
+
 .block-card-meta {
   margin-top: 0.85rem;
   border: 1px solid var(--border-light);

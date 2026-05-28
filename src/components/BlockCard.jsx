@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import SafeMarkdown from "./SafeMarkdown";
-import { extractPromptText } from "../lib/content";
+import { extractPromptText, extractPromptAttachments } from "../lib/content";
+import { getAttachmentUrl } from "../lib/chatApi";
 
 function ReasoningIcon({ isOpen }) {
   return (
@@ -170,6 +171,7 @@ export default function BlockCard({
   const adaptationInfo = block.adaptationInfo ?? null;
   const summaryInfo = block.summaryInfo ?? null;
   const isSystemBlock = block.blockType === "system";
+  const attachments = extractPromptAttachments(block.prompt);
 
   async function handleCopy() {
     try {
@@ -221,6 +223,25 @@ export default function BlockCard({
           <div className="block-card-section-title">用户</div>
           <div className="block-card-prompt">{extractPromptText(block.prompt) || "暂无内容"}</div>
         </section>
+
+        {attachments.length > 0 ? (
+          <details className="block-card-details">
+            <summary>
+              附件 ({attachments.length})
+            </summary>
+            <div className="block-card-attachments">
+              {attachments.map((att) => (
+                <img
+                  key={att.attachmentId}
+                  className="block-card-attachment-thumb"
+                  src={getAttachmentUrl(att.attachmentId)}
+                  alt={att.fileName || "图片"}
+                  loading="lazy"
+                />
+              ))}
+            </div>
+          </details>
+        ) : null}
 
         {!isSystemBlock && block.reasoning ? (
           <section className="block-card-section">

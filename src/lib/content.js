@@ -16,3 +16,13 @@ export function extractPromptText(prompt) {
 
   return prompt ? String(prompt) : "";
 }
+
+export function extractPromptAttachments(prompt) {
+  if (!Array.isArray(prompt)) {
+    return [];
+  }
+
+  return prompt.filter(
+    (block) => block.type === "image_attachment" && block.attachmentId,
+  );
+}
