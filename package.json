@@ -1,7 +1,7 @@
 {
   "name": "hi-web-talk",
   "private": true,
-  "version": "1.15.2",
+  "version": "1.15.4",
   "type": "module",
   "engines": {
     "node": ">=18.0.0"

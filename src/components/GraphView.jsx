@@ -10,10 +10,23 @@ const ROW_GAP = 64;
 const PADDING_X = 28;
 const PADDING_Y = 28;
 
-function buildGraphLayout(blocks) {
+const NODE_WIDTH_COMPACT = 140;
+const NODE_HEIGHT_COMPACT = 40;
+const COLUMN_GAP_COMPACT = 28;
+const ROW_GAP_COMPACT = 28;
+
+function buildGraphLayout(blocks, zoomLevel = 1) {
   if (blocks.length === 0) {
     return { nodes: [], edges: [], width: 0, height: 0 };
   }
+
+  const isCompact = zoomLevel === 0;
+  const nodeW = isCompact ? NODE_WIDTH_COMPACT : NODE_WIDTH;
+  const nodeH = isCompact ? NODE_HEIGHT_COMPACT : NODE_HEIGHT;
+  const colGap = isCompact ? COLUMN_GAP_COMPACT : COLUMN_GAP;
+  const rowGap = isCompact ? ROW_GAP_COMPACT : ROW_GAP;
+  const padX = isCompact ? 16 : PADDING_X;
+  const padY = isCompact ? 16 : PADDING_Y;
 
   const childrenByParent = new Map();
 
@@ -62,8 +75,8 @@ function buildGraphLayout(blocks) {
 
       return {
         ...block,
-        x: PADDING_X + position.column * (NODE_WIDTH + COLUMN_GAP),
-        y: PADDING_Y + position.depth * (NODE_HEIGHT + ROW_GAP),
+        x: padX + position.column * (nodeW + colGap),
+        y: padY + position.depth * (nodeH + rowGap),
       };
     })
     .sort((left, right) => left.y - right.y || left.x - right.x);
@@ -81,11 +94,13 @@ function buildGraphLayout(blocks) {
   return {
     nodes,
     edges,
+    nodeW,
+    nodeH,
     width:
-      PADDING_X * 2 +
-      Math.max(columnCursor, 1) * NODE_WIDTH +
-      Math.max(columnCursor - 1, 0) * COLUMN_GAP,
-    height: PADDING_Y * 2 + (maxDepth + 1) * NODE_HEIGHT + maxDepth * ROW_GAP,
+      padX * 2 +
+      Math.max(columnCursor, 1) * nodeW +
+      Math.max(columnCursor - 1, 0) * colGap,
+    height: padY * 2 + (maxDepth + 1) * nodeH + maxDepth * rowGap,
   };
 }
 
@@ -121,6 +136,7 @@ const GraphView = memo(function GraphView(props) {
   const { blocks = [], isLoading, onActivateBlock, onFocusBlock, graph, focusedBlockSHA1 = "", adaptationDefinitions = [], onBranchFromBlock, onRegenerate, onToggleAdaptation, onRunAdaptation } = props;
   const canvasScrollRef = useRef(null);
   const selectedNodeRef = useRef(null);
+  const zoomAnchorRef = useRef(null);
   const dragStateRef = useRef({
     isDragging: false,
     startX: 0,
@@ -132,6 +148,7 @@ const GraphView = memo(function GraphView(props) {
   });
   const [isDetailCollapsed, setIsDetailCollapsed] = useState(true);
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
   const [selectedSHA1, setSelectedSHA1] = useState(
     focusedBlockSHA1 || graph?.rootBlockSHA1 || blocks[0]?.sha1 || "",
   );
@@ -224,6 +241,72 @@ const GraphView = memo(function GraphView(props) {
       window.removeEventListener("blur", finishDrag);
     };
   }, [isDraggingCanvas]);
+
+  useEffect(() => {
+    const scrollElement = canvasScrollRef.current;
+
+    if (!scrollElement) {
+      return undefined;
+    }
+
+    function handleWheel(event) {
+      if (!event.ctrlKey) {
+        return;
+      }
+
+      event.preventDefault();
+      const direction = event.deltaY > 0 ? -1 : 1;
+
+      setZoomLevel((current) => {
+        const next = current + direction;
+
+        if (next < 0 || next > 1) {
+          return current;
+        }
+
+        const rect = scrollElement.getBoundingClientRect();
+        const canvas = scrollElement.querySelector(".graph-canvas");
+        const contentW = canvas ? canvas.scrollWidth : scrollElement.scrollWidth;
+        const contentH = canvas ? canvas.scrollHeight : scrollElement.scrollHeight;
+
+        zoomAnchorRef.current = {
+          next,
+          ratioX: (scrollElement.scrollLeft + (event.clientX - rect.left)) / contentW,
+          ratioY: (scrollElement.scrollTop + (event.clientY - rect.top)) / contentH,
+        };
+
+        return next;
+      });
+    }
+
+    scrollElement.addEventListener("wheel", handleWheel, { passive: false });
+    return () => scrollElement.removeEventListener("wheel", handleWheel);
+  }, []);
+
+  useEffect(() => {
+    const anchor = zoomAnchorRef.current;
+
+    if (!anchor) {
+      return;
+    }
+
+    zoomAnchorRef.current = null;
+    const scrollElement = canvasScrollRef.current;
+
+    if (!scrollElement) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      const canvas = scrollElement.querySelector(".graph-canvas");
+      const contentW = canvas ? canvas.scrollWidth : scrollElement.scrollWidth;
+      const contentH = canvas ? canvas.scrollHeight : scrollElement.scrollHeight;
+      const rect = scrollElement.getBoundingClientRect();
+
+      scrollElement.scrollLeft = anchor.ratioX * contentW - rect.width / 2;
+      scrollElement.scrollTop = anchor.ratioY * contentH - rect.height / 2;
+    });
+  }, [zoomLevel]);
 
   function handleCanvasMouseDown(event) {
     if (event.button !== 0) {
@@ -370,34 +453,14 @@ const GraphView = memo(function GraphView(props) {
     );
   }
 
-  const layout = buildGraphLayout(blocks);
+  const layout = buildGraphLayout(blocks, zoomLevel);
   const selectedBlock = blocks.find((block) => block.sha1 === selectedSHA1) ?? blocks[0];
+  const isCompact = zoomLevel === 0;
+  const { nodeW, nodeH } = layout;
 
   return (
     <div className={`graph-view-shell ${isDetailCollapsed ? "detail-collapsed" : ""}`}>
-      <div className="graph-detail-panel">
-        <div className="graph-detail-header">
-          <div>
-            <div className="settings-eyebrow">Block Detail</div>
-            <h2 className="settings-panel-title">当前选中节点</h2>
-          </div>
-          <button
-            type="button"
-            className="graph-detail-toggle-btn"
-            onClick={() => setIsDetailCollapsed(true)}
-            aria-label="收起节点详情"
-          >
-            收起
-          </button>
-        </div>
-        <BlockCard
-          block={selectedBlock}
-          className="graph-detail-card"
-          isFocused={selectedBlock?.sha1 === focusedBlockSHA1}
-          {...props}
-        />
-      </div>
-      <div className="graph-canvas-panel">
+      <div className={`graph-canvas-panel ${isCompact ? "zoomed-out" : ""}`}>
         {isDetailCollapsed ? (
           <button
             type="button"
@@ -408,6 +471,9 @@ const GraphView = memo(function GraphView(props) {
             展开详情
           </button>
         ) : null}
+        <div className="graph-zoom-indicator" aria-hidden="true">
+          {["紧凑", "标准"][zoomLevel]}
+        </div>
         <div
           className={`graph-canvas-scroll ${isDraggingCanvas ? "dragging" : ""}`.trim()}
           ref={canvasScrollRef}
@@ -417,9 +483,9 @@ const GraphView = memo(function GraphView(props) {
           <div className="graph-canvas" style={{ width: `${layout.width}px`, height: `${layout.height}px` }}>
             <svg className="graph-svg" width={layout.width} height={layout.height}>
               {layout.edges.map((edge) => {
-                const startX = edge.from.x + NODE_WIDTH / 2;
-                const startY = edge.from.y + NODE_HEIGHT;
-                const endX = edge.to.x + NODE_WIDTH / 2;
+                const startX = edge.from.x + nodeW / 2;
+                const startY = edge.from.y + nodeH;
+                const endX = edge.to.x + nodeW / 2;
                 const endY = edge.to.y;
                 const middleY = startY + (endY - startY) / 2;
                 const path = `M ${startX} ${startY} C ${startX} ${middleY}, ${endX} ${middleY}, ${endX} ${endY}`;
@@ -438,6 +504,7 @@ const GraphView = memo(function GraphView(props) {
 
             {layout.nodes.map((node) => {
               const isImportant = importantNodeSHA1s.has(node.sha1);
+              const modelLabel = node.blockType === "system" ? "system" : node.modelAlias || "dialogue";
 
               return (
               <button
@@ -445,8 +512,8 @@ const GraphView = memo(function GraphView(props) {
                 ref={selectedSHA1 === node.sha1 ? selectedNodeRef : null}
                 data-node-sha1={node.sha1}
                 type="button"
-                className={`graph-node ${selectedSHA1 === node.sha1 ? "selected" : ""} ${node.graphInfo?.isActiveBlock ? "active" : ""} ${node.sha1 === focusedBlockSHA1 ? "focused" : ""} ${node.graphInfo?.isInActiveChain ? "in-chain" : ""} ${isImportant ? "important" : ""}`}
-                style={{ left: `${node.x}px`, top: `${node.y}px`, width: `${NODE_WIDTH}px`, height: `${NODE_HEIGHT}px` }}
+                className={`graph-node ${isCompact ? "compact" : ""} ${selectedSHA1 === node.sha1 ? "selected" : ""} ${node.graphInfo?.isActiveBlock ? "active" : ""} ${node.sha1 === focusedBlockSHA1 ? "focused" : ""} ${node.graphInfo?.isInActiveChain ? "in-chain" : ""} ${isImportant ? "important" : ""}`}
+                style={{ left: `${node.x}px`, top: `${node.y}px`, width: `${nodeW}px`, height: `${nodeH}px` }}
                 disabled={isLoading}
                 onClick={() => {
                   setSelectedSHA1(node.sha1);
@@ -457,35 +524,63 @@ const GraphView = memo(function GraphView(props) {
                   handleOpenContextMenu(node, event.clientX, event.clientY);
                 }}
               >
-                {isImportant ? (
-                  <div className="graph-node-important-badge" aria-label="重要标记">
-                    <svg width="14" height="14" viewBox="0 0 26 26" aria-hidden="true" focusable="false">
-                      <path
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        fill="none"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M13 3l2.7 5.5 6 .9-4.3 4.2 1 6.1L13 17.4 7.6 19.7l1-6.1L4.3 9.4l6-.9Z"
-                      />
-                    </svg>
-                  </div>
-                ) : null}
-                <div className="graph-node-title-row">
-                  <span className="graph-node-type">
-                    {node.blockType === "system" ? "system" : node.modelAlias || "dialogue"}
-                  </span>
-                  <span className="graph-node-sha">{node.sha1.slice(0, 6)}</span>
-                </div>
-                <div className="graph-node-content">{getNodeSnippet(node)}</div>
-                <div className="graph-node-footer">
-                  <span>深度 {node.graphInfo?.depth ?? 0}</span>
-                  <span>子节点 {node.graphInfo?.childCount ?? 0}</span>
-                </div>
+                {isCompact ? (
+                  <span className="graph-node-compact-label">{node.sha1.slice(0, 6)}</span>
+                ) : (
+                  <>
+                    {isImportant ? (
+                      <div className="graph-node-important-badge" aria-label="重要标记">
+                        <svg width="14" height="14" viewBox="0 0 26 26" aria-hidden="true" focusable="false">
+                          <path
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            fill="none"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M13 3l2.7 5.5 6 .9-4.3 4.2 1 6.1L13 17.4 7.6 19.7l1-6.1L4.3 9.4l6-.9Z"
+                          />
+                        </svg>
+                      </div>
+                    ) : null}
+                    <div className="graph-node-title-row">
+                      <span className="graph-node-type">{modelLabel}</span>
+                      <span className="graph-node-sha">{node.sha1.slice(0, 6)}</span>
+                    </div>
+                    <div className="graph-node-content">{getNodeSnippet(node)}</div>
+                    <div className="graph-node-footer">
+                      <span>深度 {node.graphInfo?.depth ?? 0}</span>
+                      <span>子节点 {node.graphInfo?.childCount ?? 0}</span>
+                    </div>
+                  </>
+                )}
               </button>
               );
             })}
           </div>
+        </div>
+      </div>
+      <div className="graph-detail-panel">
+        <div className="graph-detail-header">
+          <div>
+            <div className="settings-eyebrow">Block Detail</div>
+            <h2 className="settings-panel-title">当前选中节点</h2>
+          </div>
+          <button
+            type="button"
+            className="graph-detail-toggle-btn"
+            onClick={() => setIsDetailCollapsed(true)}
+            aria-label="收起节点详情"
+          >
+            收起
+          </button>
+        </div>
+        <div className="graph-detail-card-wrapper">
+          <BlockCard
+            block={selectedBlock}
+            className="graph-detail-card"
+            isFocused={selectedBlock?.sha1 === focusedBlockSHA1}
+            {...props}
+          />
         </div>
       </div>
       <ContextMenu

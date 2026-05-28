@@ -69,6 +69,7 @@ import {
   listModels,
   updateAppSettings,
   updateModel,
+  clearCredentialCache,
 } from "./services/modelConfigService.js";
 import {
   createSession,
@@ -386,6 +387,7 @@ app.put("/api/models/:alias", authenticateToken, validateParams(pathModelAliasSc
   try {
     const model = await updateModel(request.params.alias, parseModelPayload(request.body), request.user.id, request.user.role);
     invalidateModelAdapterCache();
+    clearCredentialCache();
     const models = await listModels(request.user.id, request.user.role);
     response.json({
       model: models.find((item) => item.alias === model.alias) ?? null,

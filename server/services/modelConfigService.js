@@ -34,6 +34,10 @@ let cachedEncryptionKey = null;
 const credentialCache = new Map();
 let credentialCleanupTimer = null;
 
+export function clearCredentialCache() {
+  credentialCache.clear();
+}
+
 function scheduleCredentialCacheCleanup() {
   if (credentialCleanupTimer) {
     return;
@@ -513,9 +517,13 @@ export async function updateModel(alias, payload, userId = null, role = "user") 
     throw error;
   }
 
+  const sanitizedPayload = Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== undefined),
+  );
+
   const mergedRecord = {
     ...currentModel,
-    ...payload,
+    ...sanitizedPayload,
     alias,
     updatedAt: nowIso(),
   };

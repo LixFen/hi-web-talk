@@ -1,3 +1,10 @@
+# 1.15.4
+
+- Fix: modifying a saved model's configuration (without clearing the stored API key) no longer silently wipes the encrypted key.
+- Fix: credential cache is now cleared immediately after a model update, preventing stale keys from being used.
+- Graph view detail panel now floats over the graph canvas instead of occupying a fixed side column.
+- Graph view supports Ctrl+scroll zoom with two levels: compact (sha1 only) and standard; zoom centers on the mouse pointer position.
+
 # 1.15.3
 
 - Now attchments can be displayed in BlockView mode.
