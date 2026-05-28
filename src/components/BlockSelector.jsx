@@ -117,7 +117,7 @@ export default function BlockSelector({
   const showPanel = isHovered || isOpen;
   const focusedBlock = displayBlocks.find((b) => b.sha1 === focusedBlockSHA1);
   const focusedLabel = focusedBlock
-    ? (focusedBlock.summaryInfo?.summary || focusedBlock.prompt?.slice(0, 20) || "")
+    ? (focusedBlock.summaryInfo?.summary || extractPromptText(focusedBlock.prompt).slice(0, 20) || "")
     : "";
 
   return (

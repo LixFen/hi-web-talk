@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
-import { DATA_DIR } from "../constants.js";
+import { DATA_DIR, JWT_SECRET } from "../constants.js";
 import { ensureDir, pathExists } from "../lib/fileStore.js";
 import { getDatabase } from "../lib/database.js";
 
@@ -16,7 +16,7 @@ function getAttachmentPath(sessionHash, attachmentId) {
 }
 
 function getEncryptionKey() {
-  const secret = process.env.ATTACHMENT_ENCRYPTION_KEY?.trim() || process.env.JWT_SECRET;
+  const secret = process.env.ATTACHMENT_ENCRYPTION_KEY?.trim() || process.env.JWT_SECRET || JWT_SECRET;
   return crypto.createHash("sha256").update(secret).digest();
 }
 

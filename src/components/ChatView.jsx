@@ -6,6 +6,7 @@ import {
   resolveReadCursor,
 } from "../lib/chatReadingState";
 import MessageList from "./MessageList";
+import { extractPromptText } from "../lib/content";
 
 function clampText(value = "", maxLength = 120) {
   const normalized = `${value ?? ""}`.replace(/\s+/g, " ").trim();
@@ -72,7 +73,7 @@ function buildBranchPreviews(graphBlocks = [], activeBlockSHA1 = "") {
         id: childBlock.sha1,
         order: index + 1,
         targetSHA1: childBlock.sha1,
-        title: clampText(childBlock.prompt || "未命名分支", 40),
+        title: clampText(extractPromptText(childBlock.prompt) || "未命名分支", 40),
         preview: clampText(previewText, 120),
         meta:
           stepCount > 1

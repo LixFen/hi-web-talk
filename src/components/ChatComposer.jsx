@@ -191,7 +191,6 @@ const ChatComposer = ({
       try {
         const base64Data = await readFileAsBase64(compressedBlob);
         const fn = onUploadAttachment;
-        console.log('[ChatComposer] paste upload start, onUploadAttachment exists:', !!fn, 'file:', fileName);
         if (!fn) {
           console.error('[ChatComposer] paste: onUploadAttachment is not set, keeping local preview');
           return;
@@ -292,7 +291,6 @@ const ChatComposer = ({
         try {
           const base64Data = await readFileAsBase64(compressedBlob);
           const fn = onUploadAttachmentRef.current;
-          console.log('[ChatComposer] upload start, onUploadAttachment exists:', !!fn, 'file:', file.name);
           if (!fn) {
             console.error('[ChatComposer] onUploadAttachment is not set, keeping local preview');
             return;
