@@ -45,9 +45,10 @@ function downgradeContentToText(content) {
     if (block.type === "text") {
       textParts.push(block.text ?? "");
     } else if (block.type === "image_url") {
-      textParts.push("[图片]");
+      textParts.push("[图片：当前模型不支持查看图片]");
     } else if (block.type === "image_attachment") {
-      textParts.push(`[图片: ${block.fileName ?? "附件"}]`);
+      const fileName = block.fileName ?? "附件";
+      textParts.push(`[图片: ${fileName} - 当前模型不支持查看图片]`);
     } else {
       textParts.push(`[${block.type ?? "未知内容"}]`);
     }
