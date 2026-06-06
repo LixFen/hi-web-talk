@@ -149,6 +149,7 @@ const GraphView = memo(function GraphView(props) {
   const [isDetailCollapsed, setIsDetailCollapsed] = useState(true);
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [showHidden, setShowHidden] = useState(false);
   const [selectedSHA1, setSelectedSHA1] = useState(
     focusedBlockSHA1 || graph?.rootBlockSHA1 || blocks[0]?.sha1 || "",
   );
@@ -444,6 +445,20 @@ const GraphView = memo(function GraphView(props) {
     [blocks],
   );
 
+  const hiddenNodeSHA1s = useMemo(
+    () =>
+      new Set(
+        blocks
+          .filter((block) =>
+            block.adaptationInfo?.labels?.some((label) => label.key === "label.hidden"),
+          )
+          .map((block) => block.sha1),
+      ),
+    [blocks],
+  );
+
+  const hiddenCount = hiddenNodeSHA1s.size;
+
   if (blocks.length === 0) {
     return (
       <div className="view-empty-state">
@@ -453,7 +468,8 @@ const GraphView = memo(function GraphView(props) {
     );
   }
 
-  const layout = buildGraphLayout(blocks, zoomLevel);
+  const visibleBlocks = showHidden ? blocks : blocks.filter((block) => !hiddenNodeSHA1s.has(block.sha1));
+  const layout = buildGraphLayout(visibleBlocks, zoomLevel);
   const selectedBlock = blocks.find((block) => block.sha1 === selectedSHA1) ?? blocks[0];
   const isCompact = zoomLevel === 0;
   const { nodeW, nodeH } = layout;
@@ -469,6 +485,16 @@ const GraphView = memo(function GraphView(props) {
             aria-label="展开节点详情"
           >
             展开详情
+          </button>
+        ) : null}
+        {hiddenCount > 0 ? (
+          <button
+            type="button"
+            className={`graph-hidden-toggle-btn ${showHidden ? "active" : ""}`}
+            onClick={() => setShowHidden((v) => !v)}
+            aria-label={showHidden ? "隐藏已标记分支" : "显示已标记分支"}
+          >
+            {showHidden ? "隐藏分支" : `显示隐藏 (${hiddenCount})`}
           </button>
         ) : null}
         <div className="graph-zoom-indicator" aria-hidden="true">
@@ -491,12 +517,14 @@ const GraphView = memo(function GraphView(props) {
                 const path = `M ${startX} ${startY} C ${startX} ${middleY}, ${endX} ${middleY}, ${endX} ${endY}`;
                 const isImportant =
                   importantNodeSHA1s.has(edge.from.sha1) && importantNodeSHA1s.has(edge.to.sha1);
+                const isHidden =
+                  hiddenNodeSHA1s.has(edge.from.sha1) || hiddenNodeSHA1s.has(edge.to.sha1);
 
                 return (
                   <path
                     key={edge.id}
                     d={path}
-                    className={`graph-edge ${isImportant ? "important" : ""}`}
+                    className={`graph-edge ${isImportant ? "important" : ""} ${isHidden ? "hidden-edge" : ""}`}
                   />
                 );
               })}
@@ -504,6 +532,7 @@ const GraphView = memo(function GraphView(props) {
 
             {layout.nodes.map((node) => {
               const isImportant = importantNodeSHA1s.has(node.sha1);
+              const isHidden = hiddenNodeSHA1s.has(node.sha1);
               const modelLabel = node.blockType === "system" ? "system" : node.modelAlias || "dialogue";
 
               return (
@@ -512,7 +541,7 @@ const GraphView = memo(function GraphView(props) {
                 ref={selectedSHA1 === node.sha1 ? selectedNodeRef : null}
                 data-node-sha1={node.sha1}
                 type="button"
-                className={`graph-node ${isCompact ? "compact" : ""} ${selectedSHA1 === node.sha1 ? "selected" : ""} ${node.graphInfo?.isActiveBlock ? "active" : ""} ${node.sha1 === focusedBlockSHA1 ? "focused" : ""} ${node.graphInfo?.isInActiveChain ? "in-chain" : ""} ${isImportant ? "important" : ""}`}
+                className={`graph-node ${isCompact ? "compact" : ""} ${selectedSHA1 === node.sha1 ? "selected" : ""} ${node.graphInfo?.isActiveBlock ? "active" : ""} ${node.sha1 === focusedBlockSHA1 ? "focused" : ""} ${node.graphInfo?.isInActiveChain ? "in-chain" : ""} ${isImportant ? "important" : ""} ${isHidden ? "hidden-node" : ""}`}
                 style={{ left: `${node.x}px`, top: `${node.y}px`, width: `${nodeW}px`, height: `${nodeH}px` }}
                 disabled={isLoading}
                 onClick={() => {

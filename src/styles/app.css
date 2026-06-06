@@ -3004,6 +3004,51 @@
   opacity: 0.7;
 }
 
+.graph-hidden-toggle-btn {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  z-index: 3;
+  border: 1px solid var(--border-light);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 0.76rem;
+  font-weight: 500;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  transition: background var(--duration-fast), border-color var(--duration-fast),
+              box-shadow var(--duration-fast), transform var(--duration-fast);
+}
+
+.graph-hidden-toggle-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.graph-hidden-toggle-btn.active {
+  background: color-mix(in srgb, var(--bg-main) 80%, #f4d58d 20%);
+  border-color: color-mix(in srgb, #f4d58d 45%, var(--border-strong));
+}
+
+.graph-edge.hidden-edge {
+  opacity: 0.3;
+  stroke-dasharray: 4 3;
+}
+
+.graph-node.hidden-node {
+  opacity: 0.4;
+  border-style: dashed;
+  border-color: var(--text-muted);
+}
+
+.graph-node.hidden-node:hover {
+  opacity: 0.7;
+}
+
 .graph-detail-card {
   box-shadow: none;
   background: transparent;

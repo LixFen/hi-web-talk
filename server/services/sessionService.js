@@ -151,13 +151,16 @@ function getBlockDepth(block, blockMap, depthCache = new Map()) {
   return depth;
 }
 
-function buildBranchInfo(block, activeBlockSHA1, siblingsByParent, childrenByParent) {
+function buildBranchInfo(block, activeBlockSHA1, siblingsByParent, childrenByParent, hiddenSHA1Set) {
   if (block.blockType !== "dialogue") {
     return null;
   }
 
   const parentKey = block.parentBlockSHA1 ?? "__root__";
-  const siblings = siblingsByParent.get(parentKey) ?? [block];
+  const allSiblings = siblingsByParent.get(parentKey) ?? [block];
+  const siblings = hiddenSHA1Set?.size > 0
+    ? allSiblings.filter((sibling) => sibling.sha1 === block.sha1 || !hiddenSHA1Set.has(sibling.sha1))
+    : allSiblings;
   const siblingIndex = siblings.findIndex((sibling) => sibling.sha1 === block.sha1);
   const previousSibling = siblingIndex > 0 ? siblings[siblingIndex - 1] : null;
   const nextSibling =
@@ -183,6 +186,7 @@ function buildBlockViewModels(
   activeChainSHA1Set,
   adaptationMap,
   summaryMap,
+  hiddenSHA1Set,
 ) {
   const dialogueBlocks = allBlocks.filter((block) => block.blockType === "dialogue");
   const siblingsByParent = buildChildrenByParent(dialogueBlocks);
@@ -201,6 +205,7 @@ function buildBlockViewModels(
       activeBlockSHA1,
       siblingsByParent,
       childrenByParent,
+      hiddenSHA1Set,
     );
     const childBlocks = childrenByParent.get(block.sha1) ?? [];
 
@@ -233,6 +238,11 @@ function buildChainChatMessages(chainBlocks, blockViewMap) {
     const blockView = blockViewMap.get(block.sha1) ?? block;
     const summaryRecord = blockView.summaryInfo ?? null;
     const adaptationState = blockView.adaptationInfo ?? null;
+
+    if (adaptationState?.labels?.some((label) => label.key === "label.hidden")) {
+      continue;
+    }
+
     const branchInfo = blockView.branchInfo ?? null;
 
     messages.push({
@@ -522,6 +532,13 @@ export async function getSessionDetail(sessionHash, cachedData = null, viewMode 
 
   const allBlocks = await listBlocks(sessionHash);
 
+  const hiddenSHA1Set = new Set();
+  for (const [sha1, records] of adaptationMap) {
+    if (records.some((r) => r.key === "label.hidden" && r.enabled)) {
+      hiddenSHA1Set.add(sha1);
+    }
+  }
+
   const resolvedActiveBlockSHA1 = resolveActiveBlockSHA1(currentSession, allBlocks);
   const resolvedFocusedBlockSHA1 = resolveFocusedBlockSHA1(
     currentSession,
@@ -560,6 +577,7 @@ export async function getSessionDetail(sessionHash, cachedData = null, viewMode 
     activeChainSHA1Set,
     adaptationMap,
     summaryMap,
+    hiddenSHA1Set,
   );
   const blockViewMap = new Map(blockViewModels.map((block) => [block.sha1, block]));
 

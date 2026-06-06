@@ -40,11 +40,13 @@ import {
 } from "./lib/validation.js";
 import { loginUser, registerUser, getUserById } from "./services/userService.js";
 import { readSessionRecord } from "./lib/database.js";
+import { sessionDetailCache } from "./lib/cache.js";
 import {
   listAdaptationDefinitions,
   listBlockAdaptations,
   listSessionAdaptations,
   upsertBlockAdaptation,
+  upsertBlockAdaptationRecursive,
 } from "./services/blockAdaptationService.js";
 import {
   createDialogueBlock,
@@ -661,19 +663,31 @@ app.get("/api/sessions/:sessionHash/blocks/:blockSHA1/adaptations", authenticate
 
 app.put("/api/sessions/:sessionHash/blocks/:blockSHA1/adaptations/:key", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), validateBody(blockAdaptationUpsertSchema), async (request, response) => {
   try {
-    const adaptation = await upsertBlockAdaptation(
-      request.params.sessionHash,
-      request.params.blockSHA1,
-      request.params.key,
-      {
-        enabled: request.body.enabled,
-        status: request.body.status,
-        source: request.body.source ?? "user",
-        config: request.body.config ?? {},
-        payload: request.body.payload ?? {},
-        meta: request.body.meta ?? {},
-      },
-    );
+    const payload = {
+      enabled: request.body.enabled,
+      status: request.body.status,
+      source: request.body.source ?? "user",
+      config: request.body.config ?? {},
+      payload: request.body.payload ?? {},
+      meta: request.body.meta ?? {},
+    };
+
+    const isRecursiveLabel = request.params.key === "label.hidden";
+
+    const adaptation = isRecursiveLabel
+      ? await upsertBlockAdaptationRecursive(
+          request.params.sessionHash,
+          request.params.blockSHA1,
+          request.params.key,
+          payload,
+        )
+      : await upsertBlockAdaptation(
+          request.params.sessionHash,
+          request.params.blockSHA1,
+          request.params.key,
+          payload,
+        );
+    sessionDetailCache.clearSession(request.params.sessionHash);
     const detail = await getSessionDetail(request.params.sessionHash);
 
     response.json({ adaptation, detail });
@@ -699,6 +713,7 @@ app.post("/api/sessions/:sessionHash/blocks/:blockSHA1/adaptations/:key/run", au
       modelAlias,
       { role: request.user.role },
     );
+    sessionDetailCache.clearSession(request.params.sessionHash);
     const detail = await getSessionDetail(request.params.sessionHash);
 
     response.status(201).json({ summary, detail });
@@ -782,6 +797,7 @@ app.post("/api/sessions/:sessionHash/summaries/:blockSHA1/generate", authenticat
       modelAlias,
       { role: request.user.role },
     );
+    sessionDetailCache.clearSession(request.params.sessionHash);
     const detail = await getSessionDetail(request.params.sessionHash);
     response.status(201).json({ summary, detail });
   } catch (error) {

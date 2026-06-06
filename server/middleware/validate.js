@@ -19,7 +19,7 @@ export function validateBody(schema) {
 export function validateParams(schema) {
   return (request, response, next) => {
     try {
-      request.params = schema.parse(request.params ?? {});
+      request.params = schema.passthrough().parse(request.params ?? {});
       next();
     } catch (error) {
       if (error instanceof ZodError) {

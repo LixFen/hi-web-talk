@@ -3,6 +3,7 @@ import {
   deleteAdaptationRecordsForBlocks,
   listAdaptationRecords,
   listAdaptationRecordsWithCount,
+  listBlockRecords,
   readAdaptationRecord,
   upsertAdaptationRecord,
 } from "../lib/database.js";
@@ -62,6 +63,17 @@ const BUILTIN_ADAPTATION_DEFINITIONS = [
     defaultEnabled: false,
     defaultStatus: "inactive",
     ui: { placement: "message-toolbar", order: 50 },
+  },
+  {
+    key: "label.hidden",
+    label: "隐藏分支",
+    shortLabel: "隐藏",
+    category: "label",
+    kind: "toggle",
+    description: "标记为隐藏分支，在图视图中可切换是否显示。",
+    defaultEnabled: false,
+    defaultStatus: "inactive",
+    ui: { placement: "message-toolbar", order: 55 },
   },
   {
     key: "label.review",
@@ -182,6 +194,37 @@ export async function upsertBlockAdaptation(sessionHash, blockSHA1, key, partial
   });
   upsertAdaptationRecord(sessionHash, blockSHA1, key, nextRecord);
   return nextRecord;
+}
+
+export async function upsertBlockAdaptationRecursive(sessionHash, blockSHA1, key, partialRecord = {}) {
+  const allBlocks = listBlockRecords(sessionHash);
+
+  const childrenByParent = new Map();
+  for (const block of allBlocks) {
+    if (block.parentBlockSHA1) {
+      const siblings = childrenByParent.get(block.parentBlockSHA1) ?? [];
+      siblings.push(block);
+      childrenByParent.set(block.parentBlockSHA1, siblings);
+    }
+  }
+
+  const targetSHA1s = new Set();
+  const queue = [blockSHA1];
+  while (queue.length > 0) {
+    const sha1 = queue.shift();
+    if (targetSHA1s.has(sha1)) continue;
+    targetSHA1s.add(sha1);
+    const children = childrenByParent.get(sha1) ?? [];
+    for (const child of children) {
+      queue.push(child.sha1);
+    }
+  }
+
+  const results = [];
+  for (const sha1 of targetSHA1s) {
+    results.push(await upsertBlockAdaptation(sessionHash, sha1, key, partialRecord));
+  }
+  return results;
 }
 
 export async function getSessionAdaptationMap(sessionHash) {

@@ -56,6 +56,10 @@ function buildBranchPreviews(graphBlocks = [], activeBlockSHA1 = "") {
         return null;
       }
 
+      if (childBlock.adaptationInfo?.labels?.some((label) => label.key === "label.hidden")) {
+        return null;
+      }
+
       const latestLeaf = getLatestDescendantLeaf(childBlock, blockMap);
       const summaryText = latestLeaf.summaryInfo?.summary || childBlock.summaryInfo?.summary || "";
       const previewText =
