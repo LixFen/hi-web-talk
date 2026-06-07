@@ -8,6 +8,8 @@
 - Feat: model management sidebar now uses a tree layout (Provider → Models); model selector is grouped by Provider.
 - Feat: Provider CRUD — create, edit, and delete Providers with independent Base URL and credentials.
 - Fix: auto-migrate existing flat model records to Provider + Model structure on first startup; existing aliases are preserved.
+- Fix: sending a message after hiding the active chain now correctly attaches the reply to the nearest visible ancestor instead of the hidden block.
+- Feat: clicking a hidden node in graph view (show-hidden mode) no longer activates it — only visible nodes can be navigated to.
 
 # 1.15.4
 

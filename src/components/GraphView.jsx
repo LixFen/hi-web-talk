@@ -546,7 +546,9 @@ const GraphView = memo(function GraphView(props) {
                 disabled={isLoading}
                 onClick={() => {
                   setSelectedSHA1(node.sha1);
-                  onActivateBlock?.(node.sha1);
+                  if (!isHidden) {
+                    onActivateBlock?.(node.sha1);
+                  }
                 }}
                 onContextMenu={(event) => {
                   event.preventDefault();

@@ -962,6 +962,26 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
     }
 
     const context = await buildContextForActiveBlock(sessionHash, session.activeBlockSHA1);
+
+    // If the active block is hidden, attach the new block to the nearest visible ancestor
+    let effectiveParentSHA1 = session.activeBlockSHA1;
+    if (context.adaptationMap && context.chainBlocks) {
+      const hiddenSet = new Set();
+      for (const [sha1, records] of context.adaptationMap) {
+        if (records.some((r) => r.key === "label.hidden" && r.enabled)) {
+          hiddenSet.add(sha1);
+        }
+      }
+      if (hiddenSet.has(session.activeBlockSHA1)) {
+        for (let i = context.chainBlocks.length - 1; i >= 0; i--) {
+          if (!hiddenSet.has(context.chainBlocks[i].sha1)) {
+            effectiveParentSHA1 = context.chainBlocks[i].sha1;
+            break;
+          }
+        }
+      }
+    }
+
     let providerMessages = [
       ...(context.messages.length > 0
         ? context.messages
@@ -985,7 +1005,7 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
       prompt: normalizedPrompt,
       response: result.reply,
       reasoning: result.reasoning ?? "",
-      parentBlockSHA1: session.activeBlockSHA1,
+      parentBlockSHA1: effectiveParentSHA1,
       contextLength: context.contextLength,
       tokenUsage: result.usage,
       meta: {
@@ -1110,6 +1130,26 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
       contextLength: context.contextLength,
       messageCount: context.messages.length,
     });
+
+    // If the active block is hidden, attach the new block to the nearest visible ancestor
+    let effectiveParentSHA1 = session.activeBlockSHA1;
+    if (context.adaptationMap && context.chainBlocks) {
+      const hiddenSet = new Set();
+      for (const [sha1, records] of context.adaptationMap) {
+        if (records.some((r) => r.key === "label.hidden" && r.enabled)) {
+          hiddenSet.add(sha1);
+        }
+      }
+      if (hiddenSet.has(session.activeBlockSHA1)) {
+        for (let i = context.chainBlocks.length - 1; i >= 0; i--) {
+          if (!hiddenSet.has(context.chainBlocks[i].sha1)) {
+            effectiveParentSHA1 = context.chainBlocks[i].sha1;
+            break;
+          }
+        }
+      }
+    }
+
     let providerMessages = [
       ...(context.messages.length > 0
         ? context.messages
@@ -1156,7 +1196,7 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
       prompt: normalizedPrompt,
       response: result.reply,
       reasoning: result.reasoning ?? "",
-      parentBlockSHA1: session.activeBlockSHA1,
+      parentBlockSHA1: effectiveParentSHA1,
       contextLength: context.contextLength,
       tokenUsage: result.usage,
       meta: {
