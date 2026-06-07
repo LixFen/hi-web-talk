@@ -10,3 +10,4 @@ logs
 .idea
 .kilo/
 docs
+server/services/modelCapabilities.generated.js

@@ -1,3 +1,14 @@
+# 1.16.0
+
+- Feat: introduced Provider entity — API endpoint and credentials are now managed at the Provider level; models inherit from their Provider and no longer duplicate provider config.
+- Feat: model aliases are auto-generated as `providerSlug:modelName` when creating under a Provider.
+- Feat: model capabilities (multimodal, reasoning, context window) are auto-inferred from models.dev at build time and pre-filled on model creation.
+- Feat: added `npm run fetch:model-capabilities` script to refresh the model capability snapshot.
+- Feat: LLM adapters now extend a shared `BaseLLMAdapter` base class with unified retry logic (5xx exponential backoff).
+- Feat: model management sidebar now uses a tree layout (Provider → Models); model selector is grouped by Provider.
+- Feat: Provider CRUD — create, edit, and delete Providers with independent Base URL and credentials.
+- Fix: auto-migrate existing flat model records to Provider + Model structure on first startup; existing aliases are preserved.
+
 # 1.15.4
 
 - Fix: changed enum of validation for dark mode

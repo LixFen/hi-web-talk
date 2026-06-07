@@ -25,10 +25,40 @@ export const appSettingsSchema = z.object({
   darkMode: z.enum(["dark", "system"]).optional(),
 });
 
-const modelPayloadSchema = z.object({
-  alias: z.string().trim(),
-  label: z.string().optional(),
+// ── Provider schemas ──
+
+const providerPayloadSchema = z.object({
+  slug: z.string().trim().min(1).max(64).regex(/^[a-z0-9_-]+$/, "slug 仅允许小写字母、数字、下划线和连字符。"),
+  name: z.string().trim().min(1).max(128),
   providerType: z.string(),
+  baseURL: z.string().optional(),
+  apiKeySource: z.enum(["env", "stored"]).optional(),
+  apiKeyEnvName: z.string().optional(),
+  apiKeyEncrypted: z.string().optional(),
+  apiKey: z.string().optional(),
+  systemPromptRole: z.string().optional(),
+  requestOptions: z.record(z.unknown()).optional(),
+  shared: z.boolean().optional(),
+  meta: z.record(z.unknown()).optional(),
+});
+
+export const providerCreateSchema = providerPayloadSchema;
+
+export const providerUpdateSchema = providerPayloadSchema.partial({
+  slug: true,
+  name: true,
+  providerType: true,
+}).extend({
+  slug: z.string().trim().max(64).regex(/^[a-z0-9_-]+$/).optional(),
+});
+
+// ── Model schemas ──
+
+const modelPayloadSchema = z.object({
+  alias: z.string().trim().optional(),
+  label: z.string().optional(),
+  providerId: z.string().uuid().optional(),
+  providerType: z.string().optional(),
   baseURL: z.string().optional(),
   apiKeySource: z.enum(["env", "stored"]).optional(),
   apiKeyEnvName: z.string().optional(),
@@ -152,6 +182,10 @@ export const pathBlockSHA1Schema = z.object({
 
 export const pathModelAliasSchema = z.object({
   alias: z.string().min(1),
+});
+
+export const pathProviderIdSchema = z.object({
+  providerId: z.string().uuid(),
 });
 
 export const pathAdaptationKeySchema = z.object({

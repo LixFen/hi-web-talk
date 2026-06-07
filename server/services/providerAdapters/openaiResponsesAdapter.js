@@ -4,47 +4,50 @@ import {
   convertMultimodalContentForOpenAI,
   mergeSystemIntoFirstUser,
 } from "./baseAdapter.js";
+import { BaseLLMAdapter } from "./baseLLMAdapter.js";
 
-export function createOpenAIResponsesAdapter(modelConfig, credential) {
-  const client = new OpenAI({
-    apiKey: credential.apiKey,
-    ...(modelConfig.baseURL ? { baseURL: modelConfig.baseURL } : {}),
-  });
+class OpenAIResponsesAdapter extends BaseLLMAdapter {
+  constructor(modelConfig, credential) {
+    super(modelConfig, credential);
+    this.client = new OpenAI({
+      apiKey: credential.apiKey,
+      ...(modelConfig.baseURL ? { baseURL: modelConfig.baseURL } : {}),
+    });
+    this.systemPromptRole = modelConfig.systemPromptRole || "developer";
+  }
 
-  const systemPromptRole = modelConfig.systemPromptRole || "developer";
-
-  function normalizeMessages(messages) {
-    const effectiveMessages = modelConfig.supportsSystemRole === false
+  normalizeMessages(messages) {
+    const effectiveMessages = this.modelConfig.supportsSystemRole === false
       ? mergeSystemIntoFirstUser(messages)
       : messages;
 
     return effectiveMessages.map((message) => ({
       role:
-        message.role === "system" && systemPromptRole === "developer"
+        message.role === "system" && this.systemPromptRole === "developer"
           ? "developer"
           : message.role,
       content: convertMultimodalContentForOpenAI(message.content),
     }));
   }
 
-  function buildRequestOptions(messages) {
+  buildRequestOptions(messages) {
     const options = {
-      model: modelConfig.modelName,
-      input: normalizeMessages(messages),
+      model: this.modelConfig.modelName,
+      input: this.normalizeMessages(messages),
       stream: false,
     };
 
-    if (modelConfig.supportsThinking !== false && modelConfig.requestOptions?.reasoningEffort) {
+    if (this.modelConfig.supportsThinking !== false && this.modelConfig.requestOptions?.reasoningEffort) {
       options.reasoning = {
-        effort: modelConfig.requestOptions.reasoningEffort,
+        effort: this.modelConfig.requestOptions.reasoningEffort,
       };
     }
 
     return options;
   }
 
-  async function call({ messages }) {
-    const result = await client.responses.create(buildRequestOptions(messages));
+  async doCall(messages) {
+    const result = await this.client.responses.create(this.buildRequestOptions(messages));
 
     let reasoning = "";
     const reasoningItems = result.output?.filter((item) => item.type === "reasoning") ?? [];
@@ -56,20 +59,17 @@ export function createOpenAIResponsesAdapter(modelConfig, credential) {
       }
     }
 
-    return {
-      reply: result.output_text?.trim() || "",
-      reasoning: reasoning.trim() || "",
+    return this.buildResult({
+      reply: result.output_text || "",
+      reasoning,
       usage: formatTokenUsage(result.usage),
-      provider: modelConfig.providerType,
-      providerType: modelConfig.providerType,
-      model: modelConfig.modelName,
       responseId: result.id ?? null,
-    };
+    });
   }
 
-  async function stream({ messages, onChunk }) {
-    const stream = await client.responses.create({
-      ...buildRequestOptions(messages),
+  async doStream(messages, onChunk) {
+    const stream = await this.client.responses.create({
+      ...this.buildRequestOptions(messages),
       stream: true,
     });
 
@@ -106,16 +106,16 @@ export function createOpenAIResponsesAdapter(modelConfig, credential) {
       }
     }
 
-    return {
-      reply: reply.trim() || "",
-      reasoning: reasoning.trim() || "",
+    return this.buildResult({
+      reply,
+      reasoning,
       usage,
-      provider: modelConfig.providerType,
-      providerType: modelConfig.providerType,
-      model: modelConfig.modelName,
       responseId,
-    };
+    });
   }
+}
 
-  return { call, stream };
+export function createOpenAIResponsesAdapter(modelConfig, credential) {
+  const adapter = new OpenAIResponsesAdapter(modelConfig, credential);
+  return { call: (args) => adapter.call(args), stream: (args) => adapter.stream(args) };
 }

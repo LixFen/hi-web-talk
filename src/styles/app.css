@@ -2112,6 +2112,126 @@
   color: var(--text-secondary);
 }
 
+/* ── Tree structure for Provider → Model ── */
+
+.settings-tree-provider {
+  margin-bottom: var(--space-1);
+}
+
+.settings-tree-provider-header {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out-expo);
+  user-select: none;
+}
+
+.settings-tree-provider-header:hover {
+  background: var(--bg-hover);
+}
+
+.settings-tree-provider-header.active {
+  background: var(--bg-active, var(--bg-hover));
+  border-color: var(--border-light);
+}
+
+.settings-tree-expand {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+  cursor: pointer;
+  padding: 0.15rem 0.25rem;
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.settings-tree-expand:hover {
+  background: var(--bg-hover);
+}
+
+.settings-tree-provider-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-tree-add-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+  flex-shrink: 0;
+}
+
+.settings-tree-provider-header:hover .settings-tree-add-btn {
+  opacity: 1;
+}
+
+.settings-tree-add-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.settings-tree-models {
+  padding-left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.settings-tree-model {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  transition: background var(--duration-fast) var(--ease-out-expo);
+}
+
+.settings-tree-model:hover {
+  background: var(--bg-hover);
+}
+
+.settings-tree-model.active {
+  background: var(--bg-active, var(--bg-hover));
+}
+
+.settings-tree-model-name {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.settings-tree-model-meta {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.settings-tree-empty {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
 .settings-form {
   padding: 1.4rem;
   overflow-y: auto;

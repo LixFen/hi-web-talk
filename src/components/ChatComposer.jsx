@@ -81,6 +81,7 @@ const ChatComposer = ({
   isLoading,
   canStop = false,
   modelOptions = [],
+  providers = [],
   selectedModelId = "",
   isCollapsed = false,
   onToggleCollapsed,
@@ -476,6 +477,40 @@ const ChatComposer = ({
             >
               {modelOptions.length === 0 ? (
                 <option value="">{t('app.noAvailableModel')}</option>
+              ) : providers.length > 0 ? (
+                (() => {
+                  // Group models by provider
+                  const providerMap = new Map();
+                  for (const p of providers) {
+                    providerMap.set(p.providerId, { provider: p, models: [] });
+                  }
+                  const legacy = [];
+                  for (const m of modelOptions) {
+                    if (m.providerId && providerMap.has(m.providerId)) {
+                      providerMap.get(m.providerId).models.push(m);
+                    } else {
+                      legacy.push(m);
+                    }
+                  }
+                  const groups = [];
+                  for (const [, group] of providerMap) {
+                    if (group.models.length > 0) {
+                      groups.push(group);
+                    }
+                  }
+                  if (legacy.length > 0) {
+                    groups.push({ provider: { name: "其他" }, models: legacy });
+                  }
+                  return groups.map((group) => (
+                    <optgroup key={group.provider.name} label={group.provider.name}>
+                      {group.models.map((m) => (
+                        <option key={m.alias} value={m.alias}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ));
+                })()
               ) : (
                 modelOptions.map((option) => (
                   <option key={option.alias} value={option.alias}>

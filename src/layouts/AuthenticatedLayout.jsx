@@ -37,6 +37,7 @@ export default function AuthenticatedLayout() {
   const {
     modelOptions,
     enabledModels,
+    providers,
     providerDefinitions,
     appSettings,
     selectedModelId,
@@ -47,6 +48,9 @@ export default function AuthenticatedLayout() {
     createModel,
     updateModel,
     deleteModel,
+    createProvider,
+    updateProvider,
+    deleteProvider,
     toggleDarkMode,
     toggleShowChatFocusOutline,
     toggleHideWideScreenSideBranches,
@@ -363,6 +367,7 @@ export default function AuthenticatedLayout() {
               isLoading={isLoading || !enabledModels.length}
               canStop={canStop}
               modelOptions={enabledModels}
+              providers={providers}
               selectedModelId={selectedModelId}
               isCollapsed={isComposerCollapsed}
               onToggleCollapsed={() =>
@@ -386,6 +391,7 @@ export default function AuthenticatedLayout() {
       <ModelSettingsPanel
         open={isModelPanelOpen}
         models={modelOptions}
+        providers={providers}
         providerDefinitions={providerDefinitions}
         isSaving={isModelSaving}
         isAdmin={isAdmin}
@@ -396,6 +402,9 @@ export default function AuthenticatedLayout() {
         onCreateModel={createModel}
         onUpdateModel={updateModel}
         onDeleteModel={deleteModel}
+        onCreateProvider={createProvider}
+        onUpdateProvider={updateProvider}
+        onDeleteProvider={deleteProvider}
       />
 
       <AppearanceSettingsPanel

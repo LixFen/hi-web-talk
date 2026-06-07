@@ -4,6 +4,7 @@ import {
   convertMultimodalContentForOpenAI,
   mergeSystemIntoFirstUser,
 } from "./baseAdapter.js";
+import { BaseLLMAdapter } from "./baseLLMAdapter.js";
 
 function buildExtraBody(modelConfig) {
   const opts = modelConfig.requestOptions ?? {};
@@ -75,69 +76,66 @@ function extractReasoningFromMessage(message) {
   return "";
 }
 
-export function createOpenAIChatCompletionsAdapter(modelConfig, credential) {
-  const client = new OpenAI({
-    apiKey: credential.apiKey,
-    ...(modelConfig.baseURL ? { baseURL: modelConfig.baseURL } : {}),
-  });
+class OpenAIChatCompletionsAdapter extends BaseLLMAdapter {
+  constructor(modelConfig, credential) {
+    super(modelConfig, credential);
+    this.client = new OpenAI({
+      apiKey: credential.apiKey,
+      ...(modelConfig.baseURL ? { baseURL: modelConfig.baseURL } : {}),
+    });
+    this.systemPromptRole = modelConfig.systemPromptRole || "system";
+  }
 
-  const systemPromptRole = modelConfig.systemPromptRole || "system";
-
-  function normalizeMessages(messages) {
-    const effectiveMessages = modelConfig.supportsSystemRole === false
+  normalizeMessages(messages) {
+    const effectiveMessages = this.modelConfig.supportsSystemRole === false
       ? mergeSystemIntoFirstUser(messages)
       : messages;
 
     return effectiveMessages.map((message) => ({
       role:
-        message.role === "system" && systemPromptRole === "developer"
+        message.role === "system" && this.systemPromptRole === "developer"
           ? "developer"
           : message.role,
       content: convertMultimodalContentForOpenAI(message.content),
     }));
   }
 
-  async function call({ messages }) {
+  buildRequestBody(messages, stream = false) {
     const requestBody = {
-      model: modelConfig.modelName,
-      messages: normalizeMessages(messages),
-      stream: false,
+      model: this.modelConfig.modelName,
+      messages: this.normalizeMessages(messages),
+      stream,
     };
 
-    const extraBody = buildExtraBody(modelConfig);
+    if (stream) {
+      requestBody.stream_options = { include_usage: true };
+    }
+
+    const extraBody = buildExtraBody(this.modelConfig);
     if (extraBody) {
       Object.assign(requestBody, extraBody);
     }
 
-    const completion = await client.chat.completions.create(requestBody);
+    return requestBody;
+  }
+
+  async doCall(messages) {
+    const requestBody = this.buildRequestBody(messages, false);
+    const completion = await this.client.chat.completions.create(requestBody);
 
     const message = completion.choices?.[0]?.message ?? {};
 
-    return {
+    return this.buildResult({
       reply: message.content || "",
       reasoning: extractReasoningFromMessage(message),
       usage: formatTokenUsage(completion.usage),
-      provider: modelConfig.providerType,
-      providerType: modelConfig.providerType,
-      model: modelConfig.modelName,
       responseId: completion.id ?? null,
-    };
+    });
   }
 
-  async function stream({ messages, onChunk }) {
-    const requestBody = {
-      model: modelConfig.modelName,
-      messages: normalizeMessages(messages),
-      stream: true,
-      stream_options: { include_usage: true },
-    };
-
-    const extraBody = buildExtraBody(modelConfig);
-    if (extraBody) {
-      Object.assign(requestBody, extraBody);
-    }
-
-    const stream = await client.chat.completions.create(requestBody);
+  async doStream(messages, onChunk) {
+    const requestBody = this.buildRequestBody(messages, true);
+    const stream = await this.client.chat.completions.create(requestBody);
 
     let reply = "";
     let reasoning = "";
@@ -165,16 +163,16 @@ export function createOpenAIChatCompletionsAdapter(modelConfig, credential) {
       }
     }
 
-    return {
-      reply: reply.trim() || "",
-      reasoning: reasoning.trim() || "",
+    return this.buildResult({
+      reply,
+      reasoning,
       usage,
-      provider: modelConfig.providerType,
-      providerType: modelConfig.providerType,
-      model: modelConfig.modelName,
       responseId,
-    };
+    });
   }
+}
 
-  return { call, stream };
+export function createOpenAIChatCompletionsAdapter(modelConfig, credential) {
+  const adapter = new OpenAIChatCompletionsAdapter(modelConfig, credential);
+  return { call: (args) => adapter.call(args), stream: (args) => adapter.stream(args) };
 }

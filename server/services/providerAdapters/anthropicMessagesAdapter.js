@@ -4,22 +4,26 @@ import {
   splitSystemMessage,
   convertMultimodalContentForClaude,
 } from "./baseAdapter.js";
+import { BaseLLMAdapter } from "./baseLLMAdapter.js";
 
-export function createAnthropicMessagesAdapter(modelConfig, credential) {
-  const client = new Anthropic({
-    apiKey: credential.apiKey,
-    ...(modelConfig.baseURL ? { baseURL: modelConfig.baseURL } : {}),
-  });
+class AnthropicMessagesAdapter extends BaseLLMAdapter {
+  constructor(modelConfig, credential) {
+    super(modelConfig, credential);
+    this.client = new Anthropic({
+      apiKey: credential.apiKey,
+      ...(modelConfig.baseURL ? { baseURL: modelConfig.baseURL } : {}),
+    });
+  }
 
-  function buildRequestBody(messages) {
+  buildRequestBody(messages) {
     const { systemText, otherMessages } = splitSystemMessage(messages);
 
-    const maxTokens = modelConfig.requestOptions?.maxTokens ?? 4096;
-    const thinkingEnabled = modelConfig.requestOptions?.thinkingEnabled === true;
-    const thinkingBudgetTokens = Number(modelConfig.requestOptions?.thinkingBudgetTokens) || 1024;
+    const maxTokens = this.modelConfig.requestOptions?.maxTokens ?? 4096;
+    const thinkingEnabled = this.modelConfig.requestOptions?.thinkingEnabled === true;
+    const thinkingBudgetTokens = Number(this.modelConfig.requestOptions?.thinkingBudgetTokens) || 1024;
 
     const body = {
-      model: modelConfig.modelName,
+      model: this.modelConfig.modelName,
       messages: otherMessages.map((message) => ({
         role: message.role,
         content: convertMultimodalContentForClaude(message.content),
@@ -31,7 +35,7 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
       body.system = systemText;
     }
 
-    if (modelConfig.supportsThinking !== false && thinkingEnabled) {
+    if (this.modelConfig.supportsThinking !== false && thinkingEnabled) {
       const minBudget = 256;
       const safeMaxTokens = Math.max(maxTokens - 1, minBudget);
       const clampedBudget = Math.min(Math.max(thinkingBudgetTokens, minBudget), safeMaxTokens);
@@ -45,9 +49,9 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
     return body;
   }
 
-  async function call({ messages }) {
-    const result = await client.messages.create({
-      ...buildRequestBody(messages),
+  async doCall(messages) {
+    const result = await this.client.messages.create({
+      ...this.buildRequestBody(messages),
       stream: false,
     });
 
@@ -57,20 +61,17 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
     const thinkingBlocks = result.content?.filter((block) => block.type === "thinking") ?? [];
     const reasoning = thinkingBlocks.map((block) => block.thinking).join("\n");
 
-    return {
-      reply: reply || "",
-      reasoning: reasoning.trim() || "",
+    return this.buildResult({
+      reply,
+      reasoning,
       usage: formatTokenUsage(result.usage),
-      provider: modelConfig.providerType,
-      providerType: modelConfig.providerType,
-      model: modelConfig.modelName,
       responseId: result.id ?? null,
-    };
+    });
   }
 
-  async function stream({ messages, onChunk }) {
-    const stream = await client.messages.create({
-      ...buildRequestBody(messages),
+  async doStream(messages, onChunk) {
+    const stream = await this.client.messages.create({
+      ...this.buildRequestBody(messages),
       stream: true,
     });
 
@@ -109,16 +110,16 @@ export function createAnthropicMessagesAdapter(modelConfig, credential) {
       }
     }
 
-    return {
-      reply: reply.trim() || "",
-      reasoning: reasoning.trim() || "",
+    return this.buildResult({
+      reply,
+      reasoning,
       usage,
-      provider: modelConfig.providerType,
-      providerType: modelConfig.providerType,
-      model: modelConfig.modelName,
       responseId,
-    };
+    });
   }
+}
 
-  return { call, stream };
+export function createAnthropicMessagesAdapter(modelConfig, credential) {
+  const adapter = new AnthropicMessagesAdapter(modelConfig, credential);
+  return { call: (args) => adapter.call(args), stream: (args) => adapter.stream(args) };
 }

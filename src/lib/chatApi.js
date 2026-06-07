@@ -103,6 +103,34 @@ export function listModelProviderDefinitions() {
   return requestJson("/api/model-provider-definitions");
 }
 
+export function getModelCapabilities(modelName) {
+  return requestJson(`/api/model-capabilities?modelName=${encodeURIComponent(modelName)}`);
+}
+
+export function listProviders() {
+  return requestJson("/api/providers");
+}
+
+export function createProvider(payload) {
+  return requestJson("/api/providers", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateProvider(providerId, payload) {
+  return requestJson(`/api/providers/${encodeURIComponent(providerId)}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteProvider(providerId) {
+  return requestJson(`/api/providers/${encodeURIComponent(providerId)}`, {
+    method: "DELETE",
+  });
+}
+
 export function getAppSettings() {
   return requestJson("/api/app-settings");
 }

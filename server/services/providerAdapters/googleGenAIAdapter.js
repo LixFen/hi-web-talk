@@ -4,13 +4,17 @@ import {
   splitSystemMessage,
   convertMultimodalContentForGemini,
 } from "./baseAdapter.js";
+import { BaseLLMAdapter } from "./baseLLMAdapter.js";
 
-export function createGoogleGenAIAdapter(modelConfig, credential) {
-  const client = new GoogleGenAI({
-    apiKey: credential.apiKey,
-  });
+class GoogleGenAIAdapter extends BaseLLMAdapter {
+  constructor(modelConfig, credential) {
+    super(modelConfig, credential);
+    this.client = new GoogleGenAI({
+      apiKey: credential.apiKey,
+    });
+  }
 
-  function buildContents(messages) {
+  buildContents(messages) {
     const { systemText, otherMessages } = splitSystemMessage(messages);
 
     const contents = otherMessages.map((message) => {
@@ -31,11 +35,11 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
     return { contents, systemText };
   }
 
-  async function call({ messages }) {
-    const { contents, systemText } = buildContents(messages);
+  buildOptions(messages) {
+    const { contents, systemText } = this.buildContents(messages);
 
     const options = {
-      model: modelConfig.modelName,
+      model: this.modelConfig.modelName,
       contents,
     };
 
@@ -43,8 +47,8 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
       options.systemInstruction = { parts: [{ text: systemText }] };
     }
 
-    const opts = modelConfig.requestOptions ?? {};
-    if (modelConfig.supportsThinking !== false) {
+    const opts = this.modelConfig.requestOptions ?? {};
+    if (this.modelConfig.supportsThinking !== false) {
       const thinkingLevel = opts.thinkingLevel;
       if (thinkingLevel && thinkingLevel !== "") {
         options.generationConfig = {
@@ -57,7 +61,23 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
       }
     }
 
-    const result = await client.models.generateContent(options);
+    return options;
+  }
+
+  parseUsage(usageMetadata) {
+    if (!usageMetadata) {
+      return { input: 0, output: 0, total: 0 };
+    }
+    return formatTokenUsage({
+      input_tokens: usageMetadata.promptTokenCount,
+      output_tokens: usageMetadata.candidatesTokenCount,
+      total_tokens: usageMetadata.totalTokenCount,
+    });
+  }
+
+  async doCall(messages) {
+    const options = this.buildOptions(messages);
+    const result = await this.client.models.generateContent(options);
 
     const candidate = result.candidates?.[0];
     const parts = candidate?.content?.parts ?? [];
@@ -72,48 +92,17 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
       }
     }
 
-    return {
-      reply: reply || "",
-      reasoning: reasoning.trim() || "",
-      usage: formatTokenUsage({
-        input_tokens: result.usageMetadata?.promptTokenCount,
-        output_tokens: result.usageMetadata?.candidatesTokenCount,
-        total_tokens: result.usageMetadata?.totalTokenCount,
-      }),
-      provider: modelConfig.providerType,
-      providerType: modelConfig.providerType,
-      model: modelConfig.modelName,
+    return this.buildResult({
+      reply,
+      reasoning,
+      usage: this.parseUsage(result.usageMetadata),
       responseId: null,
-    };
+    });
   }
 
-  async function stream({ messages, onChunk }) {
-    const { contents, systemText } = buildContents(messages);
-
-    const options = {
-      model: modelConfig.modelName,
-      contents,
-    };
-
-    if (systemText) {
-      options.systemInstruction = { parts: [{ text: systemText }] };
-    }
-
-    const opts = modelConfig.requestOptions ?? {};
-    if (modelConfig.supportsThinking !== false) {
-      const thinkingLevel = opts.thinkingLevel;
-      if (thinkingLevel && thinkingLevel !== "") {
-        options.generationConfig = {
-          ...(options.generationConfig ?? {}),
-          thinkingConfig: {
-            includeThoughts: true,
-            thinkingLevel,
-          },
-        };
-      }
-    }
-
-    const streamResult = await client.models.generateContentStream(options);
+  async doStream(messages, onChunk) {
+    const options = this.buildOptions(messages);
+    const streamResult = await this.client.models.generateContentStream(options);
 
     let reply = "";
     let reasoning = "";
@@ -140,24 +129,20 @@ export function createGoogleGenAIAdapter(modelConfig, credential) {
       }
 
       if (chunk.usageMetadata) {
-        usage = formatTokenUsage({
-          input_tokens: chunk.usageMetadata.promptTokenCount,
-          output_tokens: chunk.usageMetadata.candidatesTokenCount,
-          total_tokens: chunk.usageMetadata.totalTokenCount,
-        });
+        usage = this.parseUsage(chunk.usageMetadata);
       }
     }
 
-    return {
-      reply: reply.trim() || "",
-      reasoning: reasoning.trim() || "",
+    return this.buildResult({
+      reply,
+      reasoning,
       usage,
-      provider: modelConfig.providerType,
-      providerType: modelConfig.providerType,
-      model: modelConfig.modelName,
       responseId: null,
-    };
+    });
   }
+}
 
-  return { call, stream };
+export function createGoogleGenAIAdapter(modelConfig, credential) {
+  const adapter = new GoogleGenAIAdapter(modelConfig, credential);
+  return { call: (args) => adapter.call(args), stream: (args) => adapter.stream(args) };
 }

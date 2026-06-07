@@ -191,37 +191,88 @@ function buildConfiguredAt(record, fallbackNow) {
 
 async function normalizeModelRecord(record = {}, index = 0) {
   const timestamp = nowIso();
-  const providerType = legacyProviderToType(record.providerType ?? record.provider);
-  const providerDefinition = getProviderDefinitionByType(providerType);
 
+  // ── Resolve provider context ──
+  // If providerId is set, inherit from the Provider entity.
+  // Otherwise, use inline providerType (legacy / flat mode).
+  let provider = null;
+  if (record.providerId) {
+    const { getProviderById } = await import("./providerConfigService.js");
+    provider = await getProviderById(record.providerId);
+    if (!provider) {
+      const error = new Error(`找不到 providerId: ${record.providerId}`);
+      error.status = 400;
+      throw error;
+    }
+  }
+
+  const providerType = provider
+    ? provider.providerType
+    : legacyProviderToType(record.providerType ?? record.provider);
+
+  const providerDefinition = getProviderDefinitionByType(providerType);
   if (!providerDefinition) {
-    const error = new Error(`��֧�ֵ� providerType: ${providerType}`);
+    const error = new Error(`不支持的 providerType: ${providerType}`);
     error.status = 400;
     throw error;
   }
 
-  const alias = sanitizeAlias(
-    record.alias || `${providerType}:${record.modelName ?? record.model ?? index + 1}`,
-  );
+  // ── Alias ──
+  // Auto-generate from providerSlug:modelName when providerId is present,
+  // or from providerType:modelName for legacy flat models.
+  const modelName = sanitizeOptionalText(record.modelName ?? record.model);
+  let alias = sanitizeAlias(record.alias);
+  if (!alias) {
+    if (provider) {
+      alias = sanitizeAlias(`${provider.slug}:${modelName || index + 1}`);
+    } else {
+      alias = sanitizeAlias(`${providerType}:${modelName || index + 1}`);
+    }
+  }
+
+  // ── Credential ──
   const apiKeyRaw = sanitizeOptionalText(record.apiKey ?? "");
   const apiKeyEncrypted = apiKeyRaw
     ? await encryptApiKey(apiKeyRaw)
     : sanitizeOptionalText(record.apiKeyEncrypted);
 
-  return {
-    modelId: record.modelId ?? crypto.randomUUID(),
-    alias,
-    label: sanitizeOptionalText(record.label) || alias,
+  // ── Build record ──
+  // For provider-linked models: model fields override provider defaults (when non-null).
+  // For legacy models: use inline fields as before.
+  const base = provider ? {
+    providerType: provider.providerType,
+    baseURL: provider.baseURL,
+    apiKeySource: provider.apiKeySource,
+    apiKeyEnvName: provider.apiKeyEnvName,
+    apiKeyEncrypted: provider.apiKeyEncrypted || "",
+    systemPromptRole: provider.systemPromptRole,
+    requestOptions: { ...(provider.requestOptions ?? {}) },
+  } : {
     providerType,
     baseURL: getDefaultBaseURL(providerType, record),
     apiKeySource: record.apiKeySource === "stored" ? "stored" : "env",
     apiKeyEnvName: getDefaultEnvKeyName(providerType, record),
     apiKeyEncrypted,
-    modelName: sanitizeOptionalText(record.modelName ?? record.model),
-    enabled: record.enabled !== false,
-    supportsStreaming: record.supportsStreaming !== false,
     systemPromptRole:
       record.systemPromptRole || providerDefinition.defaultSystemPromptRole || "system",
+    requestOptions: buildDefaultRequestOptions(providerType, record),
+  };
+
+  return {
+    modelId: record.modelId ?? crypto.randomUUID(),
+    alias,
+    label: sanitizeOptionalText(record.label) || alias,
+    providerId: record.providerId || null,
+    // Provider-inherited or inline fields (model overrides take precedence)
+    providerType: base.providerType,
+    baseURL: record.baseURL ?? base.baseURL,
+    apiKeySource: record.apiKeySource ?? base.apiKeySource,
+    apiKeyEnvName: record.apiKeyEnvName ?? base.apiKeyEnvName,
+    apiKeyEncrypted: apiKeyEncrypted || base.apiKeyEncrypted || "",
+    modelName,
+    enabled: record.enabled !== false,
+    supportsStreaming: record.supportsStreaming !== false,
+    systemPromptRole: record.systemPromptRole ?? base.systemPromptRole,
     supportsSystemRole:
       record.supportsSystemRole ?? providerDefinition.supportsSystemRole ?? true,
     supportsMultimodal:
@@ -230,7 +281,7 @@ async function normalizeModelRecord(record = {}, index = 0) {
       record.supportsThinking ?? providerDefinition.supportsThinking ?? false,
     thinkingDisable:
       record.thinkingDisable ?? providerDefinition.thinkingDisableConfig ?? null,
-    requestOptions: buildDefaultRequestOptions(providerType, record),
+    requestOptions: { ...(base.requestOptions ?? {}), ...(record.requestOptions ?? {}) },
     isPreset: Boolean(record.isPreset ?? false),
     shared: Boolean(record.shared ?? false),
     meta: record.meta ?? {},
@@ -244,6 +295,7 @@ function serializePublicModel(model, { configured = false } = {}) {
     modelId: model.modelId,
     alias: model.alias,
     label: model.label,
+    providerId: model.providerId ?? null,
     providerType: model.providerType,
     baseURL: model.baseURL,
     apiKeySource: model.apiKeySource,
@@ -270,24 +322,29 @@ function serializePublicModel(model, { configured = false } = {}) {
 function assertRequiredFields(payload, isCreate = false) {
   const alias = sanitizeAlias(payload.alias);
   const modelName = sanitizeOptionalText(payload.modelName);
-  const providerType = legacyProviderToType(payload.providerType ?? payload.provider);
+  const hasProviderId = Boolean(payload.providerId);
 
-  if (isCreate && !alias) {
-    const error = new Error("alias ����Ϊ�ա�����ʹ�� provider:modelName ��ʽ��");
+  // alias: required for legacy models on create; auto-generated when providerId is present
+  if (isCreate && !alias && !hasProviderId) {
+    const error = new Error("alias 不能为空。可使用 provider:modelName 格式。");
     error.status = 400;
     throw error;
   }
 
   if (!modelName) {
-    const error = new Error("modelName ����Ϊ�ա�");
+    const error = new Error("modelName 不能为空。");
     error.status = 400;
     throw error;
   }
 
-  if (!getProviderDefinitionByType(providerType)) {
-    const error = new Error(`��֧�ֵ� providerType: ${providerType}`);
-    error.status = 400;
-    throw error;
+  // providerType: inherited from Provider when providerId is set
+  if (!hasProviderId) {
+    const providerType = legacyProviderToType(payload.providerType ?? payload.provider);
+    if (!getProviderDefinitionByType(providerType)) {
+      const error = new Error(`不支持的 providerType: ${providerType}`);
+      error.status = 400;
+      throw error;
+    }
   }
 }
 
@@ -468,7 +525,18 @@ export async function createModel(payload, userId = null, role = "user") {
   const isAdmin = role === "admin";
   const targetUserId = isAdmin ? null : userId;
   const models = await readStoredModels(targetUserId);
-  const alias = sanitizeAlias(payload.alias);
+
+  // normalizeModelRecord auto-generates alias when providerId is set
+  const nextModel = await normalizeModelRecord(
+    {
+      ...payload,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    },
+    models.length,
+  );
+
+  const alias = nextModel.alias;
 
   if (models.some((model) => model.alias === alias)) {
     const error = new Error(`模型 alias 已存在: ${alias}`);
@@ -476,15 +544,6 @@ export async function createModel(payload, userId = null, role = "user") {
     throw error;
   }
 
-  const nextModel = await normalizeModelRecord(
-    {
-      ...payload,
-      alias,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    },
-    models.length,
-  );
   const nextModels = await writeModels([...models, nextModel], targetUserId);
   return nextModels.find((model) => model.alias === alias) ?? nextModel;
 }

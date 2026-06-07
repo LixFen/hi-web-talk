@@ -14,6 +14,10 @@ import {
   listAdaptationDefinitions,
   listModelProviderDefinitions,
   listModels,
+  listProviders,
+  createProvider,
+  updateProvider,
+  deleteProvider,
   updateAppSettings,
   updateModelConfig,
 } from "../lib/chatApi";
@@ -40,6 +44,7 @@ export function AppProvider({ children }) {
   const tRef = useRef(t);
   tRef.current = t;
   const [modelOptions, setModelOptions] = useState([]);
+  const [providers, setProviders] = useState([]);
   const [providerDefinitions, setProviderDefinitions] = useState([]);
   const [adaptationDefinitions, setAdaptationDefinitions] = useState([]);
   const [appSettings, setAppSettings] = useState({});
@@ -78,17 +83,20 @@ export function AppProvider({ children }) {
           { models },
           { definitions },
           { definitions: providerDefs },
+          { providers: providerList },
           { settings },
         ] = await Promise.all([
           listModels(),
           listAdaptationDefinitions(),
           listModelProviderDefinitions(),
+          listProviders(),
           getAppSettings(),
         ]);
 
         if (isCancelled) return;
 
         setModelOptions(models);
+        setProviders(providerList ?? []);
         setProviderDefinitions(providerDefs);
         setAdaptationDefinitions(definitions);
         setAppSettings(settings ?? {});
@@ -245,6 +253,69 @@ export function AppProvider({ children }) {
     [applyModels, selectedModelId],
   );
 
+  // ── Provider CRUD ──
+
+  const applyProviders = useCallback((providerList, models) => {
+    setProviders(providerList ?? []);
+    if (models) {
+      setModelOptions(models);
+      setSelectedModelId((current) => pickEnabledModelAlias(models, current));
+    }
+  }, []);
+
+  const handleCreateProvider = useCallback(
+    async (payload) => {
+      setIsModelSaving(true);
+      setError("");
+      try {
+        const result = await createProvider(payload);
+        applyProviders(result.providers, result.models);
+        return result.provider;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "创建 Provider 失败。");
+        throw err;
+      } finally {
+        setIsModelSaving(false);
+      }
+    },
+    [applyProviders],
+  );
+
+  const handleUpdateProvider = useCallback(
+    async (providerId, payload) => {
+      setIsModelSaving(true);
+      setError("");
+      try {
+        const result = await updateProvider(providerId, payload);
+        applyProviders(result.providers, result.models);
+        return result.provider;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "更新 Provider 失败。");
+        throw err;
+      } finally {
+        setIsModelSaving(false);
+      }
+    },
+    [applyProviders],
+  );
+
+  const handleDeleteProvider = useCallback(
+    async (providerId) => {
+      setIsModelSaving(true);
+      setError("");
+      try {
+        const result = await deleteProvider(providerId);
+        applyProviders(result.providers, result.models);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "删除 Provider 失败。");
+        throw err;
+      } finally {
+        setIsModelSaving(false);
+      }
+    },
+    [applyProviders],
+  );
+
   const handleToggleDarkMode = useCallback(async (mode) => {
     setIsAppearanceSaving(true);
     setError("");
@@ -349,6 +420,7 @@ export function AppProvider({ children }) {
     () => ({
       modelOptions,
       enabledModels,
+      providers,
       providerDefinitions,
       adaptationDefinitions,
       appSettings,
@@ -366,6 +438,9 @@ export function AppProvider({ children }) {
       createModel: handleCreateModel,
       updateModel: handleUpdateModel,
       deleteModel: handleDeleteModel,
+      createProvider: handleCreateProvider,
+      updateProvider: handleUpdateProvider,
+      deleteProvider: handleDeleteProvider,
       toggleDarkMode: handleToggleDarkMode,
       toggleShowChatFocusOutline: handleToggleShowChatFocusOutline,
       toggleHideWideScreenSideBranches: handleToggleHideWideScreenSideBranches,
@@ -378,6 +453,7 @@ export function AppProvider({ children }) {
     [
       modelOptions,
       enabledModels,
+      providers,
       providerDefinitions,
       adaptationDefinitions,
       appSettings,
@@ -392,6 +468,9 @@ export function AppProvider({ children }) {
       handleCreateModel,
       handleUpdateModel,
       handleDeleteModel,
+      handleCreateProvider,
+      handleUpdateProvider,
+      handleDeleteProvider,
       handleToggleDarkMode,
       handleToggleShowChatFocusOutline,
       handleToggleHideWideScreenSideBranches,

@@ -17,6 +17,8 @@ import {
   appSettingsSchema,
   modelCreateSchema,
   modelUpdateSchema,
+  providerCreateSchema,
+  providerUpdateSchema,
   attachmentUploadSchema,
   blockReplySchema,
   blockReplyStreamSchema,
@@ -34,6 +36,7 @@ import {
   pathSessionHashSchema,
   pathBlockSHA1Schema,
   pathModelAliasSchema,
+  pathProviderIdSchema,
   pathAdaptationKeySchema,
   pathAttachmentIdSchema,
   paginationQuerySchema,
@@ -73,6 +76,14 @@ import {
   updateModel,
   clearCredentialCache,
 } from "./services/modelConfigService.js";
+import { inferModelCapabilities, getSnapshotInfo } from "./services/modelCapabilities.js";
+import {
+  listProviders,
+  createProvider,
+  updateProvider,
+  deleteProvider,
+  clearProviderCredentialCache,
+} from "./services/providerConfigService.js";
 import {
   createSession,
   deleteSession,
@@ -219,6 +230,7 @@ function parseModelPayload(body = {}) {
   return {
     alias: body.alias,
     label: body.label,
+    providerId: body.providerId,
     providerType: body.providerType,
     baseURL: body.baseURL,
     apiKeySource: body.apiKeySource,
@@ -348,6 +360,62 @@ app.get("/api/health", async (_request, response) => {
 
 app.get("/api/model-provider-definitions", (_request, response) => {
   response.json({ definitions: listModelProviderDefinitions() });
+});
+
+app.get("/api/model-capabilities", (request, response) => {
+  const modelName = request.query.modelName;
+  if (!modelName || typeof modelName !== "string") {
+    response.json({ capabilities: null, snapshot: getSnapshotInfo() });
+    return;
+  }
+  response.json({ capabilities: inferModelCapabilities(modelName), snapshot: getSnapshotInfo() });
+});
+
+// ── Provider CRUD ──
+
+app.get("/api/providers", authenticateToken, async (request, response) => {
+  const providers = await listProviders(request.user.id, request.user.role);
+  response.json({ providers });
+});
+
+app.post("/api/providers", authenticateToken, validateBody(providerCreateSchema), async (request, response) => {
+  try {
+    const provider = await createProvider(request.body, request.user.id, request.user.role);
+    const providers = await listProviders(request.user.id, request.user.role);
+    response.json({ provider, providers });
+  } catch (error) {
+    response.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "创建 Provider 失败。",
+    });
+  }
+});
+
+app.put("/api/providers/:providerId", authenticateToken, validateParams(pathProviderIdSchema), validateBody(providerUpdateSchema), async (request, response) => {
+  try {
+    const provider = await updateProvider(request.params.providerId, request.body, request.user.id, request.user.role);
+    clearProviderCredentialCache();
+    clearCredentialCache();
+    const providers = await listProviders(request.user.id, request.user.role);
+    response.json({ provider, providers });
+  } catch (error) {
+    response.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "更新 Provider 失败。",
+    });
+  }
+});
+
+app.delete("/api/providers/:providerId", authenticateToken, validateParams(pathProviderIdSchema), async (request, response) => {
+  try {
+    const provider = await deleteProvider(request.params.providerId, request.user.id, request.user.role);
+    clearProviderCredentialCache();
+    clearCredentialCache();
+    const providers = await listProviders(request.user.id, request.user.role);
+    response.json({ provider, providers });
+  } catch (error) {
+    response.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "删除 Provider 失败。",
+    });
+  }
 });
 
 app.get("/api/app-settings", authenticateToken, async (request, response) => {
@@ -1390,6 +1458,18 @@ function validateEnvironment() {
 }
 
 await ensureDataLayout();
+
+// Auto-migrate: split flat models into Provider + Model
+try {
+  const { migrateProviderModelSplit } = await import("./scripts/migrateProviderModelSplit.js");
+  const migrationResult = await migrateProviderModelSplit();
+  if (migrationResult.migrated) {
+    console.log("[startup] Provider-Model 迁移完成:", migrationResult);
+  }
+} catch (error) {
+  console.error("[startup] Provider-Model 迁移失败（非致命）:", error.message);
+}
+
 streamSessionManager.startCleanupTimer();
 
 let httpServer = null;
