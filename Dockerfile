@@ -19,6 +19,7 @@ RUN npm ci --omit=dev --ignore-scripts && npm rebuild better-sqlite3
 
 COPY --from=builder /app/dist ./dist
 COPY server ./server
+COPY --from=builder /app/server/services/modelCapabilities.generated.js ./server/services/modelCapabilities.generated.js
 
 RUN mkdir -p /app/data && chown -R node:node /app/data
 
