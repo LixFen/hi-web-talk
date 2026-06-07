@@ -1,5 +1,9 @@
 # 1.16.0
 
+- Fix: sending a message with images now correctly displays the user bubble during LLM streaming, matching the behavior of plain text messages.
+- Feat: user message bubble now renders images above text for better visual hierarchy.
+- Feat: chat composer is no longer rendered in chain/graph view modes (only visible in chat view).
+- Feat: added SVG icon for the "hide branch" adaptation button, consistent with other adaptation button icons.
 - Feat: introduced Provider entity — API endpoint and credentials are now managed at the Provider level; models inherit from their Provider and no longer duplicate provider config.
 - Feat: model aliases are auto-generated as `providerSlug:modelName` when creating under a Provider.
 - Feat: model capabilities (multimodal, reasoning, context window) are auto-inferred from models.dev at build time and pre-filled on model creation.

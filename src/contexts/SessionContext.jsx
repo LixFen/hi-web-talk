@@ -591,7 +591,9 @@ export function SessionProvider({ children }) {
   const pendingUserAlreadyPersisted = useMemo(
     () =>
       messages.some(
-        (message) => message.role === "user" && message.text === pendingPrompt,
+        (message) =>
+          message.role === "user" &&
+          JSON.stringify(message.text) === JSON.stringify(pendingPrompt),
       ),
     [messages, pendingPrompt],
   );

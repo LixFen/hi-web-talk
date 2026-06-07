@@ -361,7 +361,7 @@ export default function AuthenticatedLayout() {
           )}
         </div>
 
-        {!isSidebarDrawerOpen && (
+        {!isSidebarDrawerOpen && currentViewMode === "chat" && (
           <div className="main-panel-composer">
             <ChatComposer
               isLoading={isLoading || !enabledModels.length}

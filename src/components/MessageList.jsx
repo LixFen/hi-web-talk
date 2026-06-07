@@ -406,6 +406,35 @@ function PendingOrganizeIcon() {
   );
 }
 
+function HiddenIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 26 26"
+      aria-hidden="true"
+      focusable="false"
+      className="message-action-icon-svg"
+    >
+      <path
+        stroke="currentColor"
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M2.5 13s3.5-7 10.5-7 10.5 7 10.5 7-3.5 7-10.5 7S2.5 13 2.5 13Z"
+      />
+      <circle cx="13" cy="13" r="3" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        d="M4 22L22 4"
+      />
+    </svg>
+  );
+}
+
 function getAdaptationButtonIcon(definitionKey) {
   if (definitionKey === "context.ignore") {
     return <IgnoreContextIcon />;
@@ -429,6 +458,10 @@ function getAdaptationButtonIcon(definitionKey) {
 
   if (definitionKey === "pending.organize" || definitionKey === "label.review") {
     return <PendingOrganizeIcon />;
+  }
+
+  if (definitionKey === "label.hidden") {
+    return <HiddenIcon />;
   }
 
   return null;
@@ -752,7 +785,13 @@ const MemoMessageRow = React.memo(({
         <div className="message-bubble">
           {Array.isArray(msg.text) ? (
             <div className="message-content-blocks">
-              {msg.text.map((block, index) => {
+              {[...msg.text].sort((a, b) => {
+                const aIsImage = a.type === "image_attachment" || a.type === "image_url";
+                const bIsImage = b.type === "image_attachment" || b.type === "image_url";
+                if (aIsImage && !bIsImage) return -1;
+                if (!aIsImage && bIsImage) return 1;
+                return 0;
+              }).map((block, index) => {
                 if (block.type === "text") {
                   return <div key={index} className="message-text-block">{block.text}</div>;
                 }

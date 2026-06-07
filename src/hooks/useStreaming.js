@@ -129,7 +129,7 @@ export default function useStreaming({
       if ((!textPreview && !isArray) || !model) return;
 
       onSetLoading(true);
-      setPendingPrompt(textPreview || "[图片消息]");
+      setPendingPrompt(rawContent);
       setStreamingReply("");
       streamReconnectControllerRef.current?.abort();
       streamReconnectControllerRef.current = null;
