@@ -14,6 +14,7 @@ import AppearanceSettingsPanel from "../components/AppearanceSettingsPanel";
 import InteractionSettingsPanel from "../components/InteractionSettingsPanel";
 import AboutSettingsPanel from "../components/AboutSettingsPanel";
 import SettingsMenuPanel from "../components/SettingsMenuPanel";
+import SearchModal from "../components/SearchModal";
 
 function resolveLayoutMode(viewportWidth) {
   if (viewportWidth < 600) return "mobile";
@@ -89,6 +90,7 @@ export default function AuthenticatedLayout() {
   const [isInteractionPanelOpen, setIsInteractionPanelOpen] = useState(false);
   const [isAboutPanelOpen, setIsAboutPanelOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const drawerTouchStartRef = useRef({ x: 0, y: 0, active: false });
   const drawerSwipeDetectedRef = useRef(false);
@@ -161,8 +163,9 @@ export default function AuthenticatedLayout() {
     () =>
       currentViewMode !== "chat" ||
       isAnySettingsPanelOpen ||
-      isSidebarDrawerOpen,
-    [currentViewMode, isAnySettingsPanelOpen, isSidebarDrawerOpen],
+      isSidebarDrawerOpen ||
+      isSearchOpen,
+    [currentViewMode, isAnySettingsPanelOpen, isSidebarDrawerOpen, isSearchOpen],
   );
 
   useEffect(() => {
@@ -257,6 +260,7 @@ export default function AuthenticatedLayout() {
           }
           onToggleCollapse={handleToggleSidebarMenu}
           onOpenSettings={() => setIsSettingsMenuOpen(true)}
+          onOpenSearch={() => setIsSearchOpen(true)}
           className={layoutMode === "tablet" ? "sidebar-rail" : ""}
           showHeaderToggle={layoutMode !== "mobile"}
         />
@@ -275,6 +279,10 @@ export default function AuthenticatedLayout() {
             onOpenSettings={() => {
               setIsSidebarDrawerOpen(false);
               setIsSettingsMenuOpen(true);
+            }}
+            onOpenSearch={() => {
+              setIsSidebarDrawerOpen(false);
+              setIsSearchOpen(true);
             }}
             className={`sidebar-drawer ${isSidebarDrawerOpen ? "open" : ""}`.trim()}
             toggleVariant="close"
@@ -451,6 +459,11 @@ export default function AuthenticatedLayout() {
         open={isSettingsMenuOpen}
         onClose={() => setIsSettingsMenuOpen(false)}
         onSelectSection={handleSelectSettingsSection}
+      />
+
+      <SearchModal
+        open={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
       />
     </div>
   );

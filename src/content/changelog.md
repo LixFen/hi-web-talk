@@ -1,5 +1,6 @@
 # 1.16.1
 
+- Feat: Added Search bar for history conversations.
 - Feat: improved UI visual effects, including view switch and minor effects.
 - Feat: more I18n content added.
 - Feat: added viewmode switcher, Toast exit animations.

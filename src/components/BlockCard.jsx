@@ -34,7 +34,7 @@ function ReasoningPanel({ reasoning, defaultOpen = false }) {
   }
 
   return (
-    <div className="reasoning-panel">
+    <div className={`reasoning-panel ${isOpen ? 'open' : ''}`}>
       <button
         className="reasoning-panel-header"
         type="button"
@@ -61,13 +61,11 @@ function ReasoningPanel({ reasoning, defaultOpen = false }) {
         </span>
         <ReasoningIcon isOpen={isOpen} />
       </button>
-      {isOpen ? (
-        <div className="reasoning-panel-content">
-          <SafeMarkdown className="reasoning-markdown">
-            {reasoning}
-          </SafeMarkdown>
-        </div>
-      ) : null}
+      <div className="reasoning-panel-content" aria-hidden={!isOpen}>
+        <SafeMarkdown className="reasoning-markdown">
+          {reasoning}
+        </SafeMarkdown>
+      </div>
     </div>
   );
 }

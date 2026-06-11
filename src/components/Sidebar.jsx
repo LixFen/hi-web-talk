@@ -9,6 +9,7 @@ const Sidebar = ({
   isCollapsed,
   onToggleCollapse,
   onOpenSettings,
+  onOpenSearch,
   className = "",
   showHeaderToggle = true,
   toggleVariant = "collapse",
@@ -277,6 +278,29 @@ const Sidebar = ({
             </div>
           ))}
         </div>
+      ) : null}
+
+      {!isCollapsed ? (
+        <button
+          className="sidebar-search-btn"
+          type="button"
+          onClick={onOpenSearch}
+          aria-label={t("sidebar.search")}
+          title={t("sidebar.search")}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          {t("sidebar.search")}
+        </button>
       ) : null}
 
       {!isCollapsed && currentUser ? (

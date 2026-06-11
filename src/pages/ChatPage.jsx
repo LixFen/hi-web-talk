@@ -1,14 +1,12 @@
-import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useSession } from "../contexts/SessionContext";
 import { useApp } from "../contexts/AppContext";
 import { useLocale } from "../contexts/LocaleContext";
 import ChatHero from "../components/ChatHero";
-import LoadingFallback from "../components/LoadingFallback";
-
-const ChatView = lazy(() => import("../components/ChatView"));
-const ChainCardView = lazy(() => import("../components/ChainCardView"));
-const GraphView = lazy(() => import("../components/GraphView"));
+import ChatView from "../components/ChatView";
+import ChainCardView from "../components/ChainCardView";
+import GraphView from "../components/GraphView";
 
 export default function ChatPage() {
   const { t } = useLocale();
@@ -146,22 +144,28 @@ export default function ChatPage() {
 
   const effectiveView = urlView || session.currentViewMode;
 
-  if (effectiveView === "chat") {
-    if (!session.hasStartedConversation) {
-      return (
-        <ChatHero
-          hasModels={enabledModels.length > 0}
-          onOpenSettings={() =>
-            window.dispatchEvent(
-              new CustomEvent("open-settings", { detail: { section: "model" } }),
-            )
-          }
-        />
-      );
-    }
-
+  // Show ChatHero when conversation hasn't started yet
+  if (effectiveView === "chat" && !session.hasStartedConversation) {
     return (
-      <Suspense fallback={<LoadingFallback />}>
+      <ChatHero
+        hasModels={enabledModels.length > 0}
+        onOpenSettings={() =>
+          window.dispatchEvent(
+            new CustomEvent("open-settings", { detail: { section: "model" } }),
+          )
+        }
+      />
+    );
+  }
+
+  // All views are always mounted, use CSS to show/hide for instant switching
+  return (
+    <div className="chat-page-views" style={{ display: 'contents' }}>
+      {/* Chat View */}
+      <div
+        style={{ display: effectiveView === 'chat' ? 'contents' : 'none' }}
+        aria-hidden={effectiveView !== 'chat'}
+      >
         <ChatView
           graphBlocks={session.graph.blocks}
           activeBlockSHA1={session.graph.activeBlockSHA1}
@@ -185,13 +189,13 @@ export default function ChatPage() {
           onRunAdaptation={session.runAdaptation}
           onScrollRequestHandled={session.handleChatNavigationRequestHandled}
         />
-      </Suspense>
-    );
-  }
+      </div>
 
-  if (effectiveView === "chain") {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
+      {/* Chain View */}
+      <div
+        style={{ display: effectiveView === 'chain' ? 'contents' : 'none' }}
+        aria-hidden={effectiveView !== 'chain'}
+      >
         <ChainCardView
           blocks={session.activeChainBlocks}
           isLoading={session.isLoading}
@@ -204,25 +208,27 @@ export default function ChatPage() {
           onToggleAdaptation={session.toggleAdaptation}
           onRunAdaptation={session.runAdaptation}
         />
-      </Suspense>
-    );
-  }
+      </div>
 
-  return (
-    <Suspense fallback={<LoadingFallback />}>
-      <GraphView
-        blocks={session.graph.blocks}
-        graph={session.graph}
-        focusedBlockSHA1={session.focusedBlockSHA1}
-        isLoading={session.isLoading}
-        adaptationDefinitions={adaptationDefinitions}
-        onActivateBlock={session.activateBlock}
-        onFocusBlock={session.focusBlock}
-        onBranchFromBlock={session.branchFromBlock}
-        onRegenerate={session.regenerate}
-        onToggleAdaptation={session.toggleAdaptation}
-        onRunAdaptation={session.runAdaptation}
-      />
-    </Suspense>
+      {/* Graph View */}
+      <div
+        style={{ display: effectiveView === 'graph' ? 'contents' : 'none' }}
+        aria-hidden={effectiveView !== 'graph'}
+      >
+        <GraphView
+          blocks={session.graph.blocks}
+          graph={session.graph}
+          focusedBlockSHA1={session.focusedBlockSHA1}
+          isLoading={session.isLoading}
+          adaptationDefinitions={adaptationDefinitions}
+          onActivateBlock={session.activateBlock}
+          onFocusBlock={session.focusBlock}
+          onBranchFromBlock={session.branchFromBlock}
+          onRegenerate={session.regenerate}
+          onToggleAdaptation={session.toggleAdaptation}
+          onRunAdaptation={session.runAdaptation}
+        />
+      </div>
+    </div>
   );
 }

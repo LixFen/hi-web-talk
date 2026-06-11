@@ -1445,6 +1445,137 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(
   }
 });
 
+// Search API - Search across all conversations
+app.post("/api/search", authenticateToken, async (request, response) => {
+  const { query, offset = 0, limit = 20 } = request.body;
+
+  if (!query || typeof query !== "string" || query.trim().length === 0) {
+    response.status(400).json({ error: "搜索关键词不能为空。" });
+    return;
+  }
+
+  const trimmedQuery = query.trim();
+  const searchOffset = Math.max(0, parseInt(offset, 10) || 0);
+  const searchLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+
+  try {
+    const db = getDatabase();
+
+    // Search in blocks (prompt and response fields) for the current user's sessions
+    const searchQuery = `
+      SELECT
+        b.sessionHash,
+        b.sha1 as blockSHA1,
+        b.prompt,
+        b.response,
+        b.createdAt as timestamp,
+        s.title as sessionTitle
+      FROM blocks b
+      JOIN sessions s ON b.sessionHash = s.sessionHash
+      WHERE
+        s.userId = ?
+        AND s.deletedAt IS NULL
+        AND (b.prompt LIKE ? OR b.response LIKE ?)
+      ORDER BY b.createdAt DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM blocks b
+      JOIN sessions s ON b.sessionHash = s.sessionHash
+      WHERE
+        s.userId = ?
+        AND s.deletedAt IS NULL
+        AND (b.prompt LIKE ? OR b.response LIKE ?)
+    `;
+
+    const searchPattern = `%${trimmedQuery}%`;
+    const userId = request.user.id;
+
+    // Get total count for pagination
+    const countResult = db.prepare(countQuery).get(userId, searchPattern, searchPattern);
+    const total = countResult?.total || 0;
+
+    // Get search results
+    const rows = db.prepare(searchQuery).all(userId, searchPattern, searchPattern, searchLimit, searchOffset);
+
+    // Process results to extract relevant content snippets
+    const results = rows.map((row) => {
+      // Extract content snippet from prompt or response
+      let content = "";
+      const promptText = typeof row.prompt === "string"
+        ? row.prompt
+        : Array.isArray(row.prompt)
+          ? row.prompt.map((b) => b.text ?? "").join(" ")
+          : "";
+
+      const responseText = row.response || "";
+
+      // Find which field contains the match and extract snippet
+      if (promptText.toLowerCase().includes(trimmedQuery.toLowerCase())) {
+        content = extractSnippet(promptText, trimmedQuery);
+      } else if (responseText.toLowerCase().includes(trimmedQuery.toLowerCase())) {
+        content = extractSnippet(responseText, trimmedQuery);
+      } else {
+        // Fallback: use response snippet
+        content = extractSnippet(responseText || promptText, trimmedQuery);
+      }
+
+      return {
+        sessionHash: row.sessionHash,
+        blockSHA1: row.blockSHA1,
+        content,
+        sessionTitle: row.sessionTitle,
+        timestamp: row.timestamp,
+      };
+    });
+
+    response.json({
+      results,
+      total,
+      hasMore: searchOffset + searchLimit < total,
+    });
+  } catch (error) {
+    console.error("Search error:", error);
+    response.status(500).json({
+      error: error instanceof Error ? error.message : "搜索时出错了，请稍后再试。",
+    });
+  }
+});
+
+// Helper function to extract content snippet around the search query
+function extractSnippet(text, query, contextLength = 100) {
+  if (!text) return "";
+
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  const index = lowerText.indexOf(lowerQuery);
+
+  if (index === -1) {
+    // Query not found, return beginning of text
+    return text.length > contextLength * 2
+      ? `${text.slice(0, contextLength * 2)}...`
+      : text;
+  }
+
+  // Calculate snippet boundaries
+  const start = Math.max(0, index - contextLength);
+  const end = Math.min(text.length, index + query.length + contextLength);
+
+  let snippet = text.slice(start, end);
+
+  // Add ellipsis if needed
+  if (start > 0) {
+    snippet = `...${snippet}`;
+  }
+  if (end < text.length) {
+    snippet = `${snippet}...`;
+  }
+
+  return snippet;
+}
+
 const isProduction = process.env.NODE_ENV === "production";
 
 function validateEnvironment() {

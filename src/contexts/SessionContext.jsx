@@ -215,8 +215,8 @@ export function SessionProvider({ children }) {
   );
 
   const handleFocusBlock = useCallback(
-    async (blockSHA1) => {
-      const sessionHash = activeSessionDetail?.session?.sessionHash;
+    async (blockSHA1, targetSessionHash) => {
+      const sessionHash = targetSessionHash || activeSessionDetail?.session?.sessionHash;
       if (!sessionHash || !blockSHA1 || isLoading) return;
       if (blockSHA1 === focusedBlockSHA1) return;
       setError("");
@@ -403,8 +403,8 @@ export function SessionProvider({ children }) {
   );
 
   const handleActivateBlock = useCallback(
-    async (blockSHA1) => {
-      const sessionHash = activeSessionDetail?.session?.sessionHash;
+    async (blockSHA1, targetSessionHash) => {
+      const sessionHash = targetSessionHash || activeSessionDetail?.session?.sessionHash;
       if (!sessionHash || isLoading) return;
       setError("");
       setFocusedBlockSHA1State(blockSHA1);
