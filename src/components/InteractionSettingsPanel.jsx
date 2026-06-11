@@ -1,38 +1,40 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useLocale } from "../contexts/LocaleContext";
 
-const CHAT_VIEW_ADAPTATION_BUTTON_SWITCHES = [
-  {
-    key: "showContextIgnoreButton",
-    label: "忽略上下文",
-    description: "控制「忽略上下文」按钮是否显示。",
-  },
-  {
-    key: "showSummaryPreferButton",
-    label: "优先摘要",
-    description: "控制「优先摘要」按钮是否显示。",
-  },
-  {
-    key: "showSummaryPinButton",
-    label: "固定摘要",
-    description: "控制「固定摘要」按钮是否显示。",
-  },
-  {
-    key: "showSummaryGenerateButton",
-    label: "生成摘要",
-    description: "控制「生成摘要」按钮是否显示。",
-  },
-  {
-    key: "showImportantLabelButton",
-    label: "重要",
-    description: "控制「重要」标签按钮是否显示。",
-  },
-  {
-    key: "showPendingOrganizeLabelButton",
-    label: "待整理",
-    description: "控制「待整理」标签按钮是否显示。",
-  },
-];
+function getChatViewAdaptationButtonSwitches(t) {
+  return [
+    {
+      key: "showContextIgnoreButton",
+      labelKey: "interaction.buttonIgnore",
+      descriptionKey: "interaction.buttonIgnoreDesc",
+    },
+    {
+      key: "showSummaryPreferButton",
+      labelKey: "interaction.buttonPreferSummary",
+      descriptionKey: "interaction.buttonPreferSummaryDesc",
+    },
+    {
+      key: "showSummaryPinButton",
+      labelKey: "interaction.buttonPinSummary",
+      descriptionKey: "interaction.buttonPinSummaryDesc",
+    },
+    {
+      key: "showSummaryGenerateButton",
+      labelKey: "interaction.buttonGenerateSummary",
+      descriptionKey: "interaction.buttonGenerateSummaryDesc",
+    },
+    {
+      key: "showImportantLabelButton",
+      labelKey: "interaction.buttonImportant",
+      descriptionKey: "interaction.buttonImportantDesc",
+    },
+    {
+      key: "showPendingOrganizeLabelButton",
+      labelKey: "interaction.buttonReview",
+      descriptionKey: "interaction.buttonReviewDesc",
+    },
+  ];
+}
 
 export default function InteractionSettingsPanel({
   open,
@@ -48,10 +50,19 @@ export default function InteractionSettingsPanel({
   const { t } = useLocale();
   const [activeLeaf, setActiveLeaf] = useState("chat-adaptation-buttons");
   const showChatAdaptationButtons = settings.showChatAdaptationButtons !== false;
-  const childSwitches = CHAT_VIEW_ADAPTATION_BUTTON_SWITCHES.map((item) => ({
+
+  const chatViewAdaptationButtonSwitches = useMemo(
+    () => getChatViewAdaptationButtonSwitches(t),
+    [t]
+  );
+
+  const childSwitches = chatViewAdaptationButtonSwitches.map((item) => ({
     ...item,
+    label: t(item.labelKey),
+    description: t(item.descriptionKey),
     enabled: settings[item.key] !== false,
   }));
+
   const titleModelAlias = settings.titleModelAlias || "";
   const summaryModelAlias = settings.summaryModelAlias || "";
 
@@ -190,7 +201,7 @@ export default function InteractionSettingsPanel({
                   value={titleModelAlias}
                   onChange={(e) => onChangeTitleModel?.(e.target.value)}
                   disabled={isSaving}
-                  aria-label="选择标题生成模型"
+                  aria-label={t("interaction.titleModel")}
                 >
                   <option value="">{t("interaction.autoSelect")}</option>
                   {enabledModels.map((option) => (
@@ -214,7 +225,7 @@ export default function InteractionSettingsPanel({
                   value={summaryModelAlias}
                   onChange={(e) => onChangeSummaryModel?.(e.target.value)}
                   disabled={isSaving}
-                  aria-label="选择摘要模型"
+                  aria-label={t("interaction.summaryModel")}
                 >
                   <option value="">{t("interaction.autoSelect")}</option>
                   {enabledModels.map((option) => (

@@ -12,6 +12,7 @@ import SafeMarkdown from "./SafeMarkdown";
 import { getAttachmentUrl } from "../lib/chatApi";
 import ContextMenu from "./ContextMenu";
 import { useApp } from "../contexts/AppContext";
+import { useLocale } from "../contexts/LocaleContext";
 import { extractPromptText } from "../lib/content";
 
 const READ_MARKER_SELECTOR = "[data-read-block-sha1]";
@@ -82,20 +83,20 @@ function buildReadBlockCandidates(markers, containerRect, anchorY) {
   return candidates;
 }
 
-function getCommandLabel(definition, adaptationInfo) {
+function getCommandLabel(definition, adaptationInfo, t) {
   if (definition.key === "summary.generate") {
     const status = adaptationInfo?.summaryGenerationStatus ?? "idle";
 
     if (status === "pending") {
-      return "摘要生成中";
+      return t("summary.generating");
     }
 
     if (status === "completed") {
-      return "刷新摘要";
+      return t("summary.refresh");
     }
 
     if (status === "failed") {
-      return "重试摘要";
+      return t("summary.retry");
     }
   }
 
@@ -134,12 +135,12 @@ function escapeMarkdownInline(value = "") {
   return `${value ?? ""}`.replace(/[\\`*_{}\[\]()#+\-.!|>]/g, "\\$&");
 }
 
-function buildBranchFlowTextFromGraph(branchHeadSHA1, blockMap, fallbackReply = "") {
+function buildBranchFlowTextFromGraph(branchHeadSHA1, blockMap, fallbackReply = "", t) {
   const branchHead = branchHeadSHA1 ? blockMap.get(branchHeadSHA1) : null;
 
   if (!branchHead) {
     const fallbackText = truncateFlowMarkdown(extractPromptText(fallbackReply), 420);
-    return fallbackText ? `**AI**\n\n${fallbackText}` : "切换分支继续阅读";
+    return fallbackText ? `**${t("msg.ai")}**\n\n${fallbackText}` : t("msg.switchBranchHint");
   }
 
   const userInput = normalizeFlowSnippet(extractPromptText(branchHead.prompt), 160);
@@ -149,18 +150,18 @@ function buildBranchFlowTextFromGraph(branchHeadSHA1, blockMap, fallbackReply = 
   );
 
   if (userInput && assistantText) {
-    return `**用户**\n\n${escapeMarkdownInline(userInput)}\n\n**AI**\n\n${assistantText}`;
+    return `**${t("msg.user")}**\n\n${escapeMarkdownInline(userInput)}\n\n**${t("msg.ai")}**\n\n${assistantText}`;
   }
 
   if (assistantText) {
-    return `**AI**\n\n${assistantText}`;
+    return `**${t("msg.ai")}**\n\n${assistantText}`;
   }
 
   if (userInput) {
-    return `**用户**\n\n${escapeMarkdownInline(userInput)}`;
+    return `**${t("msg.user")}**\n\n${escapeMarkdownInline(userInput)}`;
   }
 
-  return "切换分支继续阅读";
+  return t("msg.switchBranchHint");
 }
 
 function ContinueFromHereIcon() {
@@ -502,6 +503,7 @@ function ReasoningIcon({ isOpen }) {
 
 function ReasoningPanel({ reasoning, defaultOpen = false, isStreaming = false }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const { t } = useLocale();
 
   if (!reasoning || reasoning.trim().length === 0) {
     return null;
@@ -530,7 +532,7 @@ function ReasoningPanel({ reasoning, defaultOpen = false, isStreaming = false })
             <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z" />
             <path d="M9 21h6" />
           </svg>
-          {isStreaming ? "思考中..." : "已深度思考"}
+          {isStreaming ? t("msg.thinking") : t("msg.thoughtCompleted")}
         </span>
       </button>
       <div className="reasoning-panel-content" aria-hidden={!isOpen}>
@@ -556,6 +558,7 @@ const MemoMessageRow = React.memo(({
   onRunAdaptation,
   onContextMenu,
 }) => {
+  const { t } = useLocale();
   const branchInfo = msg.branchInfo;
   const adaptationInfo = msg.adaptationInfo;
   const summaryInfo = msg.summaryInfo;
@@ -570,11 +573,13 @@ const MemoMessageRow = React.memo(({
     branchInfo?.previousBranchHeadSHA1,
     graphBlockMap,
     msg.text,
+    t,
   );
   const nextBranchFlowText = buildBranchFlowTextFromGraph(
     branchInfo?.nextBranchHeadSHA1,
     graphBlockMap,
     msg.text,
+    t,
   );
   const isStreaming = msg.id === "pending-assistant-message";
 
@@ -601,10 +606,10 @@ const MemoMessageRow = React.memo(({
                 type="button"
                 disabled={isLoading}
                 onClick={() => onActivateBlock?.(branchInfo?.previousBranchHeadSHA1)}
-                aria-label="上一分支"
-                title="上一分支"
+                aria-label={t("msg.previousBranch")}
+                title={t("msg.previousBranch")}
               >
-                <span className="message-side-branch-kicker">上一分支</span>
+                <span className="message-side-branch-kicker">{t("msg.previousBranch")}</span>
                 <SafeMarkdown className="message-side-branch-text">
                   {previousBranchFlowText}
                 </SafeMarkdown>
@@ -622,7 +627,7 @@ const MemoMessageRow = React.memo(({
 
               {summaryInfo?.status === "completed" && summaryInfo.summary ? (
                 <div className="summary-panel">
-                  <div className="summary-panel-title">摘要</div>
+                  <div className="summary-panel-title">{t("msg.summaryPanel")}</div>
                   <div className="summary-panel-content">{summaryInfo.summary}</div>
                 </div>
               ) : null}
@@ -632,23 +637,23 @@ const MemoMessageRow = React.memo(({
                   <div className="message-badges">
                     {branchInfo?.siblingCount > 1 ? (
                       <span className="branch-badge">
-                        分支 {branchInfo.siblingIndex}/{branchInfo.siblingCount}
+                        {t("msg.branchInfo", { index: branchInfo.siblingIndex, total: branchInfo.siblingCount })}
                       </span>
                     ) : null}
                     {branchInfo?.childCount > 0 ? (
-                      <span className="branch-badge">后继 {branchInfo.childCount}</span>
+                      <span className="branch-badge">{t("msg.followUpBranches", { count: branchInfo.childCount })}</span>
                     ) : null}
                     {branchInfo?.isActiveBlock ? (
-                      <span className="branch-badge active">当前链尾</span>
+                      <span className="branch-badge active">{t("msg.currentChainEnd")}</span>
                     ) : null}
                     {adaptationInfo?.contextIgnore ? (
-                      <span className="adaptation-badge">忽略上下文</span>
+                      <span className="adaptation-badge">{t("msg.ignoreContext")}</span>
                     ) : null}
                     {adaptationInfo?.summaryPreferred ? (
-                      <span className="adaptation-badge">优先摘要</span>
+                      <span className="adaptation-badge">{t("msg.preferSummary")}</span>
                     ) : null}
                     {adaptationInfo?.summaryPinned ? (
-                      <span className="adaptation-badge">固定摘要</span>
+                      <span className="adaptation-badge">{t("msg.pinSummary")}</span>
                     ) : null}
                     {adaptationInfo?.labels?.map((label) => (
                       <span key={label.key} className="adaptation-badge label">
@@ -657,7 +662,7 @@ const MemoMessageRow = React.memo(({
                     ))}
                     {summaryInfo?.status ? (
                       <span className={`adaptation-badge summary ${summaryInfo.status}`}>
-                        摘要 {summaryInfo.status}
+                        {t("msg.summaryStatus", { status: summaryInfo.status })}
                       </span>
                     ) : null}
                   </div>
@@ -669,44 +674,44 @@ const MemoMessageRow = React.memo(({
                         type="button"
                         disabled={isLoading || branchInfo.isActiveBlock}
                         onClick={() => onBranchFromBlock?.(msg.blockSHA1)}
-                        aria-label="从这里继续"
-                        title="从这里继续"
+                        aria-label={t("msg.continueFromHere")}
+                        title={t("msg.continueFromHere")}
                       >
                         <ContinueFromHereIcon />
-                        <span className="message-action-btn-label">从这里继续</span>
+                        <span className="message-action-btn-label">{t("msg.continueFromHere")}</span>
                       </button>
                       <button
                         className="message-action-btn message-action-btn-icon message-action-btn-branch-inline"
                         type="button"
                         disabled={isLoading || !branchInfo.previousBranchHeadSHA1}
                         onClick={() => onActivateBlock?.(branchInfo.previousBranchHeadSHA1)}
-                        aria-label="上一分支"
-                        title="上一分支"
+                        aria-label={t("msg.previousBranch")}
+                        title={t("msg.previousBranch")}
                       >
                         <PreviousBranchIcon />
-                        <span className="message-action-btn-label">上一分支</span>
+                        <span className="message-action-btn-label">{t("msg.previousBranch")}</span>
                       </button>
                       <button
                         className="message-action-btn message-action-btn-icon message-action-btn-branch-inline"
                         type="button"
                         disabled={isLoading || !branchInfo.nextBranchHeadSHA1}
                         onClick={() => onActivateBlock?.(branchInfo.nextBranchHeadSHA1)}
-                        aria-label="下一分支"
-                        title="下一分支"
+                        aria-label={t("msg.nextBranch")}
+                        title={t("msg.nextBranch")}
                       >
                         <NextBranchIcon />
-                        <span className="message-action-btn-label">下一分支</span>
+                        <span className="message-action-btn-label">{t("msg.nextBranch")}</span>
                       </button>
                       <button
                         className="message-action-btn message-action-btn-icon"
                         type="button"
                         disabled={isLoading}
                         onClick={() => onRegenerate?.(msg.blockSHA1)}
-                        aria-label="重新生成"
-                        title="重新生成"
+                        aria-label={t("msg.regenerate")}
+                        title={t("msg.regenerate")}
                       >
                         <RegenerateIcon />
-                        <span className="message-action-btn-label">重新生成</span>
+                        <span className="message-action-btn-label">{t("msg.regenerate")}</span>
                       </button>
                     </div>
                   ) : null}
@@ -721,7 +726,7 @@ const MemoMessageRow = React.memo(({
                           definition.key === "summary.generate" &&
                           adaptationInfo.summaryGenerationStatus === "pending";
                         const buttonLabel = isCommand
-                          ? getCommandLabel(definition, adaptationInfo)
+                          ? getCommandLabel(definition, adaptationInfo, t)
                           : definition.shortLabel;
                         const buttonIcon = getAdaptationButtonIcon(definition.key);
 
@@ -768,10 +773,10 @@ const MemoMessageRow = React.memo(({
                 type="button"
                 disabled={isLoading}
                 onClick={() => onActivateBlock?.(branchInfo?.nextBranchHeadSHA1)}
-                aria-label="下一分支"
-                title="下一分支"
+                aria-label={t("msg.nextBranch")}
+                title={t("msg.nextBranch")}
               >
-                <span className="message-side-branch-kicker">下一分支</span>
+                <span className="message-side-branch-kicker">{t("msg.nextBranch")}</span>
                 <SafeMarkdown className="message-side-branch-text">
                   {nextBranchFlowText}
                 </SafeMarkdown>
@@ -798,7 +803,7 @@ const MemoMessageRow = React.memo(({
                     <img
                       key={index}
                       src={getAttachmentUrl(block.attachmentId)}
-                      alt={block.fileName || "图片"}
+                      alt={block.fileName || t("common.image")}
                       className="message-image-block"
                       loading="lazy"
                     />
@@ -809,7 +814,7 @@ const MemoMessageRow = React.memo(({
                     <img
                       key={index}
                       src={block.image_url?.url || ""}
-                      alt="图片"
+                      alt={t("common.image")}
                       className="message-image-block"
                       loading="lazy"
                     />
@@ -848,6 +853,7 @@ const MessageList = forwardRef(({
   const containerRef = useRef(null);
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, msg: null });
   const { showToast } = useApp();
+  const { t } = useLocale();
   const hasInitializedRef = useRef(false);
   const lastHandledScrollRequestIdRef = useRef(0);
   const visibleReadBlockSHA1sRef = useRef(new Set());
@@ -1224,10 +1230,10 @@ const MessageList = forwardRef(({
     if (selectedText?.length > 0) {
       items.push({
         key: "copy-selection",
-        label: "复制",
+        label: t("common.copy"),
         onClick: () => {
           navigator.clipboard.writeText(selectedText).then(() => {
-            showToast("已复制");
+            showToast(t("common.copied"));
           });
         },
       });
@@ -1238,7 +1244,7 @@ const MessageList = forwardRef(({
     if (isMobileUA) {
       items.push({
         key: "select-copy",
-        label: "选择复制",
+        label: t("common.selectCopy"),
         onClick: () => {
           const bodyEl = document.getElementById(`msg-body-${msg.id}`);
           if (bodyEl) {
@@ -1256,7 +1262,7 @@ const MessageList = forwardRef(({
     if (branchInfo) {
       items.push({
         key: "continue-from-here",
-        label: "从这里继续",
+        label: t("msg.continueFromHere"),
         disabled: isLoading || branchInfo.isActiveBlock,
         onClick: () => onBranchFromBlock?.(msg.blockSHA1),
       });
@@ -1264,7 +1270,7 @@ const MessageList = forwardRef(({
       if (branchInfo.previousBranchHeadSHA1) {
         items.push({
           key: "prev-branch",
-          label: "上一分支",
+          label: t("msg.previousBranch"),
           disabled: isLoading,
           onClick: () => onActivateBlock?.(branchInfo.previousBranchHeadSHA1),
         });
@@ -1273,7 +1279,7 @@ const MessageList = forwardRef(({
       if (branchInfo.nextBranchHeadSHA1) {
         items.push({
           key: "next-branch",
-          label: "下一分支",
+          label: t("msg.nextBranch"),
           disabled: isLoading,
           onClick: () => onActivateBlock?.(branchInfo.nextBranchHeadSHA1),
         });
@@ -1281,7 +1287,7 @@ const MessageList = forwardRef(({
 
       items.push({
         key: "regenerate",
-        label: "重新生成",
+        label: t("msg.regenerate"),
         disabled: isLoading,
         onClick: () => onRegenerate?.(msg.blockSHA1),
       });
@@ -1303,7 +1309,7 @@ const MessageList = forwardRef(({
         if (isCommand) {
           items.push({
             key: definition.key,
-            label: getCommandLabel(definition, adaptationInfo),
+            label: getCommandLabel(definition, adaptationInfo, t),
             disabled: isLoading || isPendingCommand,
             onClick: () => onRunAdaptation?.(msg.blockSHA1, definition.key),
           });
@@ -1320,7 +1326,7 @@ const MessageList = forwardRef(({
     }
 
     return items;
-  }, [contextMenu.msg, isLoading, visibleToolbarDefinitions, onBranchFromBlock, onActivateBlock, onRegenerate, onToggleAdaptation, onRunAdaptation, showToast]);
+  }, [contextMenu.msg, isLoading, visibleToolbarDefinitions, onBranchFromBlock, onActivateBlock, onRegenerate, onToggleAdaptation, onRunAdaptation, showToast, t]);
 
   return (
     <div className="messages-container" ref={containerRef}>
@@ -1346,7 +1352,7 @@ const MessageList = forwardRef(({
         {isLoading && (
           <div className="message-row assistant">
             <div className="message-bubble">
-              <span className="dot-typing">思考中...</span>
+              <span className="dot-typing">{t("msg.thinkingEllipsis")}</span>
             </div>
           </div>
         )}

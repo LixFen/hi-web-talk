@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import SafeMarkdown from "./SafeMarkdown";
+import { useLocale } from "../contexts/LocaleContext";
 import { extractPromptText, extractPromptAttachments } from "../lib/content";
 import { getAttachmentUrl } from "../lib/chatApi";
 
@@ -26,6 +27,7 @@ function ReasoningIcon({ isOpen }) {
 
 function ReasoningPanel({ reasoning, defaultOpen = false }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const { t } = useLocale();
 
   if (!reasoning || reasoning.trim().length === 0) {
     return null;
@@ -55,7 +57,7 @@ function ReasoningPanel({ reasoning, defaultOpen = false }) {
             <path d="M12 16v-4" />
             <path d="M12 8h.01" />
           </svg>
-          推理过程
+          {t("block.reasoning")}
         </span>
         <ReasoningIcon isOpen={isOpen} />
       </button>
@@ -70,20 +72,20 @@ function ReasoningPanel({ reasoning, defaultOpen = false }) {
   );
 }
 
-function getCommandLabel(definition, adaptationInfo) {
+function getCommandLabel(definition, adaptationInfo, t) {
   if (definition.key === "summary.generate") {
     const status = adaptationInfo?.summaryGenerationStatus ?? "idle";
 
     if (status === "pending") {
-      return "摘要生成中";
+      return t("summary.generating");
     }
 
     if (status === "completed") {
-      return "刷新摘要";
+      return t("summary.refresh");
     }
 
     if (status === "failed") {
-      return "重试摘要";
+      return t("summary.retry");
     }
   }
 
@@ -95,7 +97,7 @@ function buildCopyText(block) {
     return `System\n${extractPromptText(block.prompt)}`;
   }
 
-  return `用户\n${extractPromptText(block.prompt)}\n\n助手\n${block.response}`;
+  return `${t("msg.user")}\n${extractPromptText(block.prompt)}\n\n${t("msg.ai")}\n${block.response}`;
 }
 
 function buildRawText(block) {
@@ -120,12 +122,12 @@ function buildRawText(block) {
   return parts.join("\n\n");
 }
 
-function renderFlagSummary(block) {
+function renderFlagSummary(block, t) {
   const activeFlags = Object.entries(block.flags ?? {})
     .filter(([, enabled]) => Boolean(enabled))
     .map(([key]) => key);
 
-  return activeFlags.length > 0 ? activeFlags.join(" / ") : "无";
+  return activeFlags.length > 0 ? activeFlags.join(" / ") : t("msg.noFlags");
 }
 
 export default function BlockCard({
@@ -143,6 +145,7 @@ export default function BlockCard({
   className = "",
   isFocused = false,
 }) {
+  const { t } = useLocale();
   const [copyState, setCopyState] = useState("idle");
   const [rawCopyState, setRawCopyState] = useState("idle");
 
@@ -203,31 +206,31 @@ export default function BlockCard({
             {isSystemBlock ? "SYSTEM ROOT" : block.modelAlias || "dialogue"}
           </div>
           <h3 className="block-card-title">
-            {isSystemBlock ? "系统根块" : `对话块 ${block.sha1.slice(0, 8)}`}
+            {isSystemBlock ? t("block.systemRoot") : `${t("block.conversationBlock")} ${block.sha1.slice(0, 8)}`}
           </h3>
         </div>
         <div className="block-card-header-meta">
           <span className="block-card-sha">{block.sha1.slice(0, 12)}</span>
           {block.graphInfo?.isActiveBlock ? (
-            <span className="block-card-pill accent">当前活动块</span>
+            <span className="block-card-pill accent">{t("block.activeBlock")}</span>
           ) : null}
-          {isFocused ? <span className="block-card-pill focused">当前焦点</span> : null}
+          {isFocused ? <span className="block-card-pill focused">{t("block.focusedBlock")}</span> : null}
           {block.graphInfo?.isInActiveChain ? (
-            <span className="block-card-pill">当前链</span>
+            <span className="block-card-pill">{t("block.currentChain")}</span>
           ) : null}
         </div>
       </div>
 
       <div className="block-card-body">
         <section className="block-card-section">
-          <div className="block-card-section-title">用户</div>
-          <div className="block-card-prompt">{extractPromptText(block.prompt) || "暂无内容"}</div>
+          <div className="block-card-section-title">{t("block.user")}</div>
+          <div className="block-card-prompt">{extractPromptText(block.prompt) || t("common.noContent")}</div>
         </section>
 
         {attachments.length > 0 ? (
           <details className="block-card-details">
             <summary>
-              附件 ({attachments.length})
+              {t("block.attachments", { count: attachments.length })}
             </summary>
             <div className="block-card-attachments">
               {attachments.map((att) => (
@@ -235,7 +238,7 @@ export default function BlockCard({
                   key={att.attachmentId}
                   className="block-card-attachment-thumb"
                   src={getAttachmentUrl(att.attachmentId)}
-                  alt={att.fileName || "图片"}
+                  alt={att.fileName || t("common.image")}
                   loading="lazy"
                 />
               ))}
@@ -245,43 +248,43 @@ export default function BlockCard({
 
         {!isSystemBlock && block.reasoning ? (
           <section className="block-card-section">
-            <div className="block-card-section-title">推理过程</div>
+            <div className="block-card-section-title">{t("block.reasoning")}</div>
             <ReasoningPanel reasoning={block.reasoning} />
           </section>
         ) : null}
 
         {!isSystemBlock ? (
           <section className="block-card-section">
-            <div className="block-card-section-title">AI 回复</div>
+            <div className="block-card-section-title">{t("block.aiResponse")}</div>
             <SafeMarkdown className="block-card-response">
-              {block.response || "暂无内容"}
+              {block.response || t("common.noContent")}
             </SafeMarkdown>
           </section>
         ) : null}
 
         {summaryInfo?.status === "completed" && summaryInfo.summary ? (
           <section className="summary-panel block-card-summary">
-            <div className="summary-panel-title">摘要</div>
+            <div className="summary-panel-title">{t("block.summary")}</div>
             <div className="summary-panel-content">{summaryInfo.summary}</div>
           </section>
         ) : null}
 
         <div className="block-card-badges">
-          <span className="block-card-pill">深度 {block.graphInfo?.depth ?? 0}</span>
-          <span className="block-card-pill">子节点 {block.graphInfo?.childCount ?? 0}</span>
+          <span className="block-card-pill">{t("msg.depth", { count: block.graphInfo?.depth ?? 0 })}</span>
+          <span className="block-card-pill">{t("msg.childCount", { count: block.graphInfo?.childCount ?? 0 })}</span>
           {!isSystemBlock && branchInfo?.siblingCount > 1 ? (
             <span className="block-card-pill">
-              分支 {branchInfo.siblingIndex}/{branchInfo.siblingCount}
+              {t("msg.branchInfo", { index: branchInfo.siblingIndex, total: branchInfo.siblingCount })}
             </span>
           ) : null}
           {!isSystemBlock && adaptationInfo?.contextIgnore ? (
-            <span className="block-card-pill warning">忽略上下文</span>
+            <span className="block-card-pill warning">{t("msg.ignoreContext")}</span>
           ) : null}
           {!isSystemBlock && adaptationInfo?.summaryPreferred ? (
-            <span className="block-card-pill">优先摘要</span>
+            <span className="block-card-pill">{t("msg.preferSummary")}</span>
           ) : null}
           {!isSystemBlock && adaptationInfo?.summaryPinned ? (
-            <span className="block-card-pill">固定摘要</span>
+            <span className="block-card-pill">{t("msg.pinSummary")}</span>
           ) : null}
           {!isSystemBlock && adaptationInfo?.labels?.map((label) => (
             <span key={label.key} className="block-card-pill accent-soft">
@@ -290,21 +293,21 @@ export default function BlockCard({
           ))}
           {summaryInfo?.status ? (
             <span className={`block-card-pill summary-${summaryInfo.status}`}>
-              摘要 {summaryInfo.status}
+              {t("msg.summaryStatus", { status: summaryInfo.status })}
             </span>
           ) : null}
         </div>
 
         <div className="block-card-actions">
           <button className="message-action-btn" type="button" onClick={handleCopy}>
-            {copyState === "done" ? "已复制" : copyState === "failed" ? "复制失败" : "复制内容"}
+            {copyState === "done" ? t("common.copied") : copyState === "failed" ? t("common.copyFailed") : t("common.copyContent")}
           </button>
           <button className="message-action-btn" type="button" onClick={handleCopyRaw}>
             {rawCopyState === "done"
-              ? "已复制"
+              ? t("common.copied")
               : rawCopyState === "failed"
-                ? "复制失败"
-                : "复制原文"}
+                ? t("common.copyFailed")
+                : t("common.copyRaw")}
           </button>
           {!block.graphInfo?.isActiveBlock ? (
             <button
@@ -313,7 +316,7 @@ export default function BlockCard({
               disabled={isLoading}
               onClick={() => onActivateBlock?.(block.sha1)}
             >
-              切到这里
+              {t("block.switchTo")}
             </button>
           ) : null}
           {onFocusBlock && !isFocused ? (
@@ -323,7 +326,7 @@ export default function BlockCard({
               disabled={isLoading}
               onClick={() => onFocusBlock?.(block.sha1)}
             >
-              设为焦点
+              {t("block.setFocus")}
             </button>
           ) : null}
           {!isSystemBlock ? (
@@ -333,7 +336,7 @@ export default function BlockCard({
               disabled={isLoading || branchInfo?.isActiveBlock}
               onClick={() => onBranchFromBlock?.(block.sha1)}
             >
-              从这里继续
+              {t("msg.continueFromHere")}
             </button>
           ) : null}
           {!isSystemBlock ? (
@@ -343,7 +346,7 @@ export default function BlockCard({
               disabled={isLoading || !branchInfo?.previousBranchHeadSHA1}
               onClick={() => onActivateBlock?.(branchInfo?.previousBranchHeadSHA1)}
             >
-              上一分支
+              {t("msg.previousBranch")}
             </button>
           ) : null}
           {!isSystemBlock ? (
@@ -353,7 +356,7 @@ export default function BlockCard({
               disabled={isLoading || !branchInfo?.nextBranchHeadSHA1}
               onClick={() => onActivateBlock?.(branchInfo?.nextBranchHeadSHA1)}
             >
-              下一分支
+              {t("msg.nextBranch")}
             </button>
           ) : null}
           {!isSystemBlock ? (
@@ -363,7 +366,7 @@ export default function BlockCard({
               disabled={isLoading}
               onClick={() => onRegenerate?.(block.sha1)}
             >
-              重新生成
+              {t("msg.regenerate")}
             </button>
           ) : null}
           {!isSystemBlock && allowDangerousBlockDelete ? (
@@ -373,7 +376,7 @@ export default function BlockCard({
               disabled={isLoading}
               onClick={() => onDeleteBlockTree?.(block.sha1)}
             >
-              {"\u5220\u9664\u6b64\u5757\u53ca\u540e\u7ee7"}
+              {t("block.deleteBlockTree")}
             </button>
           ) : null}
         </div>
@@ -400,7 +403,7 @@ export default function BlockCard({
                       : onToggleAdaptation?.(block.sha1, definition.key, !isActive)
                   }
                 >
-                  {isCommand ? getCommandLabel(definition, adaptationInfo) : definition.shortLabel}
+                  {isCommand ? getCommandLabel(definition, adaptationInfo, t) : definition.shortLabel}
                 </button>
               );
             })}
@@ -408,7 +411,7 @@ export default function BlockCard({
         ) : null}
 
         <details className="block-card-details">
-          <summary>SHA1 / Flags / 用量</summary>
+          <summary>{t("block.detailsSummary")}</summary>
           <div className="block-card-detail-grid">
             <div>
               <strong>SHA1</strong>
@@ -420,7 +423,7 @@ export default function BlockCard({
             </div>
             <div>
               <strong>Flags</strong>
-              <p>{renderFlagSummary(block)}</p>
+              <p>{renderFlagSummary(block, t)}</p>
             </div>
             <div>
               <strong>Token</strong>

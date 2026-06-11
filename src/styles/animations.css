@@ -42,15 +42,14 @@
   animation-delay: 0.2s;
 }
 
-/* View transition animation */
+/* View transition animation — no transform so that position: fixed
+   descendants (e.g. ContextMenu) remain relative to the viewport. */
 @keyframes viewFadeIn {
   from {
     opacity: 0;
-    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -106,4 +105,52 @@
   to {
     opacity: 1;
   }
+}
+
+/* =================================================================
+   Phase 1 Animation Enhancements
+   ================================================================= */
+
+/* Toast exit animation */
+@keyframes toastSlideUp {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-1rem);
+    opacity: 0;
+  }
+}
+
+.toast-message.exiting {
+  animation: toastSlideUp 0.3s var(--ease-out-expo) forwards;
+}
+
+/* Attachment pop-in animation */
+@keyframes attachmentPopIn {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.composer-attachment-item {
+  animation: attachmentPopIn 0.2s var(--ease-out-expo) both;
+}
+
+/* Composer collapse/expand animation */
+.main-panel-composer {
+  transition: opacity 200ms var(--ease-out-expo),
+              transform 200ms var(--ease-out-expo);
+}
+
+.main-panel-composer.hidden {
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
 }

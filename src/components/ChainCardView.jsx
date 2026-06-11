@@ -1,8 +1,10 @@
 ﻿import { memo, useEffect, useRef } from "react";
 import BlockCard from "./BlockCard";
+import { useLocale } from "../contexts/LocaleContext";
 
 const ChainCardView = memo(function ChainCardView(props) {
   const { blocks = [], focusedBlockSHA1 = "", onFocusBlock } = props;
+  const { t } = useLocale();
   const stackRef = useRef(null);
 
   useEffect(() => {
@@ -23,8 +25,8 @@ const ChainCardView = memo(function ChainCardView(props) {
   if (blocks.length === 0) {
     return (
       <div className="view-empty-state">
-        <h2>当前链还没有可展示的块</h2>
-        <p>先发送一条消息，或者切到聊天视图开始新对话。</p>
+        <h2>{t("msg.noBlocksToShow")}</h2>
+        <p>{t("msg.sendToStart")}</p>
       </div>
     );
   }

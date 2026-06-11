@@ -1,6 +1,7 @@
 ﻿import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BlockCard from "./BlockCard";
 import ContextMenu from "./ContextMenu";
+import { useLocale } from "../contexts/LocaleContext";
 import { extractPromptText } from "../lib/content";
 
 const NODE_WIDTH = 220;
@@ -104,28 +105,28 @@ function buildGraphLayout(blocks, zoomLevel = 1) {
   };
 }
 
-function getNodeSnippet(block) {
+function getNodeSnippet(block, t) {
   if (block.blockType === "system") {
     return extractPromptText(block.prompt);
   }
 
-  return extractPromptText(block.prompt) || block.response || "空内容";
+  return extractPromptText(block.prompt) || block.response || t("common.emptyContent");
 }
 
-function getCommandLabel(definition, adaptationInfo) {
+function getCommandLabel(definition, adaptationInfo, t) {
   if (definition.key === "summary.generate") {
     const status = adaptationInfo?.summaryGenerationStatus ?? "idle";
 
     if (status === "pending") {
-      return "摘要生成中";
+      return t("summary.generating");
     }
 
     if (status === "completed") {
-      return "刷新摘要";
+      return t("summary.refresh");
     }
 
     if (status === "failed") {
-      return "重试摘要";
+      return t("summary.retry");
     }
   }
 
@@ -134,6 +135,7 @@ function getCommandLabel(definition, adaptationInfo) {
 
 const GraphView = memo(function GraphView(props) {
   const { blocks = [], isLoading, onActivateBlock, onFocusBlock, graph, focusedBlockSHA1 = "", adaptationDefinitions = [], onBranchFromBlock, onRegenerate, onToggleAdaptation, onRunAdaptation } = props;
+  const { t } = useLocale();
   const canvasScrollRef = useRef(null);
   const selectedNodeRef = useRef(null);
   const zoomAnchorRef = useRef(null);
@@ -367,7 +369,7 @@ const GraphView = memo(function GraphView(props) {
     if (branchInfo && !isSystemBlock) {
       items.push({
         key: "continue-from-here",
-        label: "从这里继续",
+        label: t("msg.continueFromHere"),
         disabled: isLoading || branchInfo.isActiveBlock,
         onClick: () => onBranchFromBlock?.(contextBlock.sha1),
       });
@@ -375,7 +377,7 @@ const GraphView = memo(function GraphView(props) {
       if (branchInfo.previousBranchHeadSHA1) {
         items.push({
           key: "prev-branch",
-          label: "上一分支",
+          label: t("msg.previousBranch"),
           disabled: isLoading,
           onClick: () => onActivateBlock?.(branchInfo.previousBranchHeadSHA1),
         });
@@ -384,7 +386,7 @@ const GraphView = memo(function GraphView(props) {
       if (branchInfo.nextBranchHeadSHA1) {
         items.push({
           key: "next-branch",
-          label: "下一分支",
+          label: t("msg.nextBranch"),
           disabled: isLoading,
           onClick: () => onActivateBlock?.(branchInfo.nextBranchHeadSHA1),
         });
@@ -392,7 +394,7 @@ const GraphView = memo(function GraphView(props) {
 
       items.push({
         key: "regenerate",
-        label: "重新生成",
+        label: t("msg.regenerate"),
         disabled: isLoading,
         onClick: () => onRegenerate?.(contextBlock.sha1),
       });
@@ -414,7 +416,7 @@ const GraphView = memo(function GraphView(props) {
         if (isCommand) {
           items.push({
             key: definition.key,
-            label: getCommandLabel(definition, adaptationInfo),
+            label: getCommandLabel(definition, adaptationInfo, t),
             disabled: isLoading || isPendingCommand,
             onClick: () => onRunAdaptation?.(contextBlock.sha1, definition.key),
           });
@@ -431,7 +433,7 @@ const GraphView = memo(function GraphView(props) {
     }
 
     return items;
-  }, [contextMenu.block, isLoading, toolbarDefinitions, onBranchFromBlock, onActivateBlock, onRegenerate, onToggleAdaptation, onRunAdaptation]);
+  }, [contextMenu.block, isLoading, toolbarDefinitions, onBranchFromBlock, onActivateBlock, onRegenerate, onToggleAdaptation, onRunAdaptation, t]);
 
   const importantNodeSHA1s = useMemo(
     () =>
@@ -462,8 +464,8 @@ const GraphView = memo(function GraphView(props) {
   if (blocks.length === 0) {
     return (
       <div className="view-empty-state">
-        <h2>还没有图结构可以展示</h2>
-        <p>创建会话后，这里会直接显示整张 Session / Block 图。</p>
+        <h2>{t("msg.noGraphToShow")}</h2>
+        <p>{t("msg.graphHint")}</p>
       </div>
     );
   }
@@ -482,9 +484,9 @@ const GraphView = memo(function GraphView(props) {
             type="button"
             className="graph-detail-toggle-btn"
             onClick={() => setIsDetailCollapsed(false)}
-            aria-label="展开节点详情"
+            aria-label={t("graph.expandDetail")}
           >
-            展开详情
+            {t("graph.expandDetail")}
           </button>
         ) : null}
         {hiddenCount > 0 ? (
@@ -492,13 +494,13 @@ const GraphView = memo(function GraphView(props) {
             type="button"
             className={`graph-hidden-toggle-btn ${showHidden ? "active" : ""}`}
             onClick={() => setShowHidden((v) => !v)}
-            aria-label={showHidden ? "隐藏已标记分支" : "显示已标记分支"}
+            aria-label={showHidden ? t("graph.hideLabeledBranches") : t("graph.showLabeledBranches")}
           >
-            {showHidden ? "隐藏分支" : `显示隐藏 (${hiddenCount})`}
+            {showHidden ? t("graph.hideBranches") : t("graph.showHiddenBranches", { count: hiddenCount })}
           </button>
         ) : null}
         <div className="graph-zoom-indicator" aria-hidden="true">
-          {["紧凑", "标准"][zoomLevel]}
+          {[t("graph.layoutCompact"), t("graph.layoutStandard")][zoomLevel]}
         </div>
         <div
           className={`graph-canvas-scroll ${isDraggingCanvas ? "dragging" : ""}`.trim()}
@@ -560,7 +562,7 @@ const GraphView = memo(function GraphView(props) {
                 ) : (
                   <>
                     {isImportant ? (
-                      <div className="graph-node-important-badge" aria-label="重要标记">
+                      <div className="graph-node-important-badge" aria-label={t("graph.importantBadge")}>
                         <svg width="14" height="14" viewBox="0 0 26 26" aria-hidden="true" focusable="false">
                           <path
                             stroke="currentColor"
@@ -577,10 +579,10 @@ const GraphView = memo(function GraphView(props) {
                       <span className="graph-node-type">{modelLabel}</span>
                       <span className="graph-node-sha">{node.sha1.slice(0, 6)}</span>
                     </div>
-                    <div className="graph-node-content">{getNodeSnippet(node)}</div>
+                    <div className="graph-node-content">{getNodeSnippet(node, t)}</div>
                     <div className="graph-node-footer">
-                      <span>深度 {node.graphInfo?.depth ?? 0}</span>
-                      <span>子节点 {node.graphInfo?.childCount ?? 0}</span>
+                      <span>{t("graph.depth", { count: node.graphInfo?.depth ?? 0 })}</span>
+                      <span>{t("graph.childCount", { count: node.graphInfo?.childCount ?? 0 })}</span>
                     </div>
                   </>
                 )}
@@ -594,15 +596,15 @@ const GraphView = memo(function GraphView(props) {
         <div className="graph-detail-header">
           <div>
             <div className="settings-eyebrow">Block Detail</div>
-            <h2 className="settings-panel-title">当前选中节点</h2>
+            <h2 className="settings-panel-title">{t("model.detail")}</h2>
           </div>
           <button
             type="button"
             className="graph-detail-toggle-btn"
             onClick={() => setIsDetailCollapsed(true)}
-            aria-label="收起节点详情"
+            aria-label={t("graph.collapseDetail")}
           >
-            收起
+            {t("graph.collapseDetail")}
           </button>
         </div>
         <div className="graph-detail-card-wrapper">

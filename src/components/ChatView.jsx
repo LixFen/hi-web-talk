@@ -6,6 +6,7 @@ import {
   resolveReadCursor,
 } from "../lib/chatReadingState";
 import MessageList from "./MessageList";
+import { useLocale } from "../contexts/LocaleContext";
 import { extractPromptText } from "../lib/content";
 
 function clampText(value = "", maxLength = 120) {
@@ -43,7 +44,7 @@ function getLatestDescendantLeaf(startBlock, blockMap) {
   return currentBlock ?? startBlock;
 }
 
-function buildBranchPreviews(graphBlocks = [], activeBlockSHA1 = "") {
+function buildBranchPreviews(graphBlocks = [], activeBlockSHA1 = "", t) {
   const blockMap = new Map(graphBlocks.map((block) => [block.sha1, block]));
   const activeBlock = blockMap.get(activeBlockSHA1) ?? null;
   const childBlockSHA1s = activeBlock?.graphInfo?.childBlockSHA1s ?? [];
@@ -66,7 +67,7 @@ function buildBranchPreviews(graphBlocks = [], activeBlockSHA1 = "") {
         summaryText ||
         latestLeaf.response ||
         childBlock.response ||
-        "这个分支还没有更多回复，可以点击进入后继续展开。";
+        t("chat.branchEmptyHint");
       const stepCount = Math.max(
         (latestLeaf.graphInfo?.depth ?? childBlock.graphInfo?.depth ?? 0) -
           (activeBlock?.graphInfo?.depth ?? 0),
@@ -77,12 +78,12 @@ function buildBranchPreviews(graphBlocks = [], activeBlockSHA1 = "") {
         id: childBlock.sha1,
         order: index + 1,
         targetSHA1: childBlock.sha1,
-        title: clampText(extractPromptText(childBlock.prompt) || "未命名分支", 40),
+        title: clampText(extractPromptText(childBlock.prompt) || t("chat.unnamedBranch"), 40),
         preview: clampText(previewText, 120),
         meta:
           stepCount > 1
-            ? `继续阅读 ${stepCount} 步，切换后会定位到该分支的最新块`
-            : "切换后会定位到这个分支的最新对话块",
+            ? t("chat.branchContinueSteps", { count: stepCount })
+            : t("chat.branchSwitchHint"),
       };
     })
     .filter(Boolean);
@@ -96,6 +97,8 @@ function ChatBottomDock({
   isBranchGridOverflowing,
   isLoading,
 }) {
+  const { t } = useLocale();
+
   if (!showBranches) {
     return null;
   }
@@ -108,11 +111,11 @@ function ChatBottomDock({
       {showBranches ? (
         <section
           className={`chat-bottom-dock-inline chat-bottom-dock-branches ${isSingleBranch ? "is-single-branch" : ""}`.trim()}
-          aria-label="后续分支预览"
+          aria-label={t("chat.branchPreviewAria")}
         >
           <div className="chat-bottom-dock-header">
-            <span className="chat-bottom-dock-eyebrow">后续分支</span>
-            <span className="chat-bottom-dock-caption">选择一段继续写下去的内容</span>
+            <span className="chat-bottom-dock-eyebrow">{t("chat.branches")}</span>
+            <span className="chat-bottom-dock-caption">{t("chat.branchSelectHint")}</span>
           </div>
           <div
             className={`chat-bottom-dock-grid ${isSingleBranch ? "is-single-branch" : ""} ${isMultiBranch ? "is-multi-branch" : ""} ${isBranchGridOverflowing ? "is-overflowing" : ""}`.trim()}
@@ -126,7 +129,7 @@ function ChatBottomDock({
                 disabled={isLoading}
                 onClick={() => onActivateBlock?.(preview.targetSHA1)}
               >
-                <span className="branch-preview-flow-label">分支 {preview.order}</span>
+                <span className="branch-preview-flow-label">{t("chat.branchLabel", { order: preview.order })}</span>
                 <span className="branch-preview-flow-title">{preview.title}</span>
                 <span className="branch-preview-flow-text">{preview.preview}</span>
               </button>
@@ -153,6 +156,7 @@ const ChatView = memo(function ChatView({
   onFocusBlock,
   ...props
 }) {
+  const { t } = useLocale();
   const messageListRef = useRef(null);
   const branchPreviewGridRef = useRef(null);
   const [readBlockSHA1, setReadBlockSHA1] = useState("");
@@ -160,8 +164,8 @@ const ChatView = memo(function ChatView({
   readBlockSHA1Ref.current = readBlockSHA1;
   const [isBranchGridOverflowing, setIsBranchGridOverflowing] = useState(false);
   const branchPreviews = useMemo(
-    () => buildBranchPreviews(graphBlocks, activeBlockSHA1),
-    [graphBlocks, activeBlockSHA1],
+    () => buildBranchPreviews(graphBlocks, activeBlockSHA1, t),
+    [graphBlocks, activeBlockSHA1, t],
   );
   const readableBlockSHA1s = useMemo(() => buildReadableBlockOrder(messages), [messages]);
   const latestReadableBlockSHA1 = useMemo(

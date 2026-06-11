@@ -354,7 +354,7 @@ export default function AuthenticatedLayout() {
 
           {toast.message && (
             <div className="global-toast-container">
-              <div className={`toast-message ${toast.type}`}>
+              <div className={`toast-message ${toast.type} ${toast.isExiting ? 'exiting' : ''}`}>
                 <span>{toast.message}</span>
               </div>
             </div>

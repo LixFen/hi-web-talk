@@ -499,7 +499,7 @@ const ChatComposer = ({
                     }
                   }
                   if (legacy.length > 0) {
-                    groups.push({ provider: { name: "其他" }, models: legacy });
+                    groups.push({ provider: { name: t("common.other") }, models: legacy });
                   }
                   return groups.map((group) => (
                     <optgroup key={group.provider.name} label={group.provider.name}>

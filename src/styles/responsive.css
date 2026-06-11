@@ -416,4 +416,21 @@
   .send-button svg[style*="spin"] {
     animation: none !important;
   }
+
+  .view-mode-pill {
+    transition: none;
+  }
+
+  .toast-message.exiting {
+    animation: none;
+    opacity: 0;
+  }
+
+  .composer-attachment-item {
+    animation: none;
+  }
+
+  .main-panel-composer {
+    transition: none;
+  }
 }

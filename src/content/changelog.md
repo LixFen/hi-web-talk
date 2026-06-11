@@ -1,3 +1,12 @@
+# 1.16.1
+
+- Feat: improved UI visual effects, including view switch and minor effects.
+- Feat: more I18n content added.
+- Feat: added viewmode switcher, Toast exit animations.
+- Refactor: split monolithic `app.css` (4420 lines) into 9 modular CSS files (layout, messages, composer, dock, views, settings, components, animations, responsive) for better maintainability.
+- Fix: merged duplicate selectors in `markdown.css` for `.markdown-body :not(pre) > code`.
+- Fix: Fixed the context menu position issue.
+
 # 1.16.0
 
 - Fix: sending a message with images now correctly displays the user bubble during LLM streaming, matching the behavior of plain text messages.

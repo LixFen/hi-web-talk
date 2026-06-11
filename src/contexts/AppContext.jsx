@@ -272,7 +272,7 @@ export function AppProvider({ children }) {
         applyProviders(result.providers, result.models);
         return result.provider;
       } catch (err) {
-        setError(err instanceof Error ? err.message : "创建 Provider 失败。");
+        setError(err instanceof Error ? err.message : tRef.current("app.error.createProviderFailed"));
         throw err;
       } finally {
         setIsModelSaving(false);
@@ -290,7 +290,7 @@ export function AppProvider({ children }) {
         applyProviders(result.providers, result.models);
         return result.provider;
       } catch (err) {
-        setError(err instanceof Error ? err.message : "更新 Provider 失败。");
+        setError(err instanceof Error ? err.message : tRef.current("app.error.updateProviderFailed"));
         throw err;
       } finally {
         setIsModelSaving(false);
@@ -307,7 +307,7 @@ export function AppProvider({ children }) {
         const result = await deleteProvider(providerId);
         applyProviders(result.providers, result.models);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "删除 Provider 失败。");
+        setError(err instanceof Error ? err.message : tRef.current("app.error.deleteProviderFailed"));
         throw err;
       } finally {
         setIsModelSaving(false);
@@ -406,15 +406,25 @@ export function AppProvider({ children }) {
   );
 
   const showToast = useCallback((message, type = "info") => {
-    setToast({ message, type });
+    setToast({ message, type, isExiting: false });
   }, []);
 
   useEffect(() => {
     if (!toast.message) return undefined;
     if (toast.type === "error") return undefined;
-    const timer = setTimeout(() => setToast({ message: "", type: "info" }), 2000);
-    return () => clearTimeout(timer);
-  }, [toast.message, toast.type]);
+
+    if (toast.isExiting) {
+      const clearTimer = setTimeout(() => {
+        setToast({ message: "", type: "info", isExiting: false });
+      }, 300);
+      return () => clearTimeout(clearTimer);
+    }
+
+    const exitTimer = setTimeout(() => {
+      setToast((prev) => ({ ...prev, isExiting: true }));
+    }, 2000);
+    return () => clearTimeout(exitTimer);
+  }, [toast.message, toast.type, toast.isExiting]);
 
   const value = useMemo(
     () => ({
