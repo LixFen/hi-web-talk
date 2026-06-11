@@ -361,31 +361,29 @@ export default function AuthenticatedLayout() {
           )}
         </div>
 
-        {!isSidebarDrawerOpen && currentViewMode === "chat" && (
-          <div className="main-panel-composer">
-            <ChatComposer
-              isLoading={isLoading || !enabledModels.length}
-              canStop={canStop}
-              modelOptions={enabledModels}
-              providers={providers}
-              selectedModelId={selectedModelId}
-              isCollapsed={isComposerCollapsed}
-              onToggleCollapsed={() =>
-                setIsComposerCollapsed((current) => !current)
-              }
-              onChangeModel={setSelectedModelId}
-              onSend={send}
-              onUploadAttachment={uploadAttachment}
-              onStop={stopStreaming}
-              hideToolbar={shouldHideComposer}
-              blocks={blocks}
-              focusedBlockSHA1={focusedBlockSHA1}
-              activeBlockSHA1={activeBlockSHA1}
-              onSelectBlock={selectBlock}
-              sessionHash={activeConversation?.sessionHash}
-            />
-          </div>
-        )}
+        <div className={`main-panel-composer ${shouldHideComposer ? 'hidden' : ''}`}>
+          <ChatComposer
+            isLoading={isLoading || !enabledModels.length}
+            canStop={canStop}
+            modelOptions={enabledModels}
+            providers={providers}
+            selectedModelId={selectedModelId}
+            isCollapsed={isComposerCollapsed}
+            onToggleCollapsed={() =>
+              setIsComposerCollapsed((current) => !current)
+            }
+            onChangeModel={setSelectedModelId}
+            onSend={send}
+            onUploadAttachment={uploadAttachment}
+            onStop={stopStreaming}
+            hideToolbar={shouldHideComposer}
+            blocks={blocks}
+            focusedBlockSHA1={focusedBlockSHA1}
+            activeBlockSHA1={activeBlockSHA1}
+            onSelectBlock={selectBlock}
+            sessionHash={activeConversation?.sessionHash}
+          />
+        </div>
       </main>
 
       <ModelSettingsPanel

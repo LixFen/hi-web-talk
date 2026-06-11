@@ -508,7 +508,7 @@ function ReasoningPanel({ reasoning, defaultOpen = false, isStreaming = false })
   }
 
   return (
-    <div className="reasoning-panel">
+    <div className={`reasoning-panel ${isOpen ? 'open' : ''}`}>
       <button
         className="reasoning-panel-header"
         type="button"
@@ -533,13 +533,11 @@ function ReasoningPanel({ reasoning, defaultOpen = false, isStreaming = false })
           {isStreaming ? "思考中..." : "已深度思考"}
         </span>
       </button>
-      {isOpen ? (
-        <div className="reasoning-panel-content">
-          <SafeMarkdown className="reasoning-markdown">
-            {reasoning}
-          </SafeMarkdown>
-        </div>
-      ) : null}
+      <div className="reasoning-panel-content" aria-hidden={!isOpen}>
+        <SafeMarkdown className="reasoning-markdown">
+          {reasoning}
+        </SafeMarkdown>
+      </div>
     </div>
   );
 }

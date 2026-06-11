@@ -141,7 +141,6 @@ export default function BlockSelector({
               aria-haspopup="listbox"
               aria-expanded={showPanel}
             >
-              <span className="block-selector-line" />
               {focusedLabel && <span className="block-selector-text">{focusedLabel}</span>}
             </button>
           )}
@@ -152,7 +151,6 @@ export default function BlockSelector({
               aria-haspopup="listbox"
               aria-expanded={showPanel}
             >
-              <span className="block-selector-line" />
               {focusedLabel && <span className="block-selector-text">{focusedLabel}</span>}
             </button>
           )}

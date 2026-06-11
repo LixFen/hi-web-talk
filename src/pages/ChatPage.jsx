@@ -3,9 +3,10 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useSession } from "../contexts/SessionContext";
 import { useApp } from "../contexts/AppContext";
 import { useLocale } from "../contexts/LocaleContext";
-import ChatView from "../components/ChatView";
 import ChatHero from "../components/ChatHero";
+import LoadingFallback from "../components/LoadingFallback";
 
+const ChatView = lazy(() => import("../components/ChatView"));
 const ChainCardView = lazy(() => import("../components/ChainCardView"));
 const GraphView = lazy(() => import("../components/GraphView"));
 
@@ -160,41 +161,37 @@ export default function ChatPage() {
     }
 
     return (
-      <ChatView
-        graphBlocks={session.graph.blocks}
-        activeBlockSHA1={session.graph.activeBlockSHA1}
-        focusedBlockSHA1={session.focusedBlockSHA1}
-        isReplyPending={session.isReplyPending}
-        bottomDockMode={appSettings.bottomDockMode || "smart"}
-        hideWideScreenSideBranches={
-          appSettings.hideWideScreenSideBranches === true
-        }
-        messages={session.displayMessages}
-        navigationRequest={session.chatNavigationRequest}
-        isLoading={session.isLoading}
-        hideChatBottomDock={false}
-        adaptationDefinitions={adaptationDefinitions}
-        adaptationButtonVisibility={chatAdaptationButtonVisibility}
-        onActivateBlock={session.activateBlock}
-        onFocusBlock={session.focusBlock}
-        onBranchFromBlock={session.branchFromBlock}
-        onRegenerate={session.regenerate}
-        onToggleAdaptation={session.toggleAdaptation}
-        onRunAdaptation={session.runAdaptation}
-        onScrollRequestHandled={session.handleChatNavigationRequestHandled}
-      />
+      <Suspense fallback={<LoadingFallback />}>
+        <ChatView
+          graphBlocks={session.graph.blocks}
+          activeBlockSHA1={session.graph.activeBlockSHA1}
+          focusedBlockSHA1={session.focusedBlockSHA1}
+          isReplyPending={session.isReplyPending}
+          bottomDockMode={appSettings.bottomDockMode || "smart"}
+          hideWideScreenSideBranches={
+            appSettings.hideWideScreenSideBranches === true
+          }
+          messages={session.displayMessages}
+          navigationRequest={session.chatNavigationRequest}
+          isLoading={session.isLoading}
+          hideChatBottomDock={false}
+          adaptationDefinitions={adaptationDefinitions}
+          adaptationButtonVisibility={chatAdaptationButtonVisibility}
+          onActivateBlock={session.activateBlock}
+          onFocusBlock={session.focusBlock}
+          onBranchFromBlock={session.branchFromBlock}
+          onRegenerate={session.regenerate}
+          onToggleAdaptation={session.toggleAdaptation}
+          onRunAdaptation={session.runAdaptation}
+          onScrollRequestHandled={session.handleChatNavigationRequestHandled}
+        />
+      </Suspense>
     );
   }
 
   if (effectiveView === "chain") {
     return (
-      <Suspense
-        fallback={
-          <div className="empty-state">
-            <h2 className="hero-title">{t("app.loading")}</h2>
-          </div>
-        }
-      >
+      <Suspense fallback={<LoadingFallback />}>
         <ChainCardView
           blocks={session.activeChainBlocks}
           isLoading={session.isLoading}
@@ -212,13 +209,7 @@ export default function ChatPage() {
   }
 
   return (
-    <Suspense
-      fallback={
-        <div className="empty-state">
-          <h2 className="hero-title">{t("app.loading")}</h2>
-        </div>
-      }
-    >
+    <Suspense fallback={<LoadingFallback />}>
       <GraphView
         blocks={session.graph.blocks}
         graph={session.graph}
