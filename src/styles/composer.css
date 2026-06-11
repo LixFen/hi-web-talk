@@ -1,0 +1,336 @@
+/* =================================================================
+   Composer — Input Area, Send Button, Footer Bar, Attachments
+   ================================================================= */
+
+/* -----------------------------------------------------------------
+   Composer Area
+   ----------------------------------------------------------------- */
+.composer-area {
+  width: 100%;
+  padding: 0 var(--space-4) var(--space-6);
+  background: transparent;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.composer-area > * {
+  pointer-events: auto;
+}
+
+.composer-container {
+  max-width: 48rem;
+  margin: 0 auto;
+  position: relative;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    var(--bg-main) 35%,
+    var(--bg-main) 85%,
+    transparent 100%
+  );
+  border-radius: var(--radius-xl);
+  padding: 0.5rem 0.5rem 1rem;
+}
+
+.composer-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-2);
+}
+
+.composer-collapse-button {
+  min-height: 2rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-full);
+  background: var(--bg-glass);
+  backdrop-filter: blur(8px);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.2;
+  font-weight: 500;
+  transition: all var(--duration-fast) var(--ease-out-expo);
+  box-shadow: var(--shadow-xs);
+}
+
+.composer-collapse-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.composer-collapse-button:active {
+  transform: scale(0.97);
+  box-shadow: var(--shadow-xs);
+}
+
+.composer-area.collapsed .composer-container {
+  padding-bottom: 0.25rem;
+  background: transparent;
+}
+
+.composer-area.no-toolbar.collapsed .composer-container {
+  background: transparent;
+  padding: 0;
+}
+
+.composer-area.no-toolbar.collapsed {
+  pointer-events: none;
+  padding: 0;
+}
+
+/* -----------------------------------------------------------------
+   Chat Input
+   ----------------------------------------------------------------- */
+.chat-input-wrapper {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-input);
+  border-radius: var(--radius-xl);
+  padding: 0.75rem 1.125rem;
+  box-shadow: var(--shadow-sm), 0 0 0 1px var(--border-light);
+  transition: box-shadow var(--duration-fast), border-color var(--duration-fast), transform var(--duration-fast);
+  border: 1px solid transparent;
+}
+
+.chat-input-wrapper:focus-within {
+  box-shadow: var(--shadow-md), 0 0 0 2px var(--accent-color-alpha);
+  border-color: color-mix(in srgb, var(--accent-color) 35%, transparent);
+  transform: translateY(-1px);
+}
+
+.chat-textarea {
+  flex: 1;
+  max-height: 200px;
+  resize: none;
+  padding: 0;
+  min-height: 1.5rem;
+  font-size: 1rem;
+  line-height: 1.55;
+  overflow-y: auto;
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: none;
+  border: none;
+  overscroll-behavior-y: contain;
+}
+
+.chat-textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Subtle focus indicator for keyboard navigation */
+.chat-textarea:focus-visible::placeholder {
+  color: var(--accent-color);
+  transition: color 150ms ease;
+}
+
+.chat-textarea::placeholder {
+  color: var(--text-placeholder);
+}
+
+/* -----------------------------------------------------------------
+   Send Button
+   ----------------------------------------------------------------- */
+.send-button {
+  background: var(--text-primary);
+  color: var(--bg-main);
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: var(--space-3);
+  transition: transform 80ms var(--ease-out-expo), box-shadow 150ms var(--ease-out-expo);
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+}
+
+.send-button:hover:not(:disabled) {
+  transform: scale(1.08);
+  box-shadow: var(--shadow-md);
+}
+
+.send-button:active:not(:disabled) {
+  transform: scale(0.92);
+  transition-duration: 60ms;
+}
+
+.send-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background-color: var(--text-primary);
+}
+
+.send-button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: currentColor;
+}
+
+.send-button.stop {
+  background: #b42318;
+  color: #ffffff;
+}
+
+.send-button.stop:disabled {
+  opacity: 1;
+  cursor: pointer;
+  background-color: #b42318;
+}
+
+/* -----------------------------------------------------------------
+   Footer Bar
+   ----------------------------------------------------------------- */
+.chat-footer-text {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.chat-footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: var(--space-3);
+}
+
+.chat-footer-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.composer-model-selector,
+.composer-settings-button {
+  min-height: 2.25rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-full);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  line-height: 1.2;
+  font-weight: 500;
+  transition: all var(--duration-fast) var(--ease-out-expo);
+  box-shadow: var(--shadow-xs);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.composer-model-selector {
+  max-width: min(18rem, 52vw);
+  appearance: none;
+  cursor: pointer;
+}
+
+.composer-model-selector:hover,
+.composer-settings-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.composer-model-selector:disabled,
+.composer-settings-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.composer-settings-button {
+  white-space: nowrap;
+}
+
+.chat-footer-bar .chat-footer-text {
+  text-align: right;
+}
+
+/* -----------------------------------------------------------------
+   Attachments
+   ----------------------------------------------------------------- */
+.composer-attachments {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.75rem 0;
+}
+
+.composer-attachment-item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  background: var(--bg-surface);
+}
+
+.composer-attachment-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.composer-attachment-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.composer-attachment-remove:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.composer-attachment-remove:active {
+  transform: scale(0.85);
+}
+
+.composer-attach-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-right: 0.25rem;
+}
+
+.composer-attach-btn:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.composer-attach-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.composer-attach-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

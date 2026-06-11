@@ -9,17 +9,9 @@
 .markdown-body :not(pre) > code {
   border-radius: 0.35rem;
   padding: 0.12rem 0.35rem;
-}
-
-
-
-.markdown-body :not(pre) > code.hljs,
-.markdown-body :not(pre) > code {
   background: rgba(15, 23, 42, 0.06);
   color: #1e293b;
 }
-
-
 
 :root[data-theme="dark"] .markdown-body :not(pre) > code.hljs,
 :root[data-theme="dark"] .markdown-body :not(pre) > code {
@@ -33,4 +25,239 @@
     background: rgba(148, 163, 184, 0.16);
     color: #e2e8f0;
   }
+}
+
+/* =================================================================
+   Markdown Body — Typography, Code Blocks, Tables
+   ================================================================= */
+
+.markdown-body {
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body a {
+  color: var(--accent-color);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
+  transition: border-color var(--duration-fast), color var(--duration-fast);
+}
+
+.markdown-body a:hover {
+  border-color: var(--accent-color);
+}
+
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body pre,
+.markdown-body blockquote,
+.markdown-body table {
+  margin: 0 0 0.7rem;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin: 0.9rem 0 0.5rem;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+
+.markdown-body h1 { font-size: 1.3rem; }
+.markdown-body h2 { font-size: 1.15rem; }
+.markdown-body h3 { font-size: 1.05rem; }
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.35rem;
+}
+
+.markdown-body ul { list-style: disc; }
+.markdown-body ol { list-style: decimal; }
+
+.markdown-body li {
+  margin: 0.25rem 0;
+}
+
+.markdown-body li > ul,
+.markdown-body li > ol {
+  margin-top: 0.3rem;
+  margin-bottom: 0.15rem;
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid var(--accent-color);
+  padding-left: 0.85rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  background: linear-gradient(90deg, var(--accent-color-alpha), transparent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+}
+
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--border-color);
+  margin: 1.25rem 0;
+}
+
+/* -----------------------------------------------------------------
+   Code
+   ----------------------------------------------------------------- */
+.markdown-body pre {
+  background-color: var(--n-50);
+  padding: 0.85rem;
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-inset);
+}
+
+.markdown-body .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  margin: 0.5rem 0;
+  padding: 0.25rem 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.markdown-body .katex-display > .katex {
+  text-align: center;
+  min-width: min-content;
+}
+
+:root[data-theme="dark"] .markdown-body pre {
+  background-color: var(--n-100);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .markdown-body pre {
+    background-color: var(--n-100);
+  }
+}
+
+.markdown-body code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.markdown-body :not(pre) > code {
+  background-color: var(--bg-hover);
+  padding: 0.15em 0.4em;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+  font-weight: 500;
+}
+
+.markdown-body pre code {
+  display: block;
+  background-color: transparent;
+  padding: 0;
+  border: none;
+  font-weight: 400;
+  line-height: inherit;
+  overflow-x: auto;
+}
+
+/* -----------------------------------------------------------------
+   Code Block Banner
+   ----------------------------------------------------------------- */
+.markdown-body .code-block {
+  margin: 0.85rem 0;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-inset);
+  overflow: hidden;
+}
+
+.markdown-body .code-block-title {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0.3rem 0.85rem;
+  background-color: color-mix(in srgb, var(--n-50) 85%, var(--n-100));
+  border-bottom: 1px solid var(--border-light);
+  user-select: none;
+}
+
+.markdown-body .code-block pre {
+  margin: 0;
+  padding: 0.85rem;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background-color: var(--n-50);
+  overflow-x: auto;
+}
+
+:root[data-theme="dark"] .markdown-body .code-block-title {
+  background-color: color-mix(in srgb, var(--n-100) 85%, var(--n-50));
+}
+
+:root[data-theme="dark"] .markdown-body .code-block pre {
+  background-color: var(--n-100);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .markdown-body .code-block-title {
+    background-color: color-mix(in srgb, var(--n-100) 85%, var(--n-50));
+  }
+
+  :root:not([data-theme="light"]) .markdown-body .code-block pre {
+    background-color: var(--n-100);
+  }
+}
+
+/* -----------------------------------------------------------------
+   Tables
+   ----------------------------------------------------------------- */
+.markdown-body table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.92rem;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+}
+
+.markdown-body th,
+.markdown-body td {
+  border-bottom: 1px solid var(--border-light);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.markdown-body th {
+  background: color-mix(in srgb, var(--bg-hover) 60%, transparent);
+  font-weight: 600;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.markdown-body tr:last-child td {
+  border-bottom: none;
+}
+
+.markdown-body tr:hover td {
+  background: color-mix(in srgb, var(--bg-hover) 30%, transparent);
 }

@@ -1,0 +1,37 @@
+/* =================================================================
+   App Styles — Barrel Import
+   Hi Web Talk — Premium interface with glassmorphism, layered shadows,
+   fluid spacing, and responsive adaptability.
+   ================================================================= */
+
+/* Layout & Structure */
+@import "./layout.css";
+
+/* Messages & Conversation */
+@import "./messages.css";
+
+/* Composer & Input */
+@import "./composer.css";
+
+/* Bottom Dock & Branch Previews */
+@import "./dock.css";
+
+/* Views (Empty State, Chain Card, Graph) */
+@import "./views.css";
+
+/* Settings Modal */
+@import "./settings.css";
+
+/* Reusable Components (Toast, Context Menu, Block Selector, Login) */
+@import "./components.css";
+
+/* Animations & Keyframes */
+@import "./animations.css";
+
+/* Responsive Breakpoints & Touch Adaptations */
+@import "./responsive.css";
+
+/* =================================================================
+   NOTE: Markdown styles are imported separately via main.jsx
+   (src/styles/markdown.css — includes highlight.js styles)
+   ================================================================= */

@@ -1,0 +1,109 @@
+/* =================================================================
+   Animations — Keyframes, Loading, View Transitions
+   ================================================================= */
+
+/* Dock fade pulse */
+@keyframes dockFade {
+  0%, 100% { opacity: 0.82; }
+  50% { opacity: 1; }
+}
+
+/* Dot typing animation for loading indicator */
+@keyframes dotTyping {
+  0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
+  30% { opacity: 1; transform: scale(1); }
+}
+
+.dot-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.dot-typing::before,
+.dot-typing::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-color);
+}
+
+.dot-typing::before {
+  animation: dotTyping 1.4s infinite ease-in-out;
+  animation-delay: 0s;
+}
+
+.dot-typing::after {
+  animation: dotTyping 1.4s infinite ease-in-out;
+  animation-delay: 0.2s;
+}
+
+/* View transition animation */
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.view-transition-enter {
+  animation: viewFadeIn 200ms var(--ease-out-expo) both;
+}
+
+/* Loading spinner for Suspense fallback */
+@keyframes loadingPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.loading-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.loading-fallback-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-light);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-fallback-text {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  animation: loadingPulse 1.5s ease-in-out infinite;
+}
+
+/* Generic spin */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Generic fade in */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

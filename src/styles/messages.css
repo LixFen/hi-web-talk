@@ -1,0 +1,542 @@
+/* =================================================================
+   Messages — Container, Rows, Bubbles, Side Branches, Reasoning
+   ================================================================= */
+
+/* -----------------------------------------------------------------
+   Messages Container
+   ----------------------------------------------------------------- */
+.messages-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 2rem;
+  scrollbar-gutter: stable;
+  overscroll-behavior-y: contain;
+}
+
+.messages-content {
+  max-width: 48rem;
+  margin: 0 auto;
+  width: 100%;
+  padding: var(--space-5) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  overflow-x: hidden;
+}
+
+.message-read-marker {
+  width: 100%;
+  height: 1px;
+  margin-top: 0.25rem;
+  pointer-events: none;
+}
+
+/* -----------------------------------------------------------------
+   Message Row & Bubble
+   ----------------------------------------------------------------- */
+.message-row {
+  display: flex;
+  width: 100%;
+  gap: var(--space-3);
+  scroll-margin-top: 5.5rem;
+  animation: messageEnter var(--duration-slow) var(--ease-out-expo) both;
+}
+
+@keyframes messageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-row-assistant-shell {
+  width: 100%;
+  position: relative;
+}
+
+.message-row.user {
+  justify-content: flex-end;
+}
+
+.message-row.assistant {
+  justify-content: stretch;
+}
+
+.message-bubble {
+  max-width: 80%;
+  font-size: 0.9375rem;
+  word-wrap: break-word;
+  line-height: 1.55;
+}
+
+.message-row.assistant .message-bubble {
+  max-width: 100%;
+  width: min(100%, 42rem);
+  margin: 0 auto;
+}
+
+.message-row.user .message-bubble {
+  background: var(--bg-user-msg);
+  color: var(--text-primary);
+  border-radius: var(--radius-xl);
+  border-bottom-right-radius: var(--radius-sm);
+  padding: 0.6rem 1rem;
+  box-shadow: var(--shadow-xs);
+  border: 1px solid var(--border-light);
+  font-weight: 450;
+}
+
+.message-row.assistant .message-bubble {
+  padding: 0;
+  color: var(--text-primary);
+}
+
+/* -----------------------------------------------------------------
+   Side Branches
+   ----------------------------------------------------------------- */
+.message-side-branch {
+  display: none;
+}
+
+.message-side-branch-left {
+  left: 0;
+}
+
+.message-side-branch-right {
+  right: 0;
+}
+
+.message-side-branch-btn {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: min(clamp(14rem, 22vw, 20rem), calc(100% - 1rem));
+  min-height: 0;
+  height: 100%;
+  padding: 0.45rem 0.4rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  background: transparent;
+  color: color-mix(in srgb, var(--text-primary) 80%, var(--text-secondary));
+  text-align: left;
+  opacity: 0.55;
+  transition: all var(--duration-fast) var(--ease-out-expo);
+}
+
+.message-side-branch-right .message-side-branch-btn {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.message-side-branch-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  color: var(--text-primary);
+  opacity: 1;
+  background: var(--bg-glass);
+  border-color: var(--border-light);
+  backdrop-filter: blur(8px);
+}
+
+.message-side-branch-btn:focus-visible {
+  opacity: 1;
+}
+
+.message-side-branch-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.message-side-branch-kicker {
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text-secondary) 70%, transparent);
+  font-weight: 600;
+}
+
+.message-side-branch-text {
+  display: block;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  overflow: hidden;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,1) 12%, rgba(0,0,0,1) 88%, rgba(0,0,0,0.02) 100%);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,1) 12%, rgba(0,0,0,1) 88%, rgba(0,0,0,0.02) 100%);
+}
+
+.message-side-branch-text.markdown-body {
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.message-side-branch-text.markdown-body p,
+.message-side-branch-text.markdown-body ul,
+.message-side-branch-text.markdown-body ol,
+.message-side-branch-text.markdown-body pre,
+.message-side-branch-text.markdown-body blockquote {
+  margin-bottom: 0.5rem;
+}
+
+.message-side-branch-text.markdown-body h1,
+.message-side-branch-text.markdown-body h2,
+.message-side-branch-text.markdown-body h3,
+.message-side-branch-text.markdown-body h4 {
+  margin-top: 0.4rem;
+  margin-bottom: 0.3rem;
+}
+
+/* -----------------------------------------------------------------
+   Assistant Body & Markdown
+   ----------------------------------------------------------------- */
+.message-assistant-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.message-row.assistant .markdown-body {
+  line-height: 1.65;
+  font-size: 0.9375rem;
+}
+
+.message-row.assistant .markdown-body p {
+  margin-bottom: 0.65rem;
+}
+
+/* -----------------------------------------------------------------
+   Summary Panel
+   ----------------------------------------------------------------- */
+.summary-panel {
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(0,0,0,0.01), rgba(0,0,0,0.025));
+  box-shadow: var(--shadow-inset);
+}
+
+.summary-panel-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.summary-panel-content {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  line-height: 1.55;
+}
+
+/* -----------------------------------------------------------------
+   Reasoning Panel
+   ----------------------------------------------------------------- */
+.reasoning-panel {
+  border-radius: var(--radius-md);
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  background: transparent;
+  overflow: hidden;
+}
+
+.reasoning-control-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.15rem;
+}
+
+.reasoning-control-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.reasoning-info-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--text-muted);
+  cursor: help;
+  transition: color var(--duration-fast);
+}
+
+.reasoning-info-trigger:hover {
+  color: var(--text-primary);
+}
+
+.reasoning-info-tooltip {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 0.5rem);
+  transform: translateY(-50%) translateX(-0.35rem);
+  width: max(18rem, min(26rem, 80vw));
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease, visibility var(--duration-fast) ease;
+  z-index: 999;
+}
+
+.reasoning-info-trigger:hover .reasoning-info-tooltip,
+.reasoning-info-trigger:focus-visible .reasoning-info-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+  pointer-events: auto;
+}
+
+.reasoning-info-tooltip-inner {
+  background: var(--bg-glass-strong);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem 1rem;
+  box-shadow: var(--shadow-lg);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.reasoning-info-tooltip-inner h4 {
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.reasoning-info-tooltip-inner ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.reasoning-info-tooltip-inner li {
+  margin: 0.25rem 0;
+}
+
+.reasoning-info-tooltip-inner strong {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.reasoning-info-tooltip::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  transform: translateY(-50%);
+  border-width: 0.35rem;
+  border-style: solid;
+  border-color: transparent var(--border-light) transparent transparent;
+}
+
+.reasoning-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  padding: 0.4rem 0.6rem;
+  background: color-mix(in srgb, var(--bg-hover) 30%, transparent);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  user-select: none;
+}
+
+.reasoning-panel-header:hover {
+  background: color-mix(in srgb, var(--bg-hover) 70%, transparent);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+.reasoning-panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: inherit;
+}
+
+.reasoning-panel-icon {
+  opacity: 0.8;
+  width: 1em;
+  height: 1em;
+}
+
+.reasoning-panel-content {
+  margin-top: 0;
+  padding: 0 0.75rem;
+  border-left: 2px solid var(--border-light);
+  margin-left: 0.4rem;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 200ms var(--ease-out-expo),
+              opacity 200ms var(--ease-out-expo),
+              margin-top 200ms var(--ease-out-expo),
+              padding 200ms var(--ease-out-expo);
+}
+
+.reasoning-panel.open .reasoning-panel-content {
+  margin-top: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  max-height: 1000px;
+  opacity: 1;
+}
+
+.reasoning-markdown {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.reasoning-markdown p,
+.reasoning-markdown ul,
+.reasoning-markdown ol,
+.reasoning-markdown pre,
+.reasoning-markdown blockquote {
+  margin: 0 0 0.5rem;
+}
+
+.reasoning-markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.reasoning-markdown pre {
+  background-color: color-mix(in srgb, var(--n-50) 70%, transparent);
+  padding: 0.65rem;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  border: 1px solid var(--border-light);
+}
+
+:root[data-theme="dark"] .reasoning-markdown pre {
+  background-color: color-mix(in srgb, var(--n-100) 70%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .reasoning-markdown pre {
+    background-color: color-mix(in srgb, var(--n-100) 70%, transparent);
+  }
+}
+
+/* -----------------------------------------------------------------
+   Message Tools & Badges
+   ----------------------------------------------------------------- */
+.message-tools {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.message-badges {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.branch-badge,
+.adaptation-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  background-color: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 500;
+  border: 1px solid var(--border-light);
+  backdrop-filter: blur(4px);
+}
+
+.branch-badge.active,
+.adaptation-badge.label {
+  color: var(--text-primary);
+  font-weight: 600;
+  background: var(--bg-secondary);
+  border-color: var(--border-strong);
+}
+
+.adaptation-badge.summary.completed {
+  background: rgba(27, 120, 68, 0.10);
+  color: #1b7844;
+  border-color: rgba(27, 120, 68, 0.18);
+}
+
+.adaptation-badge.summary.pending {
+  background: rgba(180, 120, 20, 0.10);
+  color: #9a6700;
+  border-color: rgba(180, 120, 20, 0.18);
+}
+
+.adaptation-badge.summary.failed {
+  background: rgba(180, 40, 40, 0.10);
+  color: #b42318;
+  border-color: rgba(180, 40, 40, 0.18);
+}
+
+.message-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.message-action-btn-branch-inline {
+  display: inline-flex;
+}
+
+/* -----------------------------------------------------------------
+   Focus States
+   ----------------------------------------------------------------- */
+.message-row.focused .message-bubble {
+  border-color: color-mix(in srgb, #f4d58d 50%, var(--border-light));
+  box-shadow: 0 0 0 1px color-mix(in srgb, #f4d58d 30%, transparent), var(--shadow-md);
+}
+
+.message-bubble.focused {
+  border-color: color-mix(in srgb, #f4d58d 50%, var(--border-light));
+}
+
+.app-shell.hide-chat-focus-outline .message-row.focused .message-bubble,
+.app-shell.hide-chat-focus-outline .message-bubble.focused {
+  box-shadow: none;
+  border-color: var(--border-light);
+}
+
+/* -----------------------------------------------------------------
+   Message Content Blocks (Multimodal)
+   ----------------------------------------------------------------- */
+.message-content-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.message-image-block {
+  max-width: 256px;
+  max-height: 256px;
+  border-radius: 8px;
+  object-fit: contain;
+  border: 1px solid var(--border-light);
+}

@@ -1,0 +1,419 @@
+/* =================================================================
+   Responsive Breakpoints
+   ================================================================= */
+
+/* -----------------------------------------------------------------
+   Large Desktop Side Branches
+   ----------------------------------------------------------------- */
+@media (min-width: 1200px) {
+  .messages-content {
+    max-width: clamp(72rem, 96vw, 108rem);
+  }
+
+  .message-row.user {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 44rem) minmax(0, 1fr);
+    justify-content: stretch;
+  }
+
+  .message-row.user .message-bubble {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .message-side-branch {
+    display: flex;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: max(0px, calc((100% - 42rem) / 2));
+    align-items: stretch;
+    justify-content: center;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .message-side-branch-btn {
+    pointer-events: auto;
+  }
+
+  .message-action-btn-branch-inline {
+    display: none;
+  }
+}
+
+/* -----------------------------------------------------------------
+   Tablet Layout
+   ----------------------------------------------------------------- */
+@media (max-width: 1280px) and (min-width: 600px) {
+  .app-shell.layout-tablet > .sidebar-rail {
+    width: 68px;
+  }
+
+  .app-shell.layout-tablet > .sidebar-rail .history-list {
+    display: none;
+  }
+}
+
+/* -----------------------------------------------------------------
+   Small Desktop / Large Tablet
+   ----------------------------------------------------------------- */
+@media (max-width: 1080px) {
+  .graph-detail-panel {
+    width: calc(100% - var(--space-4) * 2);
+    bottom: auto;
+    max-height: 44vh;
+  }
+
+  .chain-card-view,
+  .graph-view-shell {
+    padding: 0.75rem;
+  }
+
+  .block-card-header {
+    flex-direction: column;
+  }
+
+  .block-card-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* -----------------------------------------------------------------
+   Settings Modal Tablet
+   ----------------------------------------------------------------- */
+@media (max-width: 960px) {
+  .settings-modal {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .settings-sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--border-light);
+    max-height: 35vh;
+    min-height: 0;
+    flex: 0 0 auto;
+    overflow-y: auto;
+  }
+
+  .settings-form {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .settings-appearance-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+/* -----------------------------------------------------------------
+   Mobile Landscape / Small Tablet
+   ----------------------------------------------------------------- */
+@media (max-width: 720px) {
+  .topbar {
+    align-items: center;
+    gap: var(--space-2);
+    height: auto;
+    min-height: 3.5rem;
+    padding: 0.6rem var(--space-4);
+  }
+
+  .topbar-menu-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .topbar-title {
+    font-size: 0.88rem;
+  }
+
+  .topbar-actions {
+    width: auto;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: var(--space-2);
+  }
+
+  .topbar-subtitle {
+    display: none;
+  }
+
+  .view-mode-switcher {
+    width: auto;
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+
+  .view-mode-btn {
+    flex: none;
+    text-align: center;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.72rem;
+  }
+
+  .settings-modal-backdrop {
+    padding: 0;
+  }
+
+  .settings-modal {
+    width: 100%;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .composer-model-selector {
+    max-width: min(14rem, 45vw);
+  }
+
+  .settings-menu-backdrop {
+    padding: 0;
+  }
+
+  .settings-menu-modal {
+    width: 100%;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+  }
+}
+
+/* -----------------------------------------------------------------
+   Mobile Portrait
+   ----------------------------------------------------------------- */
+@media (max-width: 599px) {
+  .app-shell.layout-mobile > .sidebar-rail {
+    display: none;
+  }
+
+  .sidebar-drawer {
+    width: min(24rem, 100vw);
+  }
+
+  .composer-area {
+    padding: 0 var(--space-3) var(--space-3);
+  }
+
+  .composer-container {
+    padding: 0.25rem 0.25rem 0.5rem;
+  }
+
+  .chat-footer-text {
+    display: none;
+  }
+
+  .messages-content {
+    padding: var(--space-4) var(--space-3);
+    gap: 1.25rem;
+  }
+
+  .message-row.user .message-bubble {
+    border-radius: var(--radius-xl);
+    border-bottom-right-radius: var(--radius-sm);
+    padding: 0.55rem 0.9rem;
+  }
+
+  .hero-title {
+    margin-bottom: 4rem;
+    font-size: 1.5rem;
+  }
+
+  .suggestions-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+
+  .suggestion-card {
+    padding: 0.9rem;
+  }
+
+  .chat-input-wrapper {
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* -----------------------------------------------------------------
+   Extra Small Mobile
+   ----------------------------------------------------------------- */
+@media (max-width: 480px) {
+  .topbar {
+    padding: 0.5rem var(--space-3);
+    min-height: 3.25rem;
+  }
+
+  .messages-content {
+    padding: var(--space-3) var(--space-3);
+  }
+
+  .composer-area {
+    padding: 0 var(--space-3) var(--space-3);
+  }
+
+  .chat-footer-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .chat-footer-controls {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .composer-model-selector {
+    flex-shrink: 0;
+    max-width: min(11rem, 52vw);
+  }
+
+  .chat-footer-bar .chat-footer-text {
+    text-align: left;
+  }
+
+  .chat-bottom-dock-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .chat-bottom-dock-grid {
+    grid-template-columns: 1fr;
+    max-height: 16rem;
+  }
+
+  .branch-preview-card:nth-child(odd),
+  .branch-preview-card:nth-child(even) {
+    transform: none;
+  }
+
+  .settings-modal {
+    border-radius: 0;
+  }
+
+  .block-card-header {
+    padding: 0.875rem 1rem 0;
+  }
+
+  .block-card-body {
+    padding: 0.875rem 1rem;
+  }
+}
+
+/* -----------------------------------------------------------------
+   Narrow Block Selector Fix
+   ----------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .block-selector-panel {
+    left: 50%;
+    margin-left: -140px;
+    width: 90vw;
+    max-width: 280px;
+  }
+
+  .block-selector-dots {
+    justify-content: center;
+  }
+}
+
+/* -----------------------------------------------------------------
+   Responsive Math Scrolling (Mobile)
+   ----------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .markdown-body .katex-display {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .markdown-body .katex-display::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .markdown-body .katex-display::-webkit-scrollbar-thumb {
+    background-color: var(--text-muted);
+    border-radius: var(--radius-full);
+  }
+}
+
+/* -----------------------------------------------------------------
+   Touch Device Adaptations
+   ----------------------------------------------------------------- */
+@media (hover: none) and (pointer: coarse) {
+  /* Suppress sticky hover states on touch devices */
+  .new-chat-btn:hover,
+  .sidebar-toggle-btn:hover,
+  .sidebar-settings-btn:hover,
+  .history-item:hover,
+  .message-action-btn:hover,
+  .composer-collapse-button:hover,
+  .composer-attach-btn:hover,
+  .composer-model-selector:hover,
+  .topbar-btn:hover,
+  .suggestion-card:hover,
+  .branch-preview-flow-item:hover,
+  .graph-node:hover,
+  .block-card:hover {
+    transform: none;
+    box-shadow: var(--shadow-xs);
+  }
+
+  /* Larger tap targets for touch */
+  .composer-attachment-remove {
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+  }
+
+  .composer-attach-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .message-action-btn-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .sidebar-toggle-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .topbar-menu-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  /* Safe area for notched devices */
+  .composer-area {
+    padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
+  }
+
+  /* Touch feedback for interactive elements */
+  .history-item-row:active,
+  .message-action-btn:active,
+  .composer-collapse-button:active,
+  .sidebar-settings-btn:active {
+    opacity: 0.7;
+  }
+}
+
+/* -----------------------------------------------------------------
+   Reduced Motion Preference
+   ----------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .dot-typing::before,
+  .dot-typing::after {
+    animation: none;
+    opacity: 0.6;
+  }
+
+  .send-button svg[style*="spin"] {
+    animation: none !important;
+  }
+}

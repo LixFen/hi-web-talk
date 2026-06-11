@@ -9,7 +9,7 @@ import LoginPage from "./pages/LoginPage";
 import AuthenticatedLayout from "./layouts/AuthenticatedLayout";
 import ChatHomePage from "./pages/ChatHomePage";
 import ChatPage from "./pages/ChatPage";
-import "./styles/app.css";
+import "./styles/styles.css";
 
 function AppContent() {
   return (
