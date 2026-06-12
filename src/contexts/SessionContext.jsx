@@ -112,6 +112,7 @@ export function SessionProvider({ children }) {
   const [chatNavigationRequest, setChatNavigationRequest] = useState(null);
   const [focusedBlockSHA1State, setFocusedBlockSHA1State] = useState("");
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [searchMode, setSearchMode] = useState("auto");
 
   const activeSessionHashRef = useRef("");
   const viewSwitchVersionRef = useRef(0);
@@ -531,6 +532,7 @@ export function SessionProvider({ children }) {
     streamingReply,
     streamingReasoning,
     pendingPrompt,
+    streamingToolState,
     abortControllerRef,
     subscribeToStream,
     handleSend,
@@ -539,6 +541,7 @@ export function SessionProvider({ children }) {
   } = useStreaming({
     getSessionHash,
     selectedModel,
+    searchMode,
     onApplyDetail: applySessionDetail,
     onSetLoading: setIsLoading,
     onSetError: (msg) => setError(msg),
@@ -675,14 +678,17 @@ export function SessionProvider({ children }) {
       isLoading,
       isBootstrapping,
       error,
+      searchMode,
       streamingReply,
       streamingReasoning,
       pendingPrompt,
+      streamingToolState,
       isReplyPending,
       displayMessages,
       hasStartedConversation,
       chatNavigationRequest,
       abortControllerRef,
+      setSearchMode,
       setError,
       startNewChatDraft,
       selectConversation: handleSelectConversation,
@@ -720,9 +726,11 @@ export function SessionProvider({ children }) {
       isLoading,
       isBootstrapping,
       error,
+      searchMode,
       streamingReply,
       streamingReasoning,
       pendingPrompt,
+      streamingToolState,
       isReplyPending,
       displayMessages,
       hasStartedConversation,

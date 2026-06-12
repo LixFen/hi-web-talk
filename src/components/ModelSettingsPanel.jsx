@@ -63,6 +63,7 @@ function buildModelDraft(model, providerDefinitions, thinkingDisableOptions) {
     supportsStreaming: model?.supportsStreaming !== false,
     supportsSystemRole: model?.supportsSystemRole !== false,
     supportsMultimodal: model?.supportsMultimodal !== false,
+    supportsToolUse: model?.supportsToolUse ?? false,
     thinkingDisableKey: tdKey,
     supportsThinking: resolveSupportsThinking(tdKey, pd?.supportsThinking !== false, thinkingDisableOptions),
     systemPromptRole: model?.systemPromptRole || "system",
@@ -232,6 +233,7 @@ export default function ModelSettingsPanel({
           ...prev,
           supportsMultimodal: caps.supportsMultimodal ?? prev.supportsMultimodal,
           supportsThinking: caps.supportsThinking ?? prev.supportsThinking,
+          supportsToolUse: caps.toolUse ?? prev.supportsToolUse,
         }));
       }
     } catch {
@@ -366,6 +368,7 @@ export default function ModelSettingsPanel({
       supportsStreaming: modelDraft.supportsStreaming,
       supportsSystemRole: modelDraft.supportsSystemRole,
       supportsMultimodal: modelDraft.supportsMultimodal,
+      supportsToolUse: modelDraft.supportsToolUse,
       supportsThinking: modelDraft.supportsThinking,
       systemPromptRole: modelDraft.systemPromptRole,
       requestOptions: {
@@ -791,6 +794,10 @@ export default function ModelSettingsPanel({
           <label className="settings-toggle-row">
             <input type="checkbox" checked={modelDraft.supportsMultimodal} onChange={(e) => handleCapabilityChange({ supportsMultimodal: e.target.checked })} />
             {t("model.multimodalSupport")}
+          </label>
+          <label className="settings-toggle-row">
+            <input type="checkbox" checked={modelDraft.supportsToolUse} onChange={(e) => handleModelDraftChange({ supportsToolUse: e.target.checked })} />
+            工具调用 (Tool Use)
           </label>
           {isAdmin ? (
             <label className="settings-toggle-row">

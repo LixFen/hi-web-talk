@@ -1,3 +1,18 @@
+# 1.17.0
+
+- Feat: Web search — AI can now automatically invoke search engines to fetch real-time information (weather, news, stock prices, etc.) and inject results as context into responses.
+- Feat: Tool Calling infrastructure — LLM adapter layer supports function calling loops, laying the foundation for future tool extensions.
+- Feat: Search mode toggle — ChatComposer footer provides a 🔍 button with auto/on/off search modes.
+- Feat: Multi-round reasoning display — ReasoningPanel supports JSON array format, showing each reasoning round from tool calling separately.
+- Feat: Search source display — Response footer shows clickable source links from search results.
+- Feat: Model toolUse toggle — Model settings now include a "Tool Use" checkbox to manually override auto-detected capabilities.
+- Feat: SSE protocol extension — New `tool_start`, `tool_result`, `reasoning_round` event types.
+- Feat: Configurable search engine — Supports Brave Search, Bing, Google Custom Search, and SearXNG, switchable via environment variables.
+- Feat: Block meta extension — Search info (queries, sources) stored in `block.meta.search`, backward compatible with old data.
+- Feat: Reasoning format upgrade — `block.reasoning` changed from string to JSON array, with automatic backward compatibility for old data.
+- Refactor: BaseLLMAdapter adds `callWithTools`/`streamWithTools` methods; tool calling loop is encapsulated within the adapter, transparent to the Block layer.
+- Refactor: All four LLM adapters (OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, Google GenAI) now implement tool calling support.
+
 # 1.16.1
 
 - Feat: Added Search bar for history conversations.

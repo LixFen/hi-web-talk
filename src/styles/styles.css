@@ -25,6 +25,9 @@
 /* Reusable Components (Toast, Context Menu, Block Selector, Login) */
 @import "./components.css";
 
+/* Web Search (Tool calling, search sources, streaming status) */
+@import "./web-search.css";
+
 /* Animations & Keyframes */
 @import "./animations.css";
 

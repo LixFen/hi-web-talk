@@ -73,6 +73,8 @@ export default function AuthenticatedLayout() {
     isLoading: sessionLoading,
     isBootstrapping: sessionBootstrapping,
     error: sessionError,
+    searchMode,
+    setSearchMode,
     selectBlock,
     send,
     stopStreaming,
@@ -376,6 +378,8 @@ export default function AuthenticatedLayout() {
             modelOptions={enabledModels}
             providers={providers}
             selectedModelId={selectedModelId}
+            searchMode={searchMode}
+            onSearchModeChange={setSearchMode}
             isCollapsed={isComposerCollapsed}
             onToggleCollapsed={() =>
               setIsComposerCollapsed((current) => !current)

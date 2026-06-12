@@ -83,6 +83,8 @@ const ChatComposer = ({
   modelOptions = [],
   providers = [],
   selectedModelId = "",
+  searchMode = "auto",
+  onSearchModeChange,
   isCollapsed = false,
   onToggleCollapsed,
   onChangeModel,
@@ -105,7 +107,9 @@ const ChatComposer = ({
   const prevSessionHashRef = useRef(sessionHash);
   const onUploadAttachmentRef = useRef(onUploadAttachment);
   const uploadingRef = useRef(false);
+  const attachmentsRef = useRef(attachments);
   onUploadAttachmentRef.current = onUploadAttachment;
+  attachmentsRef.current = attachments;
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -156,7 +160,7 @@ const ChatComposer = ({
     const maxLongSide = getMaxLongSide(modelOptions, selectedModelId);
 
     for (const item of imageItems) {
-      if (attachments.length >= MAX_ATTACHMENTS) break;
+      if (attachmentsRef.current.length >= MAX_ATTACHMENTS) break;
 
       const file = item.getAsFile();
       if (!file) continue;
@@ -191,7 +195,7 @@ const ChatComposer = ({
 
       try {
         const base64Data = await readFileAsBase64(compressedBlob);
-        const fn = onUploadAttachment;
+        const fn = onUploadAttachmentRef.current;
         if (!fn) {
           console.error('[ChatComposer] paste: onUploadAttachment is not set, keeping local preview');
           return;
@@ -228,7 +232,7 @@ const ChatComposer = ({
         console.error('[ChatComposer] paste upload error:', error);
       }
     }
-  }, [onUploadAttachment, modelOptions, selectedModelId]);
+  }, [modelOptions, selectedModelId]);
 
   const handleAttachClick = useCallback(() => {
     if (isLoading) return;
@@ -259,7 +263,7 @@ const ChatComposer = ({
       const maxLongSide = getMaxLongSide(modelOptions, selectedModelId);
 
       for (const file of files) {
-        if (attachments.length >= MAX_ATTACHMENTS) break;
+        if (attachmentsRef.current.length >= MAX_ATTACHMENTS) break;
         if (!file.type.startsWith("image/")) continue;
 
         const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
@@ -373,7 +377,14 @@ const ChatComposer = ({
     }
 
     setText('');
-    setAttachments([]);
+    setAttachments((prev) => {
+      prev.forEach((a) => {
+        if (a.isLocal && a.url) {
+          URL.revokeObjectURL(a.url);
+        }
+      });
+      return [];
+    });
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -528,6 +539,42 @@ const ChatComposer = ({
             />
           </div>
           <div className="chat-footer-text">
+            {onSearchModeChange && (() => {
+              const currentModel = modelOptions.find((m) => m.alias === selectedModelId);
+              const supportsToolUse = currentModel?.supportsToolUse ?? false;
+              const searchModeClass = searchMode === "auto" ? "auto" : searchMode === "on" ? "on" : "off";
+              const searchTitle = !supportsToolUse
+                ? "当前模型不支持联网搜索"
+                : searchMode === "auto"
+                ? "联网搜索: 自动 (AI 自行判断)"
+                : searchMode === "on"
+                ? "联网搜索: 开启 (强制搜索)"
+                : "联网搜索: 关闭";
+
+              return (
+                <button
+                  type="button"
+                  className={`composer-search-btn ${searchModeClass}`}
+                  onClick={() => {
+                    if (!supportsToolUse) return;
+                    const next = searchMode === "auto" ? "on" : searchMode === "on" ? "off" : "auto";
+                    onSearchModeChange(next);
+                  }}
+                  disabled={isLoading || !supportsToolUse}
+                  title={searchTitle}
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  {supportsToolUse && (
+                    <span className="composer-search-indicator">
+                      {searchMode === "auto" ? "自动" : searchMode === "on" ? "开启" : "关闭"}
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
             {t('app.aiWarning')}
           </div>
         </div>

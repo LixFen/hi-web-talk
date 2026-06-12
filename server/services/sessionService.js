@@ -260,6 +260,7 @@ function buildChainChatMessages(chainBlocks, blockViewMap) {
       role: "assistant",
       text: block.response,
       reasoning: block.reasoning || "",
+      meta: block.meta || {},
       blockSHA1: block.sha1,
       createdAt: block.createdAt,
       modelAlias: block.modelAlias,

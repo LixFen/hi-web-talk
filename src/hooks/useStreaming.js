@@ -11,6 +11,7 @@ import {
 export default function useStreaming({
   getSessionHash,
   selectedModel,
+  searchMode,
   onApplyDetail,
   onSetLoading,
   onSetError,
@@ -19,6 +20,7 @@ export default function useStreaming({
   const [streamingReply, setStreamingReply] = useState("");
   const [streamingReasoning, setStreamingReasoning] = useState("");
   const [pendingPrompt, setPendingPrompt] = useState("");
+  const [streamingToolState, setStreamingToolState] = useState(null);
   const streamAbortControllerRef = useRef(null);
   const streamReconnectControllerRef = useRef(null);
   const streamBufferRef = useRef("");
@@ -44,6 +46,7 @@ export default function useStreaming({
       onSetLoading(true);
       setStreamingReply("");
       setStreamingReasoning("");
+      setStreamingToolState(null);
       streamBufferRef.current = "";
       streamReasoningBufferRef.current = "";
 
@@ -51,6 +54,23 @@ export default function useStreaming({
         const result = await subscribeToSessionStream(sessionHash, {
           signal: abortController.signal,
           onEvent: (event) => {
+            // 处理工具事件
+            if (event?.type === "tool_start") {
+              setStreamingToolState({ type: "searching", toolName: event.toolName, query: event.arguments?.query });
+              return;
+            }
+            if (event?.type === "tool_result") {
+              setStreamingToolState({ type: "searched", toolName: event.toolName, sources: event.sources });
+              return;
+            }
+            // 处理 reasoning round 事件
+            if (event?.type === "reasoning_round") {
+              if (event.reasoningDelta) {
+                streamReasoningBufferRef.current += `\n\n---\n\n${event.reasoningDelta}`;
+                scheduleFlush();
+              }
+              return;
+            }
             if (event?.type === "delta") {
               streamBufferRef.current += event.delta || "";
               if (event.reasoningDelta || event.reasoning_delta) {
@@ -75,6 +95,7 @@ export default function useStreaming({
           setPendingPrompt("");
           setStreamingReply("");
           setStreamingReasoning("");
+          setStreamingToolState(null);
         }
       } catch (err) {
         if (err?.name !== "AbortError") {
@@ -93,6 +114,7 @@ export default function useStreaming({
         setPendingPrompt("");
         setStreamingReply("");
         setStreamingReasoning("");
+        setStreamingToolState(null);
         streamReconnectControllerRef.current = null;
       }
     },
@@ -131,6 +153,7 @@ export default function useStreaming({
       onSetLoading(true);
       setPendingPrompt(rawContent);
       setStreamingReply("");
+      setStreamingToolState(null);
       streamReconnectControllerRef.current?.abort();
       streamReconnectControllerRef.current = null;
 
@@ -152,6 +175,7 @@ export default function useStreaming({
             sessionHash,
             prompt,
             modelAlias: model.alias,
+            searchMode,
           });
           onApplyDetail(detail, {
             revealLatestInChat: true,
@@ -170,8 +194,26 @@ export default function useStreaming({
           sessionHash,
           prompt,
           modelAlias: model.alias,
+          searchMode,
           signal: abortController.signal,
           onEvent: async (event) => {
+            // 处理工具事件
+            if (event?.type === "tool_start") {
+              setStreamingToolState({ type: "searching", toolName: event.toolName, query: event.arguments?.query });
+              return;
+            }
+            if (event?.type === "tool_result") {
+              setStreamingToolState({ type: "searched", toolName: event.toolName, sources: event.sources });
+              return;
+            }
+            // 处理 reasoning round 事件
+            if (event?.type === "reasoning_round") {
+              if (event.reasoningDelta) {
+                streamReasoningBufferRef.current += `\n\n---\n\n${event.reasoningDelta}`;
+                scheduleFlush();
+              }
+              return;
+            }
             if (event?.type === "delta") {
               streamBufferRef.current += event.delta || "";
               if (event.reasoningDelta || event.reasoning_delta) {
@@ -215,10 +257,11 @@ export default function useStreaming({
         setPendingPrompt("");
         setStreamingReply("");
         setStreamingReasoning("");
+        setStreamingToolState(null);
         streamAbortControllerRef.current = null;
       }
     },
-    [selectedModel, getSessionHash, onApplyDetail, onSetLoading, onSetError],
+    [selectedModel, searchMode, getSessionHash, onApplyDetail, onSetLoading, onSetError],
   );
 
   const handleStopStreaming = useCallback(() => {
@@ -231,6 +274,7 @@ export default function useStreaming({
     streamingReply,
     streamingReasoning,
     pendingPrompt,
+    streamingToolState,
     abortControllerRef: abortControllerValue,
     subscribeToStream,
     handleSend,

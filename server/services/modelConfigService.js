@@ -277,6 +277,7 @@ async function normalizeModelRecord(record = {}, index = 0) {
       record.supportsSystemRole ?? providerDefinition.supportsSystemRole ?? true,
     supportsMultimodal:
       record.supportsMultimodal ?? providerDefinition.supportsMultimodal ?? true,
+    supportsToolUse: Boolean(record.supportsToolUse ?? false),
     supportsThinking:
       record.supportsThinking ?? providerDefinition.supportsThinking ?? false,
     thinkingDisable:
@@ -308,6 +309,7 @@ function serializePublicModel(model, { configured = false } = {}) {
     systemPromptRole: model.systemPromptRole,
     supportsSystemRole: model.supportsSystemRole,
     supportsMultimodal: model.supportsMultimodal,
+    supportsToolUse: Boolean(model.supportsToolUse ?? false),
     supportsThinking: model.supportsThinking ?? false,
     thinkingDisable: model.thinkingDisable,
     requestOptions: model.requestOptions,

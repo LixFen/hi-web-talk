@@ -501,16 +501,90 @@ function ReasoningIcon({ isOpen }) {
   );
 }
 
+/**
+ * 规范化 reasoning：支持字符串和数组两种格式
+ */
+function normalizeReasoning(reasoning) {
+  if (!reasoning) return [];
+  if (Array.isArray(reasoning)) return reasoning;
+  if (typeof reasoning === "string" && reasoning.trim()) {
+    return [{ round: 1, content: reasoning.trim() }];
+  }
+  return [];
+}
+
+function SearchSources({ sources }) {
+  if (!sources || sources.length === 0) return null;
+
+  return (
+    <div className="search-sources">
+      <span className="search-sources-label">🔍 搜索来源:</span>
+      {sources.map((s, i) => (
+        <a
+          key={i}
+          href={s.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="search-source-link"
+          title={s.snippet || s.title}
+        >
+          {s.title}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function ReasoningPanel({ reasoning, defaultOpen = false, isStreaming = false }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const { t } = useLocale();
 
-  if (!reasoning || reasoning.trim().length === 0) {
+  const parts = normalizeReasoning(reasoning);
+
+  if (parts.length === 0) {
     return null;
   }
 
+  // 单轮：保持原有展示
+  if (parts.length === 1) {
+    return (
+      <div className={`reasoning-panel ${isOpen ? 'open' : ''}`}>
+        <button
+          className="reasoning-panel-header"
+          type="button"
+          onClick={() => setIsOpen((prev) => !prev)}
+          aria-expanded={isOpen}
+        >
+          <span className="reasoning-panel-title">
+            <ReasoningIcon isOpen={isOpen} />
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z" />
+              <path d="M9 21h6" />
+            </svg>
+            {isStreaming ? t("msg.thinking") : t("msg.thoughtCompleted")}
+          </span>
+        </button>
+        <div className="reasoning-panel-content" aria-hidden={!isOpen}>
+          <SafeMarkdown className="reasoning-markdown">
+            {parts[0].content}
+          </SafeMarkdown>
+        </div>
+      </div>
+    );
+  }
+
+  // 多轮：展示折叠的轮次
   return (
-    <div className={`reasoning-panel ${isOpen ? 'open' : ''}`}>
+    <div className={`reasoning-panel multi-round ${isOpen ? 'open' : ''}`}>
       <button
         className="reasoning-panel-header"
         type="button"
@@ -533,12 +607,18 @@ function ReasoningPanel({ reasoning, defaultOpen = false, isStreaming = false })
             <path d="M9 21h6" />
           </svg>
           {isStreaming ? t("msg.thinking") : t("msg.thoughtCompleted")}
+          <span className="reasoning-round-count">{parts.length} 轮</span>
         </span>
       </button>
       <div className="reasoning-panel-content" aria-hidden={!isOpen}>
-        <SafeMarkdown className="reasoning-markdown">
-          {reasoning}
-        </SafeMarkdown>
+        {parts.map((part, i) => (
+          <div key={i} className="reasoning-round">
+            <div className="reasoning-round-header">第 {part.round} 轮思考</div>
+            <SafeMarkdown className="reasoning-markdown">
+              {part.content}
+            </SafeMarkdown>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -624,6 +704,8 @@ const MemoMessageRow = React.memo(({
               <SafeMarkdown>
                 {msg.text}
               </SafeMarkdown>
+
+              <SearchSources sources={msg.meta?.search?.sources} />
 
               {summaryInfo?.status === "completed" && summaryInfo.summary ? (
                 <div className="summary-panel">
@@ -836,6 +918,7 @@ const MessageList = forwardRef(({
   messages,
   graphBlocks = [],
   isLoading,
+  streamingToolState = null,
   adaptationDefinitions = [],
   adaptationButtonVisibility = null,
   bottomContent = null,
@@ -1349,11 +1432,33 @@ const MessageList = forwardRef(({
           />
         ))}
 
-        {isLoading && (
+        {isLoading && !streamingToolState && (
           <div className="message-row assistant">
             <div className="message-bubble">
               <span className="dot-typing">{t("msg.thinkingEllipsis")}</span>
             </div>
+          </div>
+        )}
+
+        {streamingToolState && (
+          <div className="streaming-tool-status">
+            {streamingToolState.type === "searching" ? (
+              <span className="tool-status searching">
+                <svg className="tool-status-icon spinning" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                正在搜索: {streamingToolState.query || "..."}
+              </span>
+            ) : (
+              <span className="tool-status searched">
+                <svg className="tool-status-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                已搜索 {streamingToolState.sources?.length || 0} 个来源
+              </span>
+            )}
           </div>
         )}
 

@@ -151,6 +151,7 @@ const ChatView = memo(function ChatView({
   messages = [],
   navigationRequest = null,
   isLoading,
+  streamingToolState = null,
   hideChatBottomDock = false,
   onActivateBlock,
   onFocusBlock,
@@ -317,6 +318,7 @@ const ChatView = memo(function ChatView({
         messages={messages}
         graphBlocks={graphBlocks}
         isLoading={isLoading}
+        streamingToolState={streamingToolState}
         focusedBlockSHA1={focusedBlockSHA1}
         hideWideScreenSideBranches={hideWideScreenSideBranches}
         onActivateBlock={onActivateBlock}

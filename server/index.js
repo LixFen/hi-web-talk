@@ -61,6 +61,8 @@ import {
   listErrorLogs,
 } from "./services/errorLogService.js";
 import { callProviderModel, streamProviderModel, invalidateModelAdapterCache } from "./services/llmProviderService.js";
+import { getToolDefinitions } from "./services/tools/toolRegistry.js";
+import "./services/tools/webSearchTool.js"; // 注册 web_search 工具
 import { streamSessionManager } from "./services/streamSessionManager.js";
 import { saveAttachment, readAttachment, updateAttachmentBlockSHA1 } from "./services/attachmentService.js";
 import { resolveAttachmentMessages } from "./services/providerAdapters/attachmentResolver.js";
@@ -349,6 +351,26 @@ function logStream(stage, payload = null) {
   }
 
   //console.log(`[stream] ${timestamp} ${stage}`, payload);
+}
+
+/**
+ * 判断是否应该启用搜索（tool calling）
+ * @param {string|undefined} searchMode - 'auto' | 'on' | 'off' | undefined
+ * @param {Object} model - 模型配置
+ * @returns {boolean}
+ */
+function resolveSearchMode(searchMode, model) {
+  // 模型不支持 tool use → 不启用
+  if (!model.supportsToolUse) return false;
+
+  // 用户明确关闭
+  if (searchMode === "off") return false;
+
+  // 用户明确开启
+  if (searchMode === "on") return true;
+
+  // auto 模式：默认启用（由 AI 自行判断是否调用搜索工具）
+  return true;
 }
 
 app.get("/api/health", async (_request, response) => {
@@ -938,7 +960,7 @@ app.post("/api/blocks/:blockSHA1/branch", authenticateToken, validateParams(path
 });
 
 app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema), async (request, response) => {
-  const { sessionHash, prompt, modelAlias } = request.body;
+  const { sessionHash, prompt, modelAlias, searchMode } = request.body;
 
   const session = readSessionRecord(sessionHash);
 
@@ -958,6 +980,13 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
     const selectedModel = await getModelByAlias(modelAlias, request.user.id, request.user.role);
     if (!selectedModel || selectedModel.enabled === false) {
       response.status(400).json({ error: "未找到可用的模型配置。" });
+      return;
+    }
+
+    // 判断是否需要 tool calling（搜索）
+    const shouldUseTools = resolveSearchMode(searchMode, selectedModel);
+    if (searchMode === "on" && !selectedModel.supportsToolUse) {
+      response.status(400).json({ error: "当前模型不支持联网搜索，请切换到支持的模型。" });
       return;
     }
 
@@ -995,9 +1024,12 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
 
     providerMessages = downgradeMessagesForModel(providerMessages, selectedModel.supportsMultimodal);
 
+    const tools = shouldUseTools ? getToolDefinitions() : undefined;
+
     const result = await callProviderModel({
       modelConfig: selectedModel,
       messages: providerMessages,
+      tools,
     });
 
     const block = await createDialogueBlock(sessionHash, {
@@ -1012,6 +1044,7 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
         providerType: result.providerType,
         model: result.model,
         responseId: result.responseId,
+        ...(result.searchInfo && { search: result.searchInfo }),
       },
     });
 
@@ -1056,7 +1089,7 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
 });
 
 app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyStreamSchema), async (request, response) => {
-  const { sessionHash, prompt, modelAlias } = request.body;
+  const { sessionHash, prompt, modelAlias, searchMode } = request.body;
 
   const session = readSessionRecord(sessionHash);
 
@@ -1079,6 +1112,13 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
 
   if (selectedModel.supportsStreaming === false) {
     response.status(400).json({ error: "该模型未启用流式传输，请改用非流式回复接口。" });
+    return;
+  }
+
+  // 判断是否需要 tool calling（搜索）
+  const shouldUseTools = resolveSearchMode(searchMode, selectedModel);
+  if (searchMode === "on" && !selectedModel.supportsToolUse) {
+    response.status(400).json({ error: "当前模型不支持联网搜索，请切换到支持的模型。" });
     return;
   }
 
@@ -1171,10 +1211,39 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
     streamSession.pushEvent(startEvent);
     logStream("start-sent", { sessionHash, modelAlias: selectedModel.alias });
 
+    const tools = shouldUseTools ? getToolDefinitions() : undefined;
+
     const result = await streamProviderModel({
       modelConfig: selectedModel,
       messages: providerMessages,
-      onChunk: async ({ delta = "", reasoningDelta = "" } = {}) => {
+      tools,
+      onChunk: async (event) => {
+        // 处理工具事件
+        if (event?.type === "tool_start") {
+          streamSession.pushEvent({ type: "tool_start", toolName: event.toolName, arguments: event.arguments });
+          logStream("tool-start", { toolName: event.toolName });
+          return;
+        }
+        if (event?.type === "tool_result") {
+          streamSession.pushEvent({
+            type: "tool_result",
+            toolName: event.toolName,
+            sources: event.sources,
+          });
+          logStream("tool-result", { toolName: event.toolName });
+          return;
+        }
+        // 处理 reasoning round 事件
+        if (event?.type === "reasoning_round") {
+          streamSession.pushEvent({
+            type: "reasoning_round",
+            round: event.round,
+            reasoningDelta: event.reasoningDelta,
+          });
+          return;
+        }
+        // 处理普通 delta 事件
+        const { delta = "", reasoningDelta = "" } = event || {};
         if (delta || reasoningDelta) {
           const payload = { type: "delta" };
           if (delta) payload.delta = delta;
@@ -1203,6 +1272,7 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
         providerType: result.providerType,
         model: result.model,
         responseId: result.responseId,
+        ...(result.searchInfo && { search: result.searchInfo }),
       },
     });
 
@@ -1337,7 +1407,7 @@ app.get("/api/sessions/:sessionHash/stream", authenticateToken, validateParams(p
 });
 
 app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(pathBlockSHA1Schema), validateBody(blockRegenerateSchema), async (request, response) => {
-  const { sessionHash, modelAlias } = request.body;
+  const { sessionHash, modelAlias, searchMode } = request.body;
 
   const session = readSessionRecord(sessionHash);
 
@@ -1368,6 +1438,13 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(
       return;
     }
 
+    // 判断是否需要 tool calling（搜索）
+    const shouldUseTools = resolveSearchMode(searchMode, selectedModel);
+    if (searchMode === "on" && !selectedModel.supportsToolUse) {
+      response.status(400).json({ error: "当前模型不支持联网搜索，请切换到支持的模型。" });
+      return;
+    }
+
     const parentBlockSHA1 = targetBlock.parentBlockSHA1;
     const context = parentBlockSHA1
       ? await buildContextForActiveBlock(sessionHash, parentBlockSHA1)
@@ -1385,9 +1462,12 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(
 
     providerMessages = downgradeMessagesForModel(providerMessages, selectedModel.supportsMultimodal);
 
+    const tools = shouldUseTools ? getToolDefinitions() : undefined;
+
     const result = await callProviderModel({
       modelConfig: selectedModel,
       messages: providerMessages,
+      tools,
     });
 
     const regeneratedBlock = await createDialogueBlock(sessionHash, {
@@ -1403,6 +1483,7 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(
         model: result.model,
         responseId: result.responseId,
         regeneratedFromBlockSHA1: targetBlock.sha1,
+        ...(result.searchInfo && { search: result.searchInfo }),
       },
     });
 

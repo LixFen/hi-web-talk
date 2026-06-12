@@ -69,6 +69,7 @@ const modelPayloadSchema = z.object({
   supportsStreaming: z.boolean().optional(),
   supportsSystemRole: z.boolean().optional(),
   supportsMultimodal: z.boolean().optional(),
+  supportsToolUse: z.boolean().optional(),
   supportsThinking: z.boolean().optional(),
   thinkingDisable: z.any().optional(),
   systemPromptRole: z.string().optional(),
@@ -109,6 +110,7 @@ export const blockReplySchema = z.object({
   sessionHash: z.string().min(1, "sessionHash 不能为空。"),
   prompt: promptUnion,
   modelAlias: z.string().optional(),
+  searchMode: z.enum(["auto", "on", "off"]).optional(),
 });
 
 export const blockReplyStreamSchema = blockReplySchema;
@@ -120,6 +122,7 @@ export const blockBranchSchema = z.object({
 export const blockRegenerateSchema = z.object({
   sessionHash: z.string().min(1, "sessionHash 不能为空。"),
   modelAlias: z.string().optional(),
+  searchMode: z.enum(["auto", "on", "off"]).optional(),
 });
 
 export const sessionUpdateSchema = z.object({

@@ -20,6 +20,8 @@ export default function ChatPage() {
   const loadingSessionHashRef = useRef("");
   const redirectTimerRef = useRef(0);
   const sessionMethodsRef = useRef(null);
+  const sessionSummariesRef = useRef(session.sessionSummaries);
+  sessionSummariesRef.current = session.sessionSummaries;
   sessionMethodsRef.current = {
     selectConversation: session.selectConversation,
     subscribeToStream: session.subscribeToStream,
@@ -48,7 +50,7 @@ export default function ChatPage() {
         if (!cancelled && !detail && !cancelled) {
           methods.setError(t("chat.sessionMissing"));
           redirectTimerRef.current = window.setTimeout(() => {
-            const summaries = session.sessionSummaries;
+            const summaries = sessionSummariesRef.current;
             if (summaries.length > 0) {
               navigate(`/chat/${summaries[0].sessionHash}`, { replace: true });
             } else {
@@ -60,7 +62,7 @@ export default function ChatPage() {
         if (!cancelled) {
           methods.setError(t("chat.sessionMissing"));
           redirectTimerRef.current = window.setTimeout(() => {
-            const summaries = session.sessionSummaries;
+            const summaries = sessionSummariesRef.current;
             if (summaries.length > 0) {
               navigate(`/chat/${summaries[0].sessionHash}`, { replace: true });
             } else {
@@ -178,6 +180,7 @@ export default function ChatPage() {
           messages={session.displayMessages}
           navigationRequest={session.chatNavigationRequest}
           isLoading={session.isLoading}
+          streamingToolState={session.streamingToolState}
           hideChatBottomDock={false}
           adaptationDefinitions={adaptationDefinitions}
           adaptationButtonVisibility={chatAdaptationButtonVisibility}
