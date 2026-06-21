@@ -1,6 +1,9 @@
 import path from "path";
 
-export const DATA_DIR = path.resolve(process.cwd(), "data");
+export const DEFAULT_DATA_DIR = path.resolve(process.cwd(), "data");
+export const DATA_DIR = process.env.HI_WEB_TALK_DATA_DIR
+  ? path.resolve(process.env.HI_WEB_TALK_DATA_DIR)
+  : DEFAULT_DATA_DIR;
 export const CONFIG_DIR = path.join(DATA_DIR, "config");
 export const SESSIONS_DIR = path.join(DATA_DIR, "sessions");
 export const DATABASE_FILE = path.join(DATA_DIR, "hi-web-talk.sqlite");

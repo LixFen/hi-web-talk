@@ -43,6 +43,30 @@ Hi Web Talk 是一个自托管的多模型 AI 聊天应用，灵感来自 Git �
 | **PWA 支持** | 可安装为渐进式 Web 应用 |
 | **响应式设计** | 完美适配桌面和移动端 |
 
+### 🖥️ Electron 桌面模式
+
+项目现在支持两种 Electron 启动方式，且不影响现有 Docker 部署：
+
+| 模式 | 说明 |
+|---|---|
+| **本地完整应用** | Electron 启动内置后端，数据默认写入用户目录下的独立数据文件夹 |
+| **远程连接模式** | Electron 直接打开已部署的 Docker / Web 实例 |
+
+#### 常用命令
+
+```bash
+# 本地开发：Vite + Electron
+npm run electron:dev:full
+
+# 连接远程站点
+npm run electron:remote
+
+# 打包 Windows 便携版
+npm run electron:build
+```
+
+本地 Electron 模式下，后端会自动使用独立的运行时数据目录，不会直接复用仓库根目录下的 `data/`。
+
 ### 🛠️ 技术栈
 
 | 层级 | 技术 |

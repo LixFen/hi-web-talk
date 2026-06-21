@@ -1724,6 +1724,19 @@ try {
 
 streamSessionManager.startCleanupTimer();
 
+// Serve built frontend (for both Docker and packaged Electron)
+if (isProduction) {
+  const distDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
+  app.use(express.static(distDir));
+  // SPA fallback (skip /api/* to avoid masking 404 API routes)
+  app.get("*", (req, res) => {
+    if (req.path.startsWith("/api/")) {
+      return res.status(404).json({ error: "API 路由不存在" });
+    }
+    res.sendFile(path.join(distDir, "index.html"));
+  });
+}
+
 let httpServer = null;
 
 app.use((error, _request, response, _next) => {
