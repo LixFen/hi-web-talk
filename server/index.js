@@ -172,7 +172,17 @@ app.use(express.json({ limit: "10mb" }));
 
 app.post("/api/auth/register", authLimiter, validateBody(registerSchema), async (request, response) => {
   try {
-    const { username, password } = request.body;
+    const { username, password, inviteCode } = request.body;
+
+    // ponytail: global single invite code, per-code tracking if needed later
+    const globalSettings = await getAppSettings();
+    if (globalSettings?.inviteCodeRequired) {
+      if (!inviteCode || inviteCode !== globalSettings.inviteCode) {
+        response.status(403).json({ error: "邀请码无效。" });
+        return;
+      }
+    }
+
     const result = await registerUser(username, password);
     response.cookie("auth_token", result.token, {
       httpOnly: true,
@@ -441,13 +451,56 @@ app.delete("/api/providers/:providerId", authenticateToken, validateParams(pathP
 });
 
 app.get("/api/app-settings", authenticateToken, async (request, response) => {
-  response.json({ settings: await getAppSettings(request.user.id) });
+  const settings = await getAppSettings(request.user.id);
+  const globalSettings = await getAppSettings();
+  const isAdmin = request.user?.role === "admin";
+  response.json({
+    settings: {
+      ...settings,
+      inviteCodeRequired: globalSettings.inviteCodeRequired,
+      // ponytail: only admins see the actual code
+      inviteCode: isAdmin ? globalSettings.inviteCode : "",
+    },
+  });
 });
 
 app.patch("/api/app-settings", authenticateToken, validateBody(appSettingsSchema), async (request, response) => {
   try {
-    const settings = await updateAppSettings(request.body, request.user.id);
-    response.json({ settings });
+    const { inviteCodeRequired, inviteCode, ...userSettings } = request.body;
+    const isAdmin = request.user?.role === "admin";
+
+    // admin-only global invite code settings
+    const globalUpdate = {};
+    if (inviteCodeRequired !== undefined) globalUpdate.inviteCodeRequired = inviteCodeRequired;
+    if (inviteCode !== undefined) globalUpdate.inviteCode = inviteCode;
+    if (Object.keys(globalUpdate).length) {
+      if (!isAdmin) {
+        response.status(403).json({ error: "无权限。" });
+        return;
+      }
+      // ponytail: empty code → disable requirement
+      if (globalUpdate.inviteCode === "") {
+        globalUpdate.inviteCodeRequired = false;
+      }
+      await updateAppSettings(globalUpdate, null);
+    }
+
+    let settings;
+    if (Object.keys(userSettings).length) {
+      settings = await updateAppSettings(userSettings, request.user.id);
+    } else {
+      settings = await getAppSettings(request.user.id);
+    }
+
+    // merge global invite code back into response
+    const globalSettings = await getAppSettings();
+    response.json({
+      settings: {
+        ...settings,
+        inviteCodeRequired: globalSettings.inviteCodeRequired,
+        inviteCode: isAdmin ? globalSettings.inviteCode : "",
+      },
+    });
   } catch (error) {
     response.status(error?.status || 500).json({
       error: error instanceof Error ? error.message : "更新应用设置失败。",

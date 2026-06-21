@@ -41,11 +41,13 @@ export default function InteractionSettingsPanel({
   settings = {},
   enabledModels = [],
   isSaving = false,
+  isAdmin = false,
   onClose,
   onToggleShowChatAdaptationButtons,
   onToggleSingleChatAdaptationButton,
   onChangeTitleModel,
   onChangeSummaryModel,
+  onUpdateInteractionSettings,
 }) {
   const { t } = useLocale();
   const [activeLeaf, setActiveLeaf] = useState("chat-adaptation-buttons");
@@ -111,6 +113,17 @@ export default function InteractionSettingsPanel({
               <span className="settings-model-name">{t("interaction.modelConfig")}</span>
               <span className="settings-model-meta">{t("interaction.summaryModelDesc")}</span>
             </button>
+            {isAdmin && (
+              <button
+                type="button"
+                role="listitem"
+                className={`settings-model-item ${activeLeaf === "admin" ? "active" : ""}`.trim()}
+                onClick={() => setActiveLeaf("admin")}
+              >
+                <span className="settings-model-name">{t("interaction.admin")}</span>
+                <span className="settings-model-meta">{t("interaction.inviteCodeManagement")}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -119,7 +132,7 @@ export default function InteractionSettingsPanel({
             <div>
               <div className="settings-eyebrow">{t("settings.stageInteraction")}</div>
               <h3 className="settings-panel-title">
-                {activeLeaf === "interaction-model" ? t("interaction.modelConfig") : `${t("interaction.view")} / ${t("interaction.buttonVisibility")}`}
+                {activeLeaf === "interaction-model" ? t("interaction.modelConfig") : activeLeaf === "admin" ? t("interaction.admin") : `${t("interaction.view")} / ${t("interaction.buttonVisibility")}`}
               </h3>
             </div>
           </div>
@@ -235,6 +248,66 @@ export default function InteractionSettingsPanel({
                   ))}
                 </select>
               </section>
+            </>
+          ) : null}
+
+          {activeLeaf === "admin" ? (
+            <>
+              <section className="settings-appearance-card" aria-label={t("interaction.inviteCodeRequired")}>
+                <div>
+                  <h4 className="settings-appearance-card-title">{t("interaction.inviteCodeRequired")}</h4>
+                  <p className="settings-appearance-card-desc">
+                    {t("interaction.inviteCodeRequiredDesc")}
+                  </p>
+                </div>
+
+                <label className="settings-switch" htmlFor="invite-code-required-toggle">
+                  <input
+                    id="invite-code-required-toggle"
+                    type="checkbox"
+                    className="settings-switch-input"
+                    checked={settings.inviteCodeRequired === true}
+                    disabled={isSaving}
+                    onChange={(event) =>
+                      onUpdateInteractionSettings?.({ inviteCodeRequired: event.target.checked })
+                    }
+                  />
+                  <span className="settings-switch-track" aria-hidden="true">
+                    <span className="settings-switch-thumb" />
+                  </span>
+                  <span className="settings-switch-label">
+                    {settings.inviteCodeRequired === true ? t("interaction.enabled") : t("interaction.disabled")}
+                  </span>
+                </label>
+              </section>
+
+              {settings.inviteCodeRequired && (
+                <section className="settings-appearance-card" aria-label={t("interaction.inviteCodeLabel")}>
+                  <div>
+                    <h4 className="settings-appearance-card-title">{t("interaction.inviteCodeLabel")}</h4>
+                    <p className="settings-appearance-card-desc">
+                      {t("interaction.inviteCodeRequiredDesc")}
+                    </p>
+                  </div>
+
+                  <input
+                    type="text"
+                    className="composer-model-selector"
+                    style={{ maxWidth: 280 }}
+                    placeholder={t("interaction.inviteCodePlaceholder")}
+                    defaultValue={settings.inviteCode || ""}
+                    disabled={isSaving}
+                    onBlur={(event) => {
+                      const code = event.target.value.trim();
+                      onUpdateInteractionSettings?.(
+                        code
+                          ? { inviteCode: code }
+                          : { inviteCode: "", inviteCodeRequired: false },
+                      );
+                    }}
+                  />
+                </section>
+              )}
             </>
           ) : null}
         </div>

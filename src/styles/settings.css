@@ -951,3 +951,10 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* inline edit: input + save button */
+.settings-inline-edit {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}

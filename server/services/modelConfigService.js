@@ -730,6 +730,14 @@ export async function updateAppSettings(partialSettings = {}, userId = null) {
     nextSettings.darkMode = partialSettings.darkMode;
   }
 
+  if (Object.prototype.hasOwnProperty.call(partialSettings, "inviteCodeRequired")) {
+    nextSettings.inviteCodeRequired = partialSettings.inviteCodeRequired === true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(partialSettings, "inviteCode")) {
+    nextSettings.inviteCode = `${partialSettings.inviteCode ?? ""}`.trim();
+  }
+
   await writeJson(filePath, nextSettings);
   return nextSettings;
 }

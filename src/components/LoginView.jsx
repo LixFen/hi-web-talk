@@ -6,6 +6,7 @@ export default function LoginView({ onLogin }) {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -16,10 +17,14 @@ export default function LoginView({ onLogin }) {
 
     try {
       const endpoint = isRegister ? "/api/auth/register" : "/api/auth/login";
+      const body = { username, password };
+      if (isRegister && inviteCode.trim()) {
+        body.inviteCode = inviteCode.trim();
+      }
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(body),
       });
 
       const data = await response.text();
@@ -76,6 +81,18 @@ export default function LoginView({ onLogin }) {
             disabled={isSubmitting}
           />
         </div>
+
+        {isRegister && (
+          <div className="login-field">
+            <input
+              type="text"
+              placeholder={t("login.inviteCode")}
+              value={inviteCode}
+              onChange={(event) => setInviteCode(event.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
+        )}
 
         {error && <div className="login-error">{error}</div>}
 

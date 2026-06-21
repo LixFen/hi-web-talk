@@ -1,3 +1,7 @@
+# 1.17.1
+
+- Feat: Invite code registration — Admin can require an invite code for new user registration via Interaction Settings → Admin panel.
+
 # 1.17.0
 
 - Feat: Web search — AI can now automatically invoke search engines to fetch real-time information (weather, news, stock prices, etc.) and inject results as context into responses.

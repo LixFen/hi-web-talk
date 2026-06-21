@@ -59,6 +59,7 @@ export default function AuthenticatedLayout() {
     toggleSingleChatAdaptationButton,
     changeTitleModel,
     changeSummaryModel,
+    updateInteractionSettings,
     error: appError,
     toast,
   } = useApp();
@@ -437,6 +438,7 @@ export default function AuthenticatedLayout() {
         settings={appSettings}
         enabledModels={enabledModels}
         isSaving={isInteractionSaving}
+        isAdmin={isAdmin}
         onClose={() => {
           setIsInteractionPanelOpen(false);
           setIsSettingsMenuOpen(true);
@@ -449,6 +451,7 @@ export default function AuthenticatedLayout() {
         }
         onChangeTitleModel={changeTitleModel}
         onChangeSummaryModel={changeSummaryModel}
+        onUpdateInteractionSettings={updateInteractionSettings}
       />
 
       <AboutSettingsPanel

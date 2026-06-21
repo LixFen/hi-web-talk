@@ -3,6 +3,7 @@ import { z } from "zod";
 export const registerSchema = z.object({
   username: z.string().trim().min(2, "用户名至少需要 2 个字符。"),
   password: z.string().min(4, "密码至少需要 4 个字符。"),
+  inviteCode: z.string().optional(),
 });
 
 export const loginSchema = z.object({
@@ -23,6 +24,8 @@ export const appSettingsSchema = z.object({
   titleModelAlias: z.string().optional(),
   summaryModelAlias: z.string().optional(),
   darkMode: z.enum(["dark", "system"]).optional(),
+  inviteCodeRequired: z.boolean().optional(),
+  inviteCode: z.string().optional(),
 });
 
 // ── Provider schemas ──
