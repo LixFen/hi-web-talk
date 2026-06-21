@@ -487,6 +487,11 @@
   padding-bottom: 10rem;
 }
 
+/* 输入框收起时减小底部留白，避免出现黑块和滚动条位置异常 */
+.main-panel:has(.composer-area.collapsed) .chat-view-shell .messages-container {
+  padding-bottom: 3rem;
+}
+
 /* -----------------------------------------------------------------
    Header / Topbar
    ----------------------------------------------------------------- */
@@ -642,6 +647,17 @@
 
 .view-mode-btn.active {
   color: var(--bg-main);
+}
+
+/* Narrow / mobile — 固定大小循环按钮 */
+.view-mode-switcher-narrow {
+  width: 5rem;
+  justify-content: center;
+}
+
+.view-mode-cycle-btn {
+  width: 100%;
+  text-align: center;
 }
 
 /* -----------------------------------------------------------------
