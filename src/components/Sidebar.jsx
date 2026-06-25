@@ -22,7 +22,6 @@ const Sidebar = ({
   const {
     sessionSummaries,
     activeConversation,
-    startNewChatDraft,
     deleteConversation,
     renameConversation,
     regenerateTitle,
@@ -51,7 +50,6 @@ const Sidebar = ({
     if (toggleVariant === "close") {
       onToggleCollapse?.();
     }
-    startNewChatDraft();
     navigate("/");
   };
 

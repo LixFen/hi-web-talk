@@ -123,7 +123,8 @@ export default function ChatPage() {
     );
   }
 
-  if (sessionHash && session.activeConversation?.sessionHash !== sessionHash) {
+  // 切换会话时保留旧视图作为占位，避免布局抖动
+  if (sessionHash && !session.activeConversation && !session.isBootstrapping) {
     return (
       <div className="empty-state">
         <h2 className="hero-title">{t("chat.loadingSession")}</h2>
