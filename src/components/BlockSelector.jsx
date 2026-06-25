@@ -18,6 +18,9 @@ export default function BlockSelector({
   const containerRef = useRef(null);
   const prevFocusedSHA1Ref = useRef("");
   const isTouchDevice = useRef(false);
+  const trackAreaRef = useRef(null);
+  const touchState = useRef({ startY: 0, active: false });
+  const touchHandled = useRef(false);
 
   const displayBlocks = useMemo(() => {
     const filtered = blocks.filter((b) => b.role !== "user");
@@ -69,6 +72,15 @@ export default function BlockSelector({
     return () => window.removeEventListener("resize", updateIndicatorPosition);
   }, [updateIndicatorPosition]);
 
+  // Allow preventDefault during touch-drag on track
+  useEffect(() => {
+    const el = trackAreaRef.current;
+    if (!el) return;
+    const onMove = (e) => { if (touchState.current.active) e.preventDefault(); };
+    el.addEventListener("touchmove", onMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onMove);
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -114,6 +126,44 @@ export default function BlockSelector({
     setIsHovered(false);
   };
 
+  const handleTrackClick = () => {
+    if (touchHandled.current) { touchHandled.current = false; return; }
+    if (disabled) return;
+    setIsOpen((prev) => !prev);
+  };
+
+  const handleTrackTouchStart = (e) => {
+    if (disabled) return;
+    isTouchDevice.current = true;
+    touchState.current = { startY: e.touches[0].clientY, active: true, swiped: false };
+    touchHandled.current = false;
+  };
+
+  const handleTrackTouchMove = (e) => {
+    if (!touchState.current.active || displayBlocks.length < 2) return;
+    const deltaY = e.touches[0].clientY - touchState.current.startY;
+    if (Math.abs(deltaY) >= 20) {
+      touchState.current.swiped = true;
+      const dir = deltaY > 0 ? 1 : -1;
+      const curIdx = displayBlocks.findIndex(
+        (b) => b.sha1 === (focusedBlockSHA1 || activeBlockSHA1)
+      );
+      if (curIdx === -1) return;
+      const newIdx = Math.max(0, Math.min(displayBlocks.length - 1, curIdx + dir));
+      if (newIdx !== curIdx) onSelectBlock?.(displayBlocks[newIdx].sha1);
+      touchState.current.startY = e.touches[0].clientY;
+    }
+  };
+
+  const handleTrackTouchEnd = () => {
+    const wasSwipe = touchState.current.swiped;
+    touchState.current.active = false;
+    if (!wasSwipe) {
+      touchHandled.current = true;
+      setIsOpen((prev) => !prev);
+    }
+  };
+
   const showPanel = isHovered || isOpen;
   const focusedBlock = displayBlocks.find((b) => b.sha1 === focusedBlockSHA1);
   const focusedLabel = focusedBlock
@@ -128,8 +178,14 @@ export default function BlockSelector({
       onMouseLeave={handleMouseLeave}
     >
       <div className="block-selector-inner">
-        <div className="block-selector-track" ref={trackRef}>
-          <div className="block-selector-indicator" ref={indicatorRef} />
+        <div className="block-selector-track-area" ref={trackAreaRef}
+          onTouchStart={handleTrackTouchStart}
+          onTouchMove={handleTrackTouchMove}
+          onTouchEnd={handleTrackTouchEnd}
+          onClick={handleTrackClick}>
+          <div className="block-selector-track" ref={trackRef}>
+            <div className="block-selector-indicator" ref={indicatorRef} />
+          </div>
         </div>
 
         <div className="block-selector-anchor">

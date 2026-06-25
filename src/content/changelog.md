@@ -1,3 +1,11 @@
+# 1.18.1
+
+- Feat: touch pattern has batter performence now. 
+
+# 1.18.0
+
+- Feat: allow user create custom system prompt.
+
 # 1.17.1
 
 - Feat: Invite code registration — Admin can require an invite code for new user registration via Interaction Settings → Admin panel.

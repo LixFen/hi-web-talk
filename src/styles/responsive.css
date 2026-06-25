@@ -305,7 +305,7 @@
 }
 
 /* -----------------------------------------------------------------
-   Narrow Block Selector Fix
+   Narrow Block Selector
    ----------------------------------------------------------------- */
 @media (max-width: 640px) {
   .block-selector-panel {
@@ -313,6 +313,15 @@
     margin-left: -140px;
     width: 90vw;
     max-width: 280px;
+  }
+
+  .block-selector-list {
+    max-height: 45vh;
+  }
+
+  .block-selector-item {
+    padding: 12px 14px;
+    min-height: 44px;
   }
 
   .block-selector-dots {
@@ -362,6 +371,10 @@
     box-shadow: var(--shadow-xs);
   }
 
+  .block-selector-item:hover {
+    background: transparent;
+  }
+
   /* Larger tap targets for touch */
   .composer-attachment-remove {
     width: 28px;
@@ -389,6 +402,10 @@
     height: 2.75rem;
   }
 
+  .block-selector-track-area:active {
+    opacity: 0.7;
+  }
+
   /* Safe area for notched devices */
   .composer-area {
     padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
@@ -400,6 +417,10 @@
   .composer-collapse-button:active,
   .sidebar-settings-btn:active {
     opacity: 0.7;
+  }
+
+  .block-selector-item:active {
+    background: var(--accent-color-alpha);
   }
 }
 

@@ -209,6 +209,18 @@
   flex-shrink: 0;
 }
 
+.block-selector-track-area {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  min-height: 44px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
 .block-selector-indicator {
   position: absolute;
   top: 0;
