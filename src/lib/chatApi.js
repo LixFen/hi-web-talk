@@ -174,9 +174,11 @@ export function listSessions(page = 1, pageSize = 50) {
   return requestJson(`/api/sessions?page=${page}&pageSize=${pageSize}`);
 }
 
-export function createSession() {
+export function createSession(systemPrompt) {
+  const body = systemPrompt ? { systemPrompt } : {};
   return requestJson("/api/sessions", {
     method: "POST",
+    body: JSON.stringify(body),
   });
 }
 
@@ -523,4 +525,52 @@ export async function subscribeToSessionStream(sessionHash, { signal, onEvent } 
 
 export function getCurrentUser() {
   return requestJson("/api/auth/me");
+}
+
+export function listPromptItems() {
+  return requestJson("/api/prompt-items");
+}
+
+export function createPromptItem(name, content) {
+  return requestJson("/api/prompt-items", {
+    method: "POST",
+    body: JSON.stringify({ name, content }),
+  });
+}
+
+export function updatePromptItem(id, name, content) {
+  return requestJson(`/api/prompt-items/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ name, content }),
+  });
+}
+
+export function deletePromptItem(id) {
+  return requestJson(`/api/prompt-items/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function listPromptCombos() {
+  return requestJson("/api/prompt-combos");
+}
+
+export function createPromptCombo(name, isDefault, itemIds) {
+  return requestJson("/api/prompt-combos", {
+    method: "POST",
+    body: JSON.stringify({ name, isDefault, itemIds }),
+  });
+}
+
+export function updatePromptCombo(id, name, isDefault, itemIds) {
+  return requestJson(`/api/prompt-combos/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ name, isDefault, itemIds }),
+  });
+}
+
+export function deletePromptCombo(id) {
+  return requestJson(`/api/prompt-combos/${id}`, {
+    method: "DELETE",
+  });
 }

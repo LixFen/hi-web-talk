@@ -280,7 +280,7 @@ export async function ensureDataLayout() {
   await ensureDatabase();
 }
 
-export async function createSession(userId) {
+export async function createSession(userId, systemPrompt) {
   await ensureDataLayout();
 
   const sessionHash = createSessionHash();
@@ -296,11 +296,12 @@ export async function createSession(userId) {
       activeBlockSHA1: null,
       viewState: { mode: "chat", focusedBlockSHA1: null },
       userId,
+      systemPrompt: systemPrompt || "",
     });
 
     const appSettings = await getAppSettings(userId);
-    const systemPrompt = appSettings.defaultSystemPrompt || DEFAULT_SYSTEM_PROMPT;
-    const rootBlock = await createSystemRootBlock(sessionHash, systemPrompt);
+    const effectivePrompt = systemPrompt || appSettings.defaultSystemPrompt || DEFAULT_SYSTEM_PROMPT;
+    const rootBlock = await createSystemRootBlock(sessionHash, effectivePrompt);
 
     await upsertSessionRecord({
       sessionHash,
@@ -314,6 +315,7 @@ export async function createSession(userId) {
         focusedBlockSHA1: rootBlock.sha1,
       },
       userId,
+      systemPrompt: systemPrompt || "",
     });
 
     return getSessionDetail(sessionHash);

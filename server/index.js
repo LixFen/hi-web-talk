@@ -7,7 +7,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { DEFAULT_SYSTEM_PROMPT, JWT_SECRET, JWT_EXPIRES_IN } from "./constants.js";
+import { DEFAULT_SYSTEM_PROMPT, JWT_SECRET, JWT_EXPIRES_IN, MAX_COMBO_COUNT, MAX_ITEM_LENGTH } from "./constants.js";
 import { getDatabase } from "./lib/database.js";
 import { authenticateToken, requireSessionOwnership } from "./middleware/auth.js";
 import { validateBody, validateParams, validateQuery } from "./middleware/validate.js";
@@ -43,6 +43,16 @@ import {
 } from "./lib/validation.js";
 import { loginUser, registerUser, getUserById } from "./services/userService.js";
 import { readSessionRecord } from "./lib/database.js";
+import {
+  listPromptItemRecords,
+  createPromptItemRecord,
+  updatePromptItemRecord,
+  deletePromptItemRecord,
+  listPromptComboRecords,
+  createPromptComboRecord,
+  updatePromptComboRecord,
+  deletePromptComboRecord,
+} from "./lib/database.js";
 import { sessionDetailCache } from "./lib/cache.js";
 import {
   listAdaptationDefinitions,
@@ -635,6 +645,66 @@ app.get("/api/adaptation-definitions", (_request, response) => {
   response.json({ definitions: listAdaptationDefinitions() });
 });
 
+// ── Prompt Items ──
+
+app.get("/api/prompt-items", authenticateToken, async (request, response) => {
+  const items = listPromptItemRecords(request.user.id);
+  response.json({ items });
+});
+
+app.post("/api/prompt-items", authenticateToken, async (request, response) => {
+  const { name, content } = request.body || {};
+  if (!name || !content) return response.status(400).json({ error: "名称和内容不能为空。" });
+  if (content.length > MAX_ITEM_LENGTH) return response.status(400).json({ error: `提示词内容不能超过 ${MAX_ITEM_LENGTH} 个字符。` });
+  const item = createPromptItemRecord(request.user.id, name.trim(), content.trim());
+  response.status(201).json({ item });
+});
+
+app.put("/api/prompt-items/:id", authenticateToken, async (request, response) => {
+  const { name, content } = request.body || {};
+  if (!name || !content) return response.status(400).json({ error: "名称和内容不能为空。" });
+  if (content.length > MAX_ITEM_LENGTH) return response.status(400).json({ error: `提示词内容不能超过 ${MAX_ITEM_LENGTH} 个字符。` });
+  const item = updatePromptItemRecord(Number(request.params.id), request.user.id, name.trim(), content.trim());
+  if (!item) return response.status(404).json({ error: "条目未找到。" });
+  response.json({ item });
+});
+
+app.delete("/api/prompt-items/:id", authenticateToken, async (request, response) => {
+  deletePromptItemRecord(Number(request.params.id), request.user.id);
+  response.json({ success: true });
+});
+
+// ── Prompt Combos ──
+
+app.get("/api/prompt-combos", authenticateToken, async (request, response) => {
+  const combos = listPromptComboRecords(request.user.id);
+  response.json({ combos });
+});
+
+app.post("/api/prompt-combos", authenticateToken, async (request, response) => {
+  const { name, isDefault, itemIds } = request.body || {};
+  if (!name) return response.status(400).json({ error: "组合名称不能为空。" });
+  const existing = listPromptComboRecords(request.user.id);
+  if (existing.length >= MAX_COMBO_COUNT && request.user?.role !== "admin") {
+    return response.status(400).json({ error: `最多只能创建 ${MAX_COMBO_COUNT} 个组合。` });
+  }
+  const combo = createPromptComboRecord(request.user.id, name.trim(), !!isDefault, itemIds || []);
+  response.status(201).json({ combo });
+});
+
+app.put("/api/prompt-combos/:id", authenticateToken, async (request, response) => {
+  const { name, isDefault, itemIds } = request.body || {};
+  if (!name) return response.status(400).json({ error: "组合名称不能为空。" });
+  const combo = updatePromptComboRecord(Number(request.params.id), request.user.id, name.trim(), !!isDefault, itemIds || []);
+  if (!combo) return response.status(404).json({ error: "组合未找到。" });
+  response.json({ combo });
+});
+
+app.delete("/api/prompt-combos/:id", authenticateToken, async (request, response) => {
+  deletePromptComboRecord(Number(request.params.id), request.user.id);
+  response.json({ success: true });
+});
+
 app.get("/api/sessions", authenticateToken, validateQuery(paginationQuerySchema), async (request, response) => {
   const { page, pageSize } = request.query;
   const offset = (page - 1) * pageSize;
@@ -652,7 +722,8 @@ app.get("/api/sessions", authenticateToken, validateQuery(paginationQuerySchema)
 });
 
 app.post("/api/sessions", authenticateToken, async (request, response) => {
-  const detail = await createSession(request.user.id);
+  const systemPrompt = request.body?.systemPrompt || "";
+  const detail = await createSession(request.user.id, systemPrompt);
   response.status(201).json(detail);
 });
 

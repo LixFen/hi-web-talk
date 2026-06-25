@@ -10,6 +10,7 @@ import Sidebar from "../components/Sidebar";
 import ViewModeSwitcher from "../components/ViewModeSwitcher";
 import ChatComposer from "../components/ChatComposer";
 import ModelSettingsPanel from "../components/ModelSettingsPanel";
+import PromptManagerPanel from "../components/PromptManagerPanel";
 import AppearanceSettingsPanel from "../components/AppearanceSettingsPanel";
 import InteractionSettingsPanel from "../components/InteractionSettingsPanel";
 import AboutSettingsPanel from "../components/AboutSettingsPanel";
@@ -46,6 +47,7 @@ export default function AuthenticatedLayout() {
     isModelSaving,
     isAppearanceSaving,
     isInteractionSaving,
+    isPromptSaving,
     createModel,
     updateModel,
     deleteModel,
@@ -60,6 +62,12 @@ export default function AuthenticatedLayout() {
     changeTitleModel,
     changeSummaryModel,
     updateInteractionSettings,
+    createPromptItem,
+    updatePromptItem,
+    deletePromptItem,
+    createPromptCombo,
+    updatePromptCombo,
+    deletePromptCombo,
     error: appError,
     toast,
   } = useApp();
@@ -92,6 +100,7 @@ export default function AuthenticatedLayout() {
   const [isAppearancePanelOpen, setIsAppearancePanelOpen] = useState(false);
   const [isInteractionPanelOpen, setIsInteractionPanelOpen] = useState(false);
   const [isAboutPanelOpen, setIsAboutPanelOpen] = useState(false);
+  const [isPromptPanelOpen, setIsPromptPanelOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -134,6 +143,8 @@ export default function AuthenticatedLayout() {
       setIsSettingsMenuOpen(false);
       if (section === "model") {
         setIsModelPanelOpen(true);
+      } else if (section === "prompt") {
+        setIsPromptPanelOpen(true);
       } else if (section === "appearance") {
         setIsAppearancePanelOpen(true);
       } else if (section === "behavior") {
@@ -149,12 +160,14 @@ export default function AuthenticatedLayout() {
   const isAnySettingsPanelOpen = useMemo(
     () =>
       isModelPanelOpen ||
+      isPromptPanelOpen ||
       isAppearancePanelOpen ||
       isInteractionPanelOpen ||
       isAboutPanelOpen ||
       isSettingsMenuOpen,
     [
       isModelPanelOpen,
+      isPromptPanelOpen,
       isAppearancePanelOpen,
       isInteractionPanelOpen,
       isAboutPanelOpen,
@@ -183,6 +196,8 @@ export default function AuthenticatedLayout() {
     setIsSettingsMenuOpen(false);
     if (sectionKey === "model") {
       setIsModelPanelOpen(true);
+    } else if (sectionKey === "prompt") {
+      setIsPromptPanelOpen(true);
     } else if (sectionKey === "appearance") {
       setIsAppearancePanelOpen(true);
     } else if (sectionKey === "behavior") {
@@ -452,6 +467,14 @@ export default function AuthenticatedLayout() {
         onChangeTitleModel={changeTitleModel}
         onChangeSummaryModel={changeSummaryModel}
         onUpdateInteractionSettings={updateInteractionSettings}
+      />
+
+      <PromptManagerPanel
+        open={isPromptPanelOpen}
+        onClose={() => {
+          setIsPromptPanelOpen(false);
+          setIsSettingsMenuOpen(true);
+        }}
       />
 
       <AboutSettingsPanel

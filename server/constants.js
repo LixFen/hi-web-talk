@@ -229,3 +229,6 @@ export const DEFAULT_APP_SETTINGS = {
 
 export const DEFAULT_SESSION_TITLE = "\u65b0\u5bf9\u8bdd";
 
+export const MAX_COMBO_COUNT = 10;
+export const MAX_ITEM_LENGTH = 2000;
+

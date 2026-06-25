@@ -12,6 +12,7 @@ export default function useStreaming({
   getSessionHash,
   selectedModel,
   searchMode,
+  systemPrompt,
   onApplyDetail,
   onSetLoading,
   onSetError,
@@ -125,7 +126,7 @@ export default function useStreaming({
     async ({ fileName, mimeType, base64Data }) => {
       let sessionHash = getSessionHash();
       if (!sessionHash) {
-        const createdDetail = await createSession();
+        const createdDetail = await createSession(systemPrompt?.content || "");
         onApplyDetail(createdDetail);
         sessionHash = createdDetail.session.sessionHash;
         navigate(`/chat/${sessionHash}`);
@@ -138,7 +139,7 @@ export default function useStreaming({
       }
       return uploadAttachment({ sessionHash, fileName, mimeType, base64Data });
     },
-    [getSessionHash, onApplyDetail],
+    [getSessionHash, systemPrompt, onApplyDetail],
   );
 
   const handleSend = useCallback(
@@ -162,7 +163,7 @@ export default function useStreaming({
 
       try {
         if (!sessionHash) {
-          const createdDetail = await createSession();
+          const createdDetail = await createSession(systemPrompt?.content || "");
           onApplyDetail(createdDetail);
           sessionHash = createdDetail.session.sessionHash;
           navigate(`/chat/${sessionHash}`);
@@ -261,7 +262,7 @@ export default function useStreaming({
         streamAbortControllerRef.current = null;
       }
     },
-    [selectedModel, searchMode, getSessionHash, onApplyDetail, onSetLoading, onSetError],
+    [selectedModel, searchMode, systemPrompt, getSessionHash, onApplyDetail, onSetLoading, onSetError],
   );
 
   const handleStopStreaming = useCallback(() => {

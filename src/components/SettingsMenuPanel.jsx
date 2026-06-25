@@ -5,6 +5,7 @@ export default function SettingsMenuPanel({ open, onClose, onSelectSection }) {
   const { t } = useLocale();
   const settingSections = [
     { key: "model", label: t("settings.section.model"), description: t("settings.section.modelDesc") },
+    { key: "prompt", label: t("settings.section.prompt"), description: t("settings.section.promptDesc") },
     { key: "appearance", label: t("settings.section.appearance"), description: t("settings.section.appearanceDesc") },
     { key: "behavior", label: t("settings.section.behavior"), description: t("settings.section.behaviorDesc") },
     { key: "data", label: t("settings.section.data"), description: t("settings.section.dataDesc") },
@@ -32,6 +33,7 @@ export default function SettingsMenuPanel({ open, onClose, onSelectSection }) {
           {settingSections.map((section) => {
             const isAvailableEntry =
               section.key === "model" ||
+              section.key === "prompt" ||
               section.key === "appearance" ||
               section.key === "behavior" ||
               section.key === "about";

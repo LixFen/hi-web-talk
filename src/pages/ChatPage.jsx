@@ -7,6 +7,7 @@ import ChatHero from "../components/ChatHero";
 import ChatView from "../components/ChatView";
 import ChainCardView from "../components/ChainCardView";
 import GraphView from "../components/GraphView";
+import SystemPromptSelector from "../components/SystemPromptSelector";
 
 export default function ChatPage() {
   const { t } = useLocale();
@@ -14,7 +15,7 @@ export default function ChatPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const session = useSession();
-  const { appSettings, enabledModels, adaptationDefinitions } = useApp();
+  const { appSettings, enabledModels, adaptationDefinitions, promptItems, promptCombos } = useApp();
 
   const urlView = searchParams.get("view") || "chat";
   const loadingSessionHashRef = useRef("");
@@ -132,6 +133,19 @@ export default function ChatPage() {
     );
   }
 
+  const promptSelector = !session.activeConversation ? (
+    <SystemPromptSelector
+      items={promptItems}
+      combos={promptCombos}
+      defaultPrompt={appSettings.defaultSystemPrompt || ""}
+      selectedKey={session.selectedSystemPrompt?.key || ""}
+      onSelect={(key, content) => session.setSelectedSystemPrompt({ key, content })}
+      onOpenSettings={() => {
+        window.dispatchEvent(new CustomEvent("open-settings", { detail: { section: "prompt" } }));
+      }}
+    />
+  ) : null;
+
   if (!session.activeConversation) {
     return (
       <ChatHero
@@ -141,7 +155,9 @@ export default function ChatPage() {
             new CustomEvent("open-settings", { detail: { section: "model" } }),
           )
         }
-      />
+      >
+        {promptSelector}
+      </ChatHero>
     );
   }
 
@@ -157,7 +173,9 @@ export default function ChatPage() {
             new CustomEvent("open-settings", { detail: { section: "model" } }),
           )
         }
-      />
+      >
+        {promptSelector}
+      </ChatHero>
     );
   }
 

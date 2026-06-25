@@ -1,19 +1,19 @@
-﻿import { useLocale } from "../contexts/LocaleContext";
+import { useLocale } from "../contexts/LocaleContext";
 
-export default function ChatHero({ hasModels, onOpenSettings }) {
+export default function ChatHero({ hasModels, onOpenSettings, children }) {
   const { t } = useLocale();
 
   return (
     <div className="empty-state" style={{ padding: '0 2rem', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.9 }}>
       {/* Icon Graphic */}
-      <div 
-        className="hero-logo-container" 
-        style={{ 
-          marginBottom: '2rem', 
-          width: '64px', 
-          height: '64px', 
-          display: 'flex', 
-          alignItems: 'center', 
+      <div
+        className="hero-logo-container"
+        style={{
+          marginBottom: '2rem',
+          width: '64px',
+          height: '64px',
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'center',
           background: 'var(--bg-glass)',
           borderRadius: '24px',
@@ -32,44 +32,46 @@ export default function ChatHero({ hasModels, onOpenSettings }) {
         )}
       </div>
 
-      <h2 className="hero-title" style={{ 
-        fontSize: '2rem', 
-        fontWeight: 600, 
-        letterSpacing: '-0.02em', 
-        color: 'var(--text-primary)', 
-        marginBottom: '1rem' 
+      <h2 className="hero-title" style={{
+        fontSize: '2rem',
+        fontWeight: 600,
+        letterSpacing: '-0.02em',
+        color: 'var(--text-primary)',
+        marginBottom: '1rem'
       }}>
         {hasModels ? t("chat.heroTitle") : t("chat.heroNoModels")}
       </h2>
-      
-      <p style={{ 
-        color: 'var(--text-muted)', 
-        fontSize: '1rem', 
-        marginBottom: '2.5rem', 
-        maxWidth: '420px', 
-        textAlign: 'center', 
-        lineHeight: 1.6 
+
+      {children}
+
+      <p style={{
+        color: 'var(--text-muted)',
+        fontSize: '1rem',
+        marginBottom: '2.5rem',
+        maxWidth: '420px',
+        textAlign: 'center',
+        lineHeight: 1.6
       }}>
-        {hasModels 
-          ? " " 
+        {hasModels
+          ? " "
           : t("chat.heroNoModelsDesc")}
       </p>
-      
+
       {!hasModels && (
-        <button 
+        <button
           onClick={onOpenSettings}
-          style={{ 
-            padding: '0.875rem 1.75rem', 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            gap: '0.6rem', 
-            fontWeight: 600, 
+          style={{
+            padding: '0.875rem 1.75rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            fontWeight: 600,
             fontSize: '0.95rem',
-            background: 'var(--bg-elevated)', 
-            border: '1px solid var(--border-color)', 
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-color)',
             borderRadius: '999px',
             boxShadow: 'var(--shadow-sm)',
-            cursor: 'pointer', 
+            cursor: 'pointer',
             color: 'var(--text-primary)',
             transition: 'all var(--duration-fast) var(--ease-out-expo)'
           }}

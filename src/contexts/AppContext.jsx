@@ -20,6 +20,14 @@ import {
   deleteProvider,
   updateAppSettings,
   updateModelConfig,
+  listPromptItems,
+  createPromptItem,
+  updatePromptItem,
+  deletePromptItem,
+  listPromptCombos,
+  createPromptCombo,
+  updatePromptCombo,
+  deletePromptCombo,
 } from "../lib/chatApi";
 import { useAuth } from "./AuthContext";
 import { useLocale } from "./LocaleContext";
@@ -61,6 +69,9 @@ export function AppProvider({ children }) {
   const [isAppearanceSaving, setIsAppearanceSaving] = useState(false);
   const [isInteractionSaving, setIsInteractionSaving] = useState(false);
   const [toast, setToast] = useState({ message: "", type: "info" });
+  const [promptItems, setPromptItems] = useState([]);
+  const [promptCombos, setPromptCombos] = useState([]);
+  const [isPromptSaving, setIsPromptSaving] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -85,12 +96,16 @@ export function AppProvider({ children }) {
           { definitions: providerDefs },
           { providers: providerList },
           { settings },
+          { items: pItems },
+          { combos: pCombos },
         ] = await Promise.all([
           listModels(),
           listAdaptationDefinitions(),
           listModelProviderDefinitions(),
           listProviders(),
           getAppSettings(),
+          listPromptItems().catch(() => ({ items: [] })),
+          listPromptCombos().catch(() => ({ combos: [] })),
         ]);
 
         if (isCancelled) return;
@@ -100,6 +115,8 @@ export function AppProvider({ children }) {
         setProviderDefinitions(providerDefs);
         setAdaptationDefinitions(definitions);
         setAppSettings(settings ?? {});
+        setPromptItems(pItems ?? []);
+        setPromptCombos(pCombos ?? []);
         setSelectedModelId((current) => pickEnabledModelAlias(models, current));
       } catch (err) {
         if (!isCancelled) {
@@ -405,6 +422,81 @@ export function AppProvider({ children }) {
     [updateInteractionSettings],
   );
 
+  // ── Prompt CRUD ──
+
+  const refreshPrompts = useCallback(async () => {
+    try {
+      const [{ items }, { combos }] = await Promise.all([
+        listPromptItems(),
+        listPromptCombos(),
+      ]);
+      setPromptItems(items ?? []);
+      setPromptCombos(combos ?? []);
+    } catch {
+      // silent
+    }
+  }, []);
+
+  const handleCreatePromptItem = useCallback(async (name, content) => {
+    setIsPromptSaving(true);
+    try {
+      await createPromptItem(name, content);
+      await refreshPrompts();
+    } finally {
+      setIsPromptSaving(false);
+    }
+  }, [refreshPrompts]);
+
+  const handleUpdatePromptItem = useCallback(async (id, name, content) => {
+    setIsPromptSaving(true);
+    try {
+      await updatePromptItem(id, name, content);
+      await refreshPrompts();
+    } finally {
+      setIsPromptSaving(false);
+    }
+  }, [refreshPrompts]);
+
+  const handleDeletePromptItem = useCallback(async (id) => {
+    setIsPromptSaving(true);
+    try {
+      await deletePromptItem(id);
+      await refreshPrompts();
+    } finally {
+      setIsPromptSaving(false);
+    }
+  }, [refreshPrompts]);
+
+  const handleCreatePromptCombo = useCallback(async (name, isDefault, itemIds) => {
+    setIsPromptSaving(true);
+    try {
+      await createPromptCombo(name, isDefault, itemIds);
+      await refreshPrompts();
+    } finally {
+      setIsPromptSaving(false);
+    }
+  }, [refreshPrompts]);
+
+  const handleUpdatePromptCombo = useCallback(async (id, name, isDefault, itemIds) => {
+    setIsPromptSaving(true);
+    try {
+      await updatePromptCombo(id, name, isDefault, itemIds);
+      await refreshPrompts();
+    } finally {
+      setIsPromptSaving(false);
+    }
+  }, [refreshPrompts]);
+
+  const handleDeletePromptCombo = useCallback(async (id) => {
+    setIsPromptSaving(true);
+    try {
+      await deletePromptCombo(id);
+      await refreshPrompts();
+    } finally {
+      setIsPromptSaving(false);
+    }
+  }, [refreshPrompts]);
+
   const showToast = useCallback((message, type = "info") => {
     setToast({ message, type, isExiting: false });
   }, []);
@@ -442,6 +534,9 @@ export function AppProvider({ children }) {
       isModelSaving,
       isAppearanceSaving,
       isInteractionSaving,
+      isPromptSaving,
+      promptItems,
+      promptCombos,
       setSelectedModelId,
       setError,
       showToast,
@@ -459,6 +554,13 @@ export function AppProvider({ children }) {
       toggleSingleChatAdaptationButton: handleToggleSingleChatAdaptationButton,
       changeTitleModel: handleChangeTitleModel,
       changeSummaryModel: handleChangeSummaryModel,
+      refreshPrompts,
+      createPromptItem: handleCreatePromptItem,
+      updatePromptItem: handleUpdatePromptItem,
+      deletePromptItem: handleDeletePromptItem,
+      createPromptCombo: handleCreatePromptCombo,
+      updatePromptCombo: handleUpdatePromptCombo,
+      deletePromptCombo: handleDeletePromptCombo,
     }),
     [
       modelOptions,
@@ -475,6 +577,9 @@ export function AppProvider({ children }) {
       isModelSaving,
       isAppearanceSaving,
       isInteractionSaving,
+      isPromptSaving,
+      promptItems,
+      promptCombos,
       handleCreateModel,
       handleUpdateModel,
       handleDeleteModel,
@@ -490,6 +595,13 @@ export function AppProvider({ children }) {
       handleChangeTitleModel,
       handleChangeSummaryModel,
       showToast,
+      refreshPrompts,
+      handleCreatePromptItem,
+      handleUpdatePromptItem,
+      handleDeletePromptItem,
+      handleCreatePromptCombo,
+      handleUpdatePromptCombo,
+      handleDeletePromptCombo,
     ],
   );
 

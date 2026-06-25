@@ -131,6 +131,35 @@ function createDatabaseSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_attachments_session
       ON attachments(sessionHash, createdAt);
+
+    CREATE TABLE IF NOT EXISTS prompt_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      content TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS prompt_combos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      isDefault INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS prompt_combo_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      comboId INTEGER NOT NULL,
+      itemId INTEGER NOT NULL,
+      sortOrder INTEGER NOT NULL,
+      FOREIGN KEY (comboId) REFERENCES prompt_combos(id) ON DELETE CASCADE,
+      FOREIGN KEY (itemId) REFERENCES prompt_items(id) ON DELETE CASCADE
+    );
   `);
 }
 
@@ -355,6 +384,11 @@ function runMigrations(db) {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_userId_updatedAt ON sessions(userId, updatedAt DESC)`);
   }
 
+  const hasSystemPrompt = sessionColumns.some((col) => col.name === "systemPrompt");
+  if (!hasSystemPrompt) {
+    db.exec(`ALTER TABLE sessions ADD COLUMN systemPrompt TEXT NOT NULL DEFAULT ''`);
+  }
+
   addForeignKeysToExistingTables(db);
 }
 
@@ -401,6 +435,7 @@ export function sessionRowToRecord(row) {
     activeBlockSHA1: row.activeBlockSHA1 ?? null,
     viewState: row.viewState ? JSON.parse(row.viewState) : {},
     userId: row.userId ?? null,
+    systemPrompt: row.systemPrompt ?? "",
   };
 }
 
@@ -415,6 +450,7 @@ export function recordToSessionRow(session) {
     viewState: JSON.stringify(session.viewState ?? {}),
     deletedAt: session.deletedAt ?? null,
     userId: session.userId ?? null,
+    systemPrompt: session.systemPrompt ?? "",
   };
 }
 
@@ -432,7 +468,8 @@ export function upsertSessionRecord(session) {
       activeBlockSHA1,
       viewState,
       deletedAt,
-      userId
+      userId,
+      systemPrompt
     ) VALUES (
       @sessionHash,
       @title,
@@ -442,7 +479,8 @@ export function upsertSessionRecord(session) {
       @activeBlockSHA1,
       @viewState,
       @deletedAt,
-      @userId
+      @userId,
+      @systemPrompt
     )
     ON CONFLICT(sessionHash) DO UPDATE SET
       title = excluded.title,
@@ -452,7 +490,8 @@ export function upsertSessionRecord(session) {
       activeBlockSHA1 = excluded.activeBlockSHA1,
       viewState = excluded.viewState,
       deletedAt = excluded.deletedAt,
-      userId = excluded.userId
+      userId = excluded.userId,
+      systemPrompt = excluded.systemPrompt
   `).run(row);
 
   return sessionRowToRecord(row);
@@ -1223,4 +1262,114 @@ export function deleteAdaptationRecordsForBlocks(sessionHash, blockSHA1s = []) {
 
   const result = db.prepare(`DELETE FROM adaptations WHERE sessionHash = ?`).run(sessionHash);
   return result.changes;
+}
+
+// ── Prompt Items ──
+
+export function listPromptItemRecords(userId) {
+  const db = getDatabase();
+  return db
+    .prepare(`SELECT * FROM prompt_items WHERE userId = ? ORDER BY createdAt`)
+    .all(userId);
+}
+
+export function createPromptItemRecord(userId, name, content) {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const result = db
+    .prepare(`INSERT INTO prompt_items (userId, name, content, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)`)
+    .run(userId, name, content, now, now);
+  return { id: result.lastInsertRowid, userId, name, content, createdAt: now, updatedAt: now };
+}
+
+export function updatePromptItemRecord(id, userId, name, content) {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  db.prepare(`UPDATE prompt_items SET name = ?, content = ?, updatedAt = ? WHERE id = ? AND userId = ?`)
+    .run(name, content, now, id, userId);
+  return db.prepare(`SELECT * FROM prompt_items WHERE id = ?`).get(id);
+}
+
+export function deletePromptItemRecord(id, userId) {
+  const db = getDatabase();
+  db.prepare(`DELETE FROM prompt_items WHERE id = ? AND userId = ?`).run(id, userId);
+}
+
+// ── Prompt Combos ──
+
+export function listPromptComboRecords(userId) {
+  const db = getDatabase();
+  const combos = db
+    .prepare(`SELECT * FROM prompt_combos WHERE userId = ? ORDER BY createdAt`)
+    .all(userId);
+  const getItems = db.prepare(`
+    SELECT pci.sortOrder, pi.id, pi.name, pi.content
+    FROM prompt_combo_items pci
+    JOIN prompt_items pi ON pi.id = pci.itemId
+    WHERE pci.comboId = ?
+    ORDER BY pci.sortOrder
+  `);
+  return combos.map(combo => ({
+    ...combo,
+    items: getItems.all(combo.id),
+  }));
+}
+
+export function createPromptComboRecord(userId, name, isDefault, itemIds = []) {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  if (isDefault) {
+    db.prepare(`UPDATE prompt_combos SET isDefault = 0 WHERE userId = ?`).run(userId);
+  }
+
+  const result = db
+    .prepare(`INSERT INTO prompt_combos (userId, name, isDefault, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)`)
+    .run(userId, name, isDefault ? 1 : 0, now, now);
+  const comboId = result.lastInsertRowid;
+
+  itemIds.forEach((itemId, index) => {
+    db.prepare(`INSERT INTO prompt_combo_items (comboId, itemId, sortOrder) VALUES (?, ?, ?)`)
+      .run(comboId, itemId, index);
+  });
+
+  return { id: comboId, userId, name, isDefault: isDefault ? 1 : 0, createdAt: now, updatedAt: now };
+}
+
+export function updatePromptComboRecord(id, userId, name, isDefault, itemIds = []) {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  if (isDefault) {
+    db.prepare(`UPDATE prompt_combos SET isDefault = 0 WHERE userId = ?`).run(userId);
+  }
+
+  db.prepare(`UPDATE prompt_combos SET name = ?, isDefault = ?, updatedAt = ? WHERE id = ? AND userId = ?`)
+    .run(name, isDefault ? 1 : 0, now, id, userId);
+
+  db.prepare(`DELETE FROM prompt_combo_items WHERE comboId = ?`).run(id);
+  itemIds.forEach((itemId, index) => {
+    db.prepare(`INSERT INTO prompt_combo_items (comboId, itemId, sortOrder) VALUES (?, ?, ?)`)
+      .run(id, itemId, index);
+  });
+
+  return db.prepare(`SELECT * FROM prompt_combos WHERE id = ?`).get(id);
+}
+
+export function deletePromptComboRecord(id, userId) {
+  const db = getDatabase();
+  db.prepare(`DELETE FROM prompt_combos WHERE id = ? AND userId = ?`).run(id, userId);
+}
+
+export function getDefaultPromptComboItems(userId) {
+  const db = getDatabase();
+  const combo = db.prepare(`SELECT * FROM prompt_combos WHERE userId = ? AND isDefault = 1 LIMIT 1`).get(userId);
+  if (!combo) return null;
+  const items = db.prepare(`
+    SELECT pi.content FROM prompt_combo_items pci
+    JOIN prompt_items pi ON pi.id = pci.itemId
+    WHERE pci.comboId = ?
+    ORDER BY pci.sortOrder
+  `).all(combo.id);
+  return items.map(i => i.content).join("\n\n");
 }

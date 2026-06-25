@@ -113,6 +113,7 @@ export function SessionProvider({ children }) {
   const [focusedBlockSHA1State, setFocusedBlockSHA1State] = useState("");
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [searchMode, setSearchMode] = useState("auto");
+  const [selectedSystemPrompt, setSelectedSystemPrompt] = useState({ key: "", content: "" });
 
   const activeSessionHashRef = useRef("");
   const viewSwitchVersionRef = useRef(0);
@@ -122,6 +123,7 @@ export function SessionProvider({ children }) {
     setError("");
     setIsLoading(false);
     setActiveSessionDetail(null);
+    setSelectedSystemPrompt({ key: "", content: "" });
     setFocusedBlockSHA1State("");
     setViewMode("chat");
     activeSessionHashRef.current = "";
@@ -542,6 +544,7 @@ export function SessionProvider({ children }) {
     getSessionHash,
     selectedModel,
     searchMode,
+    systemPrompt: selectedSystemPrompt,
     onApplyDetail: applySessionDetail,
     onSetLoading: setIsLoading,
     onSetError: (msg) => setError(msg),
@@ -679,6 +682,7 @@ export function SessionProvider({ children }) {
       isBootstrapping,
       error,
       searchMode,
+      selectedSystemPrompt,
       streamingReply,
       streamingReasoning,
       pendingPrompt,
@@ -689,6 +693,7 @@ export function SessionProvider({ children }) {
       chatNavigationRequest,
       abortControllerRef,
       setSearchMode,
+      setSelectedSystemPrompt,
       setError,
       startNewChatDraft,
       selectConversation: handleSelectConversation,
