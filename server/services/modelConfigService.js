@@ -538,12 +538,22 @@ export async function createModel(payload, userId = null, role = "user") {
     models.length,
   );
 
-  const alias = nextModel.alias;
+  let alias = nextModel.alias;
 
+  // Auto-disambiguate: append -N when alias collides and user didn't specify one explicitly
   if (models.some((model) => model.alias === alias)) {
-    const error = new Error(`模型 alias 已存在: ${alias}`);
-    error.status = 409;
-    throw error;
+    if (!payload.alias) {
+      let counter = 2;
+      while (models.some((model) => model.alias === `${alias}-${counter}`)) {
+        counter++;
+      }
+      alias = `${alias}-${counter}`;
+      nextModel.alias = alias;
+    } else {
+      const error = new Error(`模型 alias 已存在: ${alias}`);
+      error.status = 409;
+      throw error;
+    }
   }
 
   const nextModels = await writeModels([...models, nextModel], targetUserId);
@@ -736,6 +746,21 @@ export async function updateAppSettings(partialSettings = {}, userId = null) {
 
   if (Object.prototype.hasOwnProperty.call(partialSettings, "inviteCode")) {
     nextSettings.inviteCode = `${partialSettings.inviteCode ?? ""}`.trim();
+  }
+
+  if (Object.prototype.hasOwnProperty.call(partialSettings, "searchEngine")) {
+    const validEngines = ["bing_html", "brave", "bing", "google", "searxng"];
+    if (validEngines.includes(partialSettings.searchEngine)) {
+      nextSettings.searchEngine = partialSettings.searchEngine;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(partialSettings, "searchSourcesCollapsed")) {
+    nextSettings.searchSourcesCollapsed = partialSettings.searchSourcesCollapsed === true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(partialSettings, "searchProviderConfigs")) {
+    nextSettings.searchProviderConfigs = partialSettings.searchProviderConfigs;
   }
 
   await writeJson(filePath, nextSettings);

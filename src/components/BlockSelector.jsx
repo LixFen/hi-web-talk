@@ -23,7 +23,7 @@ export default function BlockSelector({
   const touchHandled = useRef(false);
 
   const displayBlocks = useMemo(() => {
-    const filtered = blocks.filter((b) => b.role !== "user");
+    const filtered = blocks.filter((b) => b.role !== "user" && b.blockType !== "system");
 
     if (!activeBlockSHA1) {
       return filtered.sort((a, b) => (a.graphInfo?.depth ?? 0) - (b.graphInfo?.depth ?? 0));

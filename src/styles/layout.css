@@ -602,6 +602,22 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.topbar-prompt-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent-color, var(--primary, #5b9bd5));
+  background: color-mix(in srgb, var(--accent-color, var(--primary, #5b9bd5)) 12%, transparent);
+  padding: 0.06rem 0.45rem;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.6;
 }
 
 /* -----------------------------------------------------------------

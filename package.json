@@ -1,7 +1,7 @@
 {
   "name": "hi-web-talk",
   "private": true,
-  "version": "1.18.1",
+  "version": "1.18.3",
   "type": "module",
   "main": "electron/main.js",
   "engines": {
@@ -29,6 +29,7 @@
     "@google/genai": "^1.51.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.9.0",
+    "cheerio": "^1.2.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

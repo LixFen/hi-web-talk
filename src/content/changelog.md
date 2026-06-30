@@ -1,3 +1,29 @@
+# 1.18.3
+
+- Feat: Free Bing HTML search as default engine — no API key needed out of the box.
+- Feat: Rich search source cards — favicon, title, snippet, domain displayed in card layout.
+- Feat: Streaming search status — shows engine name, result count during search.
+- Feat: Runtime search engine switching — dropdown in ChatComposer footer, persist per user.
+- Feat: Search source images — thumbnails displayed in source cards when available.
+- Feat: Citation annotations — sources get citationId, LLM prompted to cite with [citation:ID], rendered as clickable links.
+- Feat: Collapsible search sources — default collapsed, smooth expand/collapse animation.
+- Feat: Tool call logging in reasoning panel — search queries shown in thinking rounds.
+- Feat: Search engine API config UI — configure API keys for Brave, Bing, Google, SearXNG in Interaction Settings.
+- Feat: searchSourcesCollapsed user setting — control default collapse behavior of source cards.
+- Fix: normalizeMessages strips tool_call_id — OpenAI adapter now preserves tool_call_id and tool_calls in message mapping.
+- Fix: areRowPropsEqual missing visibleToolbarDefinitions — adaptation buttons now appear after async bootstrap.
+- Fix: currentViewMode priority inverted — local viewMode takes precedence over server state, fixing composer hiding on rapid view switch.
+- Fix: BlockCard ReasoningPanel doesn't handle array reasoning — single/multi-round reasoning now supported.
+- Fix: parseModelPayload missing supportsToolUse — model tool use capability now persists on create/update.
+- Fix: createModel alias collision — auto-disambiguates by appending -N suffix when user didn't provide explicit alias.
+- Refactor: searchProviders.js uses builder pattern — accepts user config overrides merged with env vars.
+- Refactor: Bing HTML search uses cheerio — CSS selector parsing instead of fragile regex.
+- Chore: add cheerio dependency.
+
+# 1.18.2
+
+- Feat: block-selector nolonger display root block.
+
 # 1.18.1
 
 - Feat: touch pattern has batter performence now. 

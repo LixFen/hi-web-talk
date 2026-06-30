@@ -220,7 +220,7 @@ export function setFocusedBlock(sessionHash, focusedBlockSHA1) {
   });
 }
 
-export function sendReply({ sessionHash, prompt, modelAlias, searchMode }) {
+export function sendReply({ sessionHash, prompt, modelAlias, searchMode, searchEngine }) {
   return requestJson("/api/blocks/reply", {
     method: "POST",
     body: JSON.stringify({
@@ -228,11 +228,12 @@ export function sendReply({ sessionHash, prompt, modelAlias, searchMode }) {
       prompt,
       modelAlias,
       searchMode,
+      searchEngine,
     }),
   });
 }
 
-export async function sendReplyStream({ sessionHash, prompt, modelAlias, searchMode, signal, onEvent }) {
+export async function sendReplyStream({ sessionHash, prompt, modelAlias, searchMode, searchEngine, signal, onEvent }) {
   const token = getToken();
   const response = await fetch("/api/blocks/reply/stream", {
     method: "POST",
@@ -246,6 +247,7 @@ export async function sendReplyStream({ sessionHash, prompt, modelAlias, searchM
       prompt,
       modelAlias,
       searchMode,
+      searchEngine,
     }),
     signal,
   });
@@ -333,13 +335,14 @@ export async function sendReplyStream({ sessionHash, prompt, modelAlias, searchM
   }
 }
 
-export function regenerateBlock({ sessionHash, blockSHA1, modelAlias, searchMode }) {
+export function regenerateBlock({ sessionHash, blockSHA1, modelAlias, searchMode, searchEngine }) {
   return requestJson(`/api/blocks/${blockSHA1}/regenerate`, {
     method: "POST",
     body: JSON.stringify({
       sessionHash,
       modelAlias,
       searchMode,
+      searchEngine,
     }),
   });
 }

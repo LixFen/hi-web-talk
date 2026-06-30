@@ -97,6 +97,9 @@ class OpenAIChatCompletionsAdapter extends BaseLLMAdapter {
           ? "developer"
           : message.role,
       content: convertMultimodalContentForOpenAI(message.content),
+      // ponytail: preserve tool call fields stripped by the map above
+      ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
+      ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
     }));
   }
 

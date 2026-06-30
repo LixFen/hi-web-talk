@@ -7,6 +7,18 @@
 import { registerTool } from "./toolRegistry.js";
 import { webSearch } from "../webSearchService.js";
 
+// ponytail: module-level config, set per-request. Node single-threaded, no race.
+let preferredEngine = null;
+let preferredProviderConfigs = {};
+
+export function setPreferredEngine(engine) {
+  preferredEngine = engine;
+}
+
+export function setPreferredProviderConfigs(configs) {
+  preferredProviderConfigs = configs || {};
+}
+
 const webSearchDefinition = {
   type: "function",
   function: {
@@ -41,10 +53,13 @@ async function execute({ query }) {
     const result = await webSearch(query.trim(), {
       maxResults: 5,
       fetchContent: true,
+      engine: preferredEngine || undefined,
+      providerConfigs: preferredProviderConfigs,
     });
 
     return {
       query: result.query,
+      engine: result.engine,
       sources: result.sources.map((s) => ({
         title: s.title,
         url: s.url,
@@ -55,6 +70,7 @@ async function execute({ query }) {
   } catch (err) {
     return {
       query: query,
+      engine: preferredEngine,
       error: err.message,
       sources: [],
     };

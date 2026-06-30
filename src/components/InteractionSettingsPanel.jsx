@@ -113,6 +113,15 @@ export default function InteractionSettingsPanel({
               <span className="settings-model-name">{t("interaction.modelConfig")}</span>
               <span className="settings-model-meta">{t("interaction.summaryModelDesc")}</span>
             </button>
+            <button
+              type="button"
+              role="listitem"
+              className={`settings-model-item ${activeLeaf === "search" ? "active" : ""}`.trim()}
+              onClick={() => setActiveLeaf("search")}
+            >
+              <span className="settings-model-name">{t("interaction.searchConfig")}</span>
+              <span className="settings-model-meta">{t("interaction.searchEngine")}</span>
+            </button>
             {isAdmin && (
               <button
                 type="button"
@@ -132,7 +141,7 @@ export default function InteractionSettingsPanel({
             <div>
               <div className="settings-eyebrow">{t("settings.stageInteraction")}</div>
               <h3 className="settings-panel-title">
-                {activeLeaf === "interaction-model" ? t("interaction.modelConfig") : activeLeaf === "admin" ? t("interaction.admin") : `${t("interaction.view")} / ${t("interaction.buttonVisibility")}`}
+                {activeLeaf === "interaction-model" ? t("interaction.modelConfig") : activeLeaf === "admin" ? t("interaction.admin") : activeLeaf === "search" ? t("interaction.searchConfig") : `${t("interaction.view")} / ${t("interaction.buttonVisibility")}`}
               </h3>
             </div>
           </div>
@@ -251,6 +260,15 @@ export default function InteractionSettingsPanel({
             </>
           ) : null}
 
+          {activeLeaf === "search" ? (
+            <SearchConfigPanel
+              settings={settings}
+              isSaving={isSaving}
+              onUpdate={onUpdateInteractionSettings}
+              t={t}
+            />
+          ) : null}
+
           {activeLeaf === "admin" ? (
             <>
               <section className="settings-appearance-card" aria-label={t("interaction.inviteCodeRequired")}>
@@ -313,5 +331,159 @@ export default function InteractionSettingsPanel({
         </div>
       </div>
     </div>
+  );
+}
+
+function SearchConfigPanel({ settings, isSaving, onUpdate, t }) {
+  const providerConfigs = settings.searchProviderConfigs || {};
+  const [draft, setDraft] = React.useState(providerConfigs);
+  const hasChanges = JSON.stringify(draft) !== JSON.stringify(providerConfigs);
+
+  const save = () => {
+    if (hasChanges) onUpdate?.({ searchProviderConfigs: draft });
+  };
+
+  const setVal = (engine, key, val) => {
+    setDraft((prev) => ({
+      ...prev,
+      [engine]: { ...(prev[engine] || {}), [key]: val },
+    }));
+  };
+
+  return (
+    <>
+      <section className="settings-appearance-card" aria-label={t("interaction.searchConfig")}>
+        <div>
+          <h4 className="settings-appearance-card-title">{t("interaction.searchEngine")}</h4>
+          <p className="settings-appearance-card-desc">{t("interaction.searchEngineDesc")}</p>
+        </div>
+        <select
+          className="composer-model-selector"
+          value={settings.searchEngine || "bing_html"}
+          onChange={(e) => onUpdate?.({ searchEngine: e.target.value })}
+          disabled={isSaving}
+          aria-label={t("interaction.searchEngine")}
+        >
+          <option value="bing_html">{t("interaction.engine_bing_html")}</option>
+          <option value="brave">{t("interaction.engine_brave")}</option>
+          <option value="bing">{t("interaction.engine_bing")}</option>
+          <option value="google">{t("interaction.engine_google")}</option>
+          <option value="searxng">{t("interaction.engine_searxng")}</option>
+        </select>
+      </section>
+
+      <section className="settings-appearance-card" aria-label={t("interaction.searchSourcesCollapsed")}>
+        <div>
+          <h4 className="settings-appearance-card-title">{t("interaction.searchSourcesCollapsed")}</h4>
+          <p className="settings-appearance-card-desc">{t("interaction.searchSourcesCollapsedDesc")}</p>
+        </div>
+        <label className="settings-switch" htmlFor="search-sources-collapsed-toggle">
+          <input
+            id="search-sources-collapsed-toggle"
+            type="checkbox"
+            className="settings-switch-input"
+            checked={settings.searchSourcesCollapsed !== false}
+            disabled={isSaving}
+            onChange={(event) => onUpdate?.({ searchSourcesCollapsed: event.target.checked })}
+          />
+          <span className="settings-switch-track" aria-hidden="true">
+            <span className="settings-switch-thumb" />
+          </span>
+          <span className="settings-switch-label">
+            {settings.searchSourcesCollapsed !== false ? t("interaction.enabled") : t("interaction.disabled")}
+          </span>
+        </label>
+      </section>
+
+      <section className="settings-appearance-card">
+        <div>
+          <h4 className="settings-appearance-card-title">{t("interaction.engineConfig")}</h4>
+          <p className="settings-appearance-card-desc">{t("interaction.engineConfigDesc")}</p>
+        </div>
+      </section>
+
+      {/* Brave */}
+      <section className="settings-appearance-card">
+        <div>
+          <h4 className="settings-appearance-card-title">{t("interaction.engine_brave")}</h4>
+          <p className="settings-appearance-card-desc">{t("interaction.braveApiKeyDesc")}</p>
+        </div>
+        <input
+          type="password"
+          className="composer-model-selector"
+          style={{ maxWidth: 320 }}
+          placeholder={t("interaction.braveApiKey")}
+          value={draft.brave?.apiKey || ""}
+          disabled={isSaving}
+          onChange={(e) => setVal("brave", "apiKey", e.target.value)}
+          onBlur={save}
+        />
+      </section>
+
+      {/* Bing API */}
+      <section className="settings-appearance-card">
+        <div>
+          <h4 className="settings-appearance-card-title">{t("interaction.engine_bing")}</h4>
+          <p className="settings-appearance-card-desc">{t("interaction.bingApiKeyDesc")}</p>
+        </div>
+        <input
+          type="password"
+          className="composer-model-selector"
+          style={{ maxWidth: 320 }}
+          placeholder={t("interaction.bingApiKey")}
+          value={draft.bing?.apiKey || ""}
+          disabled={isSaving}
+          onChange={(e) => setVal("bing", "apiKey", e.target.value)}
+          onBlur={save}
+        />
+      </section>
+
+      {/* Google */}
+      <section className="settings-appearance-card">
+        <div>
+          <h4 className="settings-appearance-card-title">{t("interaction.engine_google")}</h4>
+          <p className="settings-appearance-card-desc">{t("interaction.googleApiKeyDesc")}</p>
+        </div>
+        <input
+          type="password"
+          className="composer-model-selector"
+          style={{ maxWidth: 320 }}
+          placeholder={t("interaction.googleApiKey")}
+          value={draft.google?.apiKey || ""}
+          disabled={isSaving}
+          onChange={(e) => setVal("google", "apiKey", e.target.value)}
+          onBlur={save}
+        />
+        <div style={{ height: 8 }} />
+        <input
+          type="text"
+          className="composer-model-selector"
+          style={{ maxWidth: 320 }}
+          placeholder={t("interaction.googleCseId")}
+          value={draft.google?.cseId || ""}
+          disabled={isSaving}
+          onChange={(e) => setVal("google", "cseId", e.target.value)}
+          onBlur={save}
+        />
+      </section>
+
+      {/* SearXNG */}
+      <section className="settings-appearance-card">
+        <div>
+          <h4 className="settings-appearance-card-title">{t("interaction.engine_searxng")}</h4>
+          <p className="settings-appearance-card-desc">{t("interaction.searxngUrlDesc")}</p>
+        </div>
+        <input
+          type="text"
+          className="composer-model-selector"
+          style={{ maxWidth: 320 }}
+          placeholder={t("interaction.searxngUrl")}
+          value={draft.searxng?.baseUrl || ""}
+          disabled={isSaving}
+          onChange={(e) => setVal("searxng", "baseUrl", e.target.value)}
+          onBlur={save}
+        />
+      </section>
+    </>
   );
 }

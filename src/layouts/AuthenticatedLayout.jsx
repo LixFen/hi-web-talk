@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useApp } from "../contexts/AppContext";
 import { useSession } from "../contexts/SessionContext";
 import { useLocale } from "../contexts/LocaleContext";
+import { extractPromptText } from "../lib/content";
 import Sidebar from "../components/Sidebar";
 import ViewModeSwitcher from "../components/ViewModeSwitcher";
 import ChatComposer from "../components/ChatComposer";
@@ -68,7 +69,10 @@ export default function AuthenticatedLayout() {
     createPromptCombo,
     updatePromptCombo,
     deletePromptCombo,
+    promptItems,
+    promptCombos,
     error: appError,
+    updateAppSettings,
     toast,
   } = useApp();
   const {
@@ -89,7 +93,16 @@ export default function AuthenticatedLayout() {
     stopStreaming,
     uploadAttachment,
     abortControllerRef,
+    selectedSystemPrompt,
   } = useSession();
+  const handleSearchEngineChange = useCallback(async (engine) => {
+    try {
+      await updateAppSettings({ searchEngine: engine });
+    } catch {
+      // fallback silently
+    }
+  }, [updateAppSettings]);
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() =>
     getStoredSidebarCollapsed(),
   );
@@ -110,6 +123,20 @@ export default function AuthenticatedLayout() {
   const layoutMode = resolveLayoutMode(viewportWidth);
   const showSidebarMenuButton = layoutMode === "mobile";
   const isAdmin = isAdminUser;
+
+  // system prompt label from session's system block, not global UI state
+  const systemPromptLabel = useMemo(() => {
+    const sysBlock = (graph.blocks ?? []).find((b) => b.blockType === "system");
+    if (!sysBlock) return null;
+    const text = extractPromptText(sysBlock.prompt);
+    const item = promptItems.find((i) => i.content === text);
+    if (item) return item.name;
+    const combo = promptCombos.find((c) =>
+      c.items && c.items.map((ci) => ci.content).join("\n\n") === text,
+    );
+    if (combo) return combo.name;
+    return null;
+  }, [graph.blocks, promptItems, promptCombos]);
 
   useEffect(() => {
     function handleResize() {
@@ -324,6 +351,7 @@ export default function AuthenticatedLayout() {
                     roundCount: Math.max(activeChainBlocks.length - 1, 0),
                   })
                 : t("app.multiViewWorkbench")}
+              {systemPromptLabel && <span className="topbar-prompt-badge">{systemPromptLabel}</span>}
             </div>
           </div>
           <div className="topbar-actions">
@@ -396,6 +424,8 @@ export default function AuthenticatedLayout() {
             selectedModelId={selectedModelId}
             searchMode={searchMode}
             onSearchModeChange={setSearchMode}
+            searchEngine={appSettings.searchEngine || "bing_html"}
+            onSearchEngineChange={handleSearchEngineChange}
             isCollapsed={isComposerCollapsed}
             onToggleCollapsed={() =>
               setIsComposerCollapsed((current) => !current)

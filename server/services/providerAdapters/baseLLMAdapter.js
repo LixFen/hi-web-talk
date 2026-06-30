@@ -161,6 +161,16 @@ export class BaseLLMAdapter {
 
         onToolEvent?.({ type: "tool_start", toolName, arguments: toolArgs });
 
+        // 将工具调用过程写入 reasoning
+        if (toolName === "web_search") {
+          const query = toolArgs?.query || "";
+          const reasoningContent = `> 🔍 **联网搜索** — ${query}`;
+          reasoningParts.push({
+            round: reasoningParts.length + 1,
+            content: reasoningContent,
+          });
+        }
+
         let toolResult;
         if (executor) {
           try {
@@ -174,10 +184,11 @@ export class BaseLLMAdapter {
 
         // 收集搜索信息
         if (toolName === "web_search" && toolResult.sources) {
-          searchInfo.used = true;
           if (toolResult.query) searchInfo.queries.push(toolResult.query);
+          const startIdx = searchInfo.sources.length;
           searchInfo.sources.push(
-            ...toolResult.sources.map((s) => ({
+            ...toolResult.sources.map((s, i) => ({
+              citationId: startIdx + i + 1,
               title: s.title,
               url: s.url,
               snippet: s.snippet,
@@ -188,6 +199,7 @@ export class BaseLLMAdapter {
         onToolEvent?.({
           type: "tool_result",
           toolName,
+          engine: toolResult.engine,
           result: toolResult,
           sources: toolResult.sources,
         });
@@ -268,6 +280,19 @@ export class BaseLLMAdapter {
         onToolEvent?.({ type: "tool_start", toolName, arguments: toolArgs });
         onChunk?.({ type: "tool_start", toolName, arguments: toolArgs });
 
+        // 将工具调用过程写入 reasoning（流式）
+        if (toolName === "web_search") {
+          const query = toolArgs?.query || "";
+          const roundNum = reasoningParts.length + 1;
+          const reasoningContent = `> 🔍 **联网搜索** — ${query}`;
+          reasoningParts.push({ round: roundNum, content: reasoningContent });
+          onChunk?.({
+            type: "reasoning_round",
+            round: roundNum,
+            reasoningDelta: reasoningContent,
+          });
+        }
+
         let toolResult;
         if (executor) {
           try {
@@ -283,8 +308,10 @@ export class BaseLLMAdapter {
         if (toolName === "web_search" && toolResult.sources) {
           searchInfo.used = true;
           if (toolResult.query) searchInfo.queries.push(toolResult.query);
+          const startIdx = searchInfo.sources.length;
           searchInfo.sources.push(
-            ...toolResult.sources.map((s) => ({
+            ...toolResult.sources.map((s, i) => ({
+              citationId: startIdx + i + 1,
               title: s.title,
               url: s.url,
               snippet: s.snippet,
@@ -301,6 +328,7 @@ export class BaseLLMAdapter {
         onChunk?.({
           type: "tool_result",
           toolName,
+          engine: toolResult.engine,
           sources: toolResult.sources?.map((s) => ({
             title: s.title,
             url: s.url,

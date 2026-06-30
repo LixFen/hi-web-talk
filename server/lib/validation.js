@@ -26,6 +26,9 @@ export const appSettingsSchema = z.object({
   darkMode: z.enum(["dark", "system"]).optional(),
   inviteCodeRequired: z.boolean().optional(),
   inviteCode: z.string().optional(),
+  searchEngine: z.string().optional(),
+  searchSourcesCollapsed: z.boolean().optional(),
+  searchProviderConfigs: z.record(z.any()).optional(),
 });
 
 // ── Provider schemas ──
@@ -114,6 +117,7 @@ export const blockReplySchema = z.object({
   prompt: promptUnion,
   modelAlias: z.string().optional(),
   searchMode: z.enum(["auto", "on", "off"]).optional(),
+  searchEngine: z.string().optional(),
 });
 
 export const blockReplyStreamSchema = blockReplySchema;
@@ -126,6 +130,7 @@ export const blockRegenerateSchema = z.object({
   sessionHash: z.string().min(1, "sessionHash 不能为空。"),
   modelAlias: z.string().optional(),
   searchMode: z.enum(["auto", "on", "off"]).optional(),
+  searchEngine: z.string().optional(),
 });
 
 export const sessionUpdateSchema = z.object({

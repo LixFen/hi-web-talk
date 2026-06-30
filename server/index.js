@@ -73,6 +73,7 @@ import {
 import { callProviderModel, streamProviderModel, invalidateModelAdapterCache } from "./services/llmProviderService.js";
 import { getToolDefinitions } from "./services/tools/toolRegistry.js";
 import "./services/tools/webSearchTool.js"; // 注册 web_search 工具
+import { setPreferredEngine, setPreferredProviderConfigs } from "./services/tools/webSearchTool.js";
 import { streamSessionManager } from "./services/streamSessionManager.js";
 import { saveAttachment, readAttachment, updateAttachmentBlockSHA1 } from "./services/attachmentService.js";
 import { resolveAttachmentMessages } from "./services/providerAdapters/attachmentResolver.js";
@@ -264,6 +265,7 @@ function parseModelPayload(body = {}) {
     supportsStreaming: body.supportsStreaming,
     supportsSystemRole: body.supportsSystemRole,
     supportsMultimodal: body.supportsMultimodal,
+    supportsToolUse: body.supportsToolUse,
     supportsThinking: body.supportsThinking,
     thinkingDisable: body.thinkingDisable,
     systemPromptRole: body.systemPromptRole,
@@ -1084,7 +1086,9 @@ app.post("/api/blocks/:blockSHA1/branch", authenticateToken, validateParams(path
 });
 
 app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema), async (request, response) => {
-  const { sessionHash, prompt, modelAlias, searchMode } = request.body;
+  const { sessionHash, prompt, modelAlias, searchMode, searchEngine } = request.body;
+  setPreferredEngine(searchEngine || null);
+  getAppSettings(request.user.id).then((s) => setPreferredProviderConfigs(s.searchProviderConfigs)).catch(() => {});
 
   const session = readSessionRecord(sessionHash);
 
@@ -1213,7 +1217,9 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
 });
 
 app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyStreamSchema), async (request, response) => {
-  const { sessionHash, prompt, modelAlias, searchMode } = request.body;
+  const { sessionHash, prompt, modelAlias, searchMode, searchEngine } = request.body;
+  setPreferredEngine(searchEngine || null);
+  getAppSettings(request.user.id).then((s) => setPreferredProviderConfigs(s.searchProviderConfigs)).catch(() => {});
 
   const session = readSessionRecord(sessionHash);
 
@@ -1352,6 +1358,7 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
           streamSession.pushEvent({
             type: "tool_result",
             toolName: event.toolName,
+            engine: event.engine,
             sources: event.sources,
           });
           logStream("tool-result", { toolName: event.toolName });
@@ -1531,7 +1538,9 @@ app.get("/api/sessions/:sessionHash/stream", authenticateToken, validateParams(p
 });
 
 app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(pathBlockSHA1Schema), validateBody(blockRegenerateSchema), async (request, response) => {
-  const { sessionHash, modelAlias, searchMode } = request.body;
+  const { sessionHash, modelAlias, searchMode, searchEngine } = request.body;
+  setPreferredEngine(searchEngine || null);
+  getAppSettings(request.user.id).then((s) => setPreferredProviderConfigs(s.searchProviderConfigs)).catch(() => {});
 
   const session = readSessionRecord(sessionHash);
 

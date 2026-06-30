@@ -9,6 +9,7 @@
   useState,
 } from "react";
 import SafeMarkdown from "./SafeMarkdown";
+import SearchSources, { renderCitations } from "./SearchSources";
 import { getAttachmentUrl } from "../lib/chatApi";
 import ContextMenu from "./ContextMenu";
 import { useApp } from "../contexts/AppContext";
@@ -476,7 +477,8 @@ function areRowPropsEqual(prevProps, nextProps) {
     prevProps.msg.text === nextProps.msg.text &&
     prevProps.msg.reasoning === nextProps.msg.reasoning &&
     prevProps.isFocused === nextProps.isFocused &&
-    prevProps.isLoading === nextProps.isLoading
+    prevProps.isLoading === nextProps.isLoading &&
+    prevProps.visibleToolbarDefinitions?.length === nextProps.visibleToolbarDefinitions?.length
   );
 }
 
@@ -513,27 +515,6 @@ function normalizeReasoning(reasoning) {
   return [];
 }
 
-function SearchSources({ sources }) {
-  if (!sources || sources.length === 0) return null;
-
-  return (
-    <div className="search-sources">
-      <span className="search-sources-label">🔍 搜索来源:</span>
-      {sources.map((s, i) => (
-        <a
-          key={i}
-          href={s.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="search-source-link"
-          title={s.snippet || s.title}
-        >
-          {s.title}
-        </a>
-      ))}
-    </div>
-  );
-}
 
 function ReasoningPanel({ reasoning, defaultOpen = false, isStreaming = false }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -639,6 +620,7 @@ const MemoMessageRow = React.memo(({
   onContextMenu,
 }) => {
   const { t } = useLocale();
+  const { appSettings } = useApp();
   const branchInfo = msg.branchInfo;
   const adaptationInfo = msg.adaptationInfo;
   const summaryInfo = msg.summaryInfo;
@@ -702,10 +684,10 @@ const MemoMessageRow = React.memo(({
               <ReasoningPanel reasoning={msg.reasoning} defaultOpen={isStreaming} isStreaming={isStreaming} />
 
               <SafeMarkdown>
-                {msg.text}
+                {renderCitations(msg.text, msg.meta?.search?.sources)}
               </SafeMarkdown>
 
-              <SearchSources sources={msg.meta?.search?.sources} />
+              <SearchSources sources={msg.meta?.search?.sources} defaultCollapsed={appSettings.searchSourcesCollapsed !== false} />
 
               {summaryInfo?.status === "completed" && summaryInfo.summary ? (
                 <div className="summary-panel">
@@ -1448,7 +1430,9 @@ const MessageList = forwardRef(({
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                正在搜索: {streamingToolState.query || "..."}
+                {streamingToolState.engine
+                  ? `正在通过 ${streamingToolState.engine} 搜索: ${streamingToolState.query || "..."}`
+                  : `正在搜索: ${streamingToolState.query || "..."}`}
               </span>
             ) : (
               <span className="tool-status searched">
@@ -1456,7 +1440,9 @@ const MessageList = forwardRef(({
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                已搜索 {streamingToolState.sources?.length || 0} 个来源
+                {streamingToolState.sources?.length > 0
+                  ? `已从 ${streamingToolState.sources.length} 个来源找到结果`
+                  : "搜索完成，无结果"}
               </span>
             )}
           </div>

@@ -98,7 +98,7 @@ async function loadAllSessions() {
 
 export function SessionProvider({ children }) {
   const { isAuthenticated } = useAuth();
-  const { selectedModel } = useApp();
+  const { selectedModel, appSettings } = useApp();
   const { t } = useLocale();
   const tRef = useRef(t);
   tRef.current = t;
@@ -291,7 +291,13 @@ export function SessionProvider({ children }) {
       setError("");
       try {
         await deleteSession(conversation.id);
-        const remainingSessions = await loadAllSessions();
+        let remainingSessions;
+        try {
+          remainingSessions = await loadAllSessions();
+        } catch {
+          // loadAllSessions 失败时乐观移除已删除的会话，避免 UI 不更新
+          remainingSessions = sessionSummaries.filter((s) => s.sessionHash !== conversation.id);
+        }
         setSessionSummaries(remainingSessions);
         let nextHash = null;
         if (activeSessionDetail?.session?.sessionHash === conversation.id) {
@@ -317,7 +323,7 @@ export function SessionProvider({ children }) {
         setIsLoading(false);
       }
     },
-    [isLoading, activeSessionDetail, applySessionDetail],
+    [isLoading, activeSessionDetail, applySessionDetail, sessionSummaries],
   );
 
   const handleRenameConversation = useCallback(
@@ -375,7 +381,7 @@ export function SessionProvider({ children }) {
   );
 
   const currentViewMode =
-    activeSessionDetail?.session?.viewState?.mode || viewMode;
+    viewMode || activeSessionDetail?.session?.viewState?.mode;
 
   const handleChangeViewMode = useCallback(
     (nextMode) => {
@@ -544,6 +550,7 @@ export function SessionProvider({ children }) {
     getSessionHash,
     selectedModel,
     searchMode,
+    searchEngine: appSettings.searchEngine || "bing_html",
     systemPrompt: selectedSystemPrompt,
     onApplyDetail: applySessionDetail,
     onSetLoading: setIsLoading,

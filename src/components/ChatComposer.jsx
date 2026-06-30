@@ -85,6 +85,8 @@ const ChatComposer = ({
   selectedModelId = "",
   searchMode = "auto",
   onSearchModeChange,
+  searchEngine = "bing_html",
+  onSearchEngineChange,
   isCollapsed = false,
   onToggleCollapsed,
   onChangeModel,
@@ -395,6 +397,31 @@ const ChatComposer = ({
       <div className="composer-container">
         {!hideToolbar ? (
           <div className="composer-toolbar">
+            <div className="composer-toolbar-left">
+              {(() => {
+                const currentModel = modelOptions.find((m) => m.alias === selectedModelId);
+                const supportsToolUse = currentModel?.supportsToolUse ?? false;
+                if (!supportsToolUse) return null;
+                const next = searchMode === "auto" ? "on" : searchMode === "on" ? "off" : "auto";
+                return (
+                  <button
+                    className="composer-mobile-search-btn"
+                    type="button"
+                    onClick={() => onSearchModeChange?.(next)}
+                    disabled={!supportsToolUse}
+                    title={searchMode}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <span className="composer-mobile-search-indicator">
+                      {searchMode === "auto" ? "自动" : searchMode === "on" ? "开启" : "关闭"}
+                    </span>
+                  </button>
+                );
+              })()}
+            </div>
             <button
               className="composer-collapse-button"
               type="button"
@@ -539,7 +566,7 @@ const ChatComposer = ({
             />
           </div>
           <div className="chat-footer-text">
-            {onSearchModeChange && (() => {
+            {(() => {
               const currentModel = modelOptions.find((m) => m.alias === selectedModelId);
               const supportsToolUse = currentModel?.supportsToolUse ?? false;
               const searchModeClass = searchMode === "auto" ? "auto" : searchMode === "on" ? "on" : "off";
@@ -552,27 +579,46 @@ const ChatComposer = ({
                 : "联网搜索: 关闭";
 
               return (
-                <button
-                  type="button"
-                  className={`composer-search-btn ${searchModeClass}`}
-                  onClick={() => {
-                    if (!supportsToolUse) return;
-                    const next = searchMode === "auto" ? "on" : searchMode === "on" ? "off" : "auto";
-                    onSearchModeChange(next);
-                  }}
-                  disabled={isLoading || !supportsToolUse}
-                  title={searchTitle}
-                >
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                  {supportsToolUse && (
-                    <span className="composer-search-indicator">
-                      {searchMode === "auto" ? "自动" : searchMode === "on" ? "开启" : "关闭"}
-                    </span>
+                <>
+                  {onSearchModeChange && (
+                    <button
+                      type="button"
+                      className={`composer-search-btn ${searchModeClass}`}
+                      onClick={() => {
+                        if (!supportsToolUse) return;
+                        const next = searchMode === "auto" ? "on" : searchMode === "on" ? "off" : "auto";
+                        onSearchModeChange(next);
+                      }}
+                      disabled={isLoading || !supportsToolUse}
+                      title={searchTitle}
+                    >
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                      {supportsToolUse && (
+                        <span className="composer-search-indicator">
+                          {searchMode === "auto" ? "自动" : searchMode === "on" ? "开启" : "关闭"}
+                        </span>
+                      )}
+                    </button>
                   )}
-                </button>
+                  {onSearchEngineChange && supportsToolUse && (
+                    <select
+                      className="composer-engine-selector"
+                      value={searchEngine}
+                      onChange={(e) => onSearchEngineChange(e.target.value)}
+                      disabled={isLoading}
+                      title={`搜索引擎: ${searchEngine}`}
+                    >
+                      <option value="bing_html">Bing (免费)</option>
+                      <option value="brave">Brave Search</option>
+                      <option value="bing">Bing API</option>
+                      <option value="google">Google</option>
+                      <option value="searxng">SearXNG</option>
+                    </select>
+                  )}
+                </>
               );
             })()}
             {t('app.aiWarning')}

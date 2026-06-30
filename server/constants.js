@@ -11,7 +11,7 @@ export const JWT_SECRET = process.env.JWT_SECRET || "hi-web-talk-jwt-secret-chan
 export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 
 export const DEFAULT_SYSTEM_PROMPT =
-  "You are Hi Web Talk, a helpful AI assistant inside a local web chat app. Answer clearly, warmly, and concisely in Chinese unless the user asks for another language.";
+  "You are Hi Web Talk, a helpful AI assistant inside a local web chat app. Answer clearly, warmly, and concisely in Chinese unless the user asks for another language. When you use web search results, cite sources using [citation:ID] format (e.g. \"根据最新报道[citation:1]，...\").";
 
 export const MODEL_PROVIDER_DEFINITIONS = [
   {
@@ -225,6 +225,9 @@ export const DEFAULT_APP_SETTINGS = {
   summaryModelAlias: "",
   inviteCodeRequired: false,
   inviteCode: "",
+  searchEngine: "bing_html",
+  searchSourcesCollapsed: true,
+  searchProviderConfigs: {},
 };
 
 export const DEFAULT_SESSION_TITLE = "\u65b0\u5bf9\u8bdd";

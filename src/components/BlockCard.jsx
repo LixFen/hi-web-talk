@@ -25,16 +25,65 @@ function ReasoningIcon({ isOpen }) {
   );
 }
 
+function normalizeReasoning(reasoning) {
+  if (Array.isArray(reasoning)) return reasoning.filter(r => r.content && r.content.trim());
+  if (typeof reasoning === "string" && reasoning.trim()) {
+    return [{ round: 1, content: reasoning.trim() }];
+  }
+  return [];
+}
+
 function ReasoningPanel({ reasoning, defaultOpen = false }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const { t } = useLocale();
+  const parts = normalizeReasoning(reasoning);
 
-  if (!reasoning || reasoning.trim().length === 0) {
+  if (parts.length === 0) {
     return null;
   }
 
+  // 单轮：保持原有展示
+  if (parts.length === 1) {
+    return (
+      <div className={`reasoning-panel ${isOpen ? 'open' : ''}`}>
+        <button
+          className="reasoning-panel-header"
+          type="button"
+          onClick={() => setIsOpen((prev) => !prev)}
+          aria-expanded={isOpen}
+        >
+          <span className="reasoning-panel-title">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="reasoning-panel-icon"
+            >
+              <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+            {t("block.reasoning")}
+          </span>
+          <ReasoningIcon isOpen={isOpen} />
+        </button>
+        <div className="reasoning-panel-content" aria-hidden={!isOpen}>
+          <SafeMarkdown className="reasoning-markdown">
+            {parts[0].content}
+          </SafeMarkdown>
+        </div>
+      </div>
+    );
+  }
+
+  // 多轮：每轮独立渲染
   return (
-    <div className={`reasoning-panel ${isOpen ? 'open' : ''}`}>
+    <div className={`reasoning-panel multi-round ${isOpen ? 'open' : ''}`}>
       <button
         className="reasoning-panel-header"
         type="button"
@@ -58,13 +107,19 @@ function ReasoningPanel({ reasoning, defaultOpen = false }) {
             <path d="M12 8h.01" />
           </svg>
           {t("block.reasoning")}
+          <span className="reasoning-round-count">{parts.length} 轮</span>
         </span>
         <ReasoningIcon isOpen={isOpen} />
       </button>
       <div className="reasoning-panel-content" aria-hidden={!isOpen}>
-        <SafeMarkdown className="reasoning-markdown">
-          {reasoning}
-        </SafeMarkdown>
+        {parts.map((part, i) => (
+          <div key={i} className="reasoning-round">
+            <div className="reasoning-round-header">第 {part.round} 轮思考</div>
+            <SafeMarkdown className="reasoning-markdown">
+              {part.content}
+            </SafeMarkdown>
+          </div>
+        ))}
       </div>
     </div>
   );

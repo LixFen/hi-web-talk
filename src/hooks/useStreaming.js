@@ -12,6 +12,7 @@ export default function useStreaming({
   getSessionHash,
   selectedModel,
   searchMode,
+  searchEngine,
   systemPrompt,
   onApplyDetail,
   onSetLoading,
@@ -61,7 +62,7 @@ export default function useStreaming({
               return;
             }
             if (event?.type === "tool_result") {
-              setStreamingToolState({ type: "searched", toolName: event.toolName, sources: event.sources });
+              setStreamingToolState({ type: "searched", toolName: event.toolName, engine: event.engine, sources: event.sources });
               return;
             }
             // 处理 reasoning round 事件
@@ -177,6 +178,7 @@ export default function useStreaming({
             prompt,
             modelAlias: model.alias,
             searchMode,
+            searchEngine,
           });
           onApplyDetail(detail, {
             revealLatestInChat: true,
@@ -196,6 +198,7 @@ export default function useStreaming({
           prompt,
           modelAlias: model.alias,
           searchMode,
+          searchEngine,
           signal: abortController.signal,
           onEvent: async (event) => {
             // 处理工具事件
@@ -204,7 +207,7 @@ export default function useStreaming({
               return;
             }
             if (event?.type === "tool_result") {
-              setStreamingToolState({ type: "searched", toolName: event.toolName, sources: event.sources });
+              setStreamingToolState({ type: "searched", toolName: event.toolName, engine: event.engine, sources: event.sources });
               return;
             }
             // 处理 reasoning round 事件
