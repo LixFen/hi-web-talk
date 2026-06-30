@@ -286,15 +286,22 @@ export default function BlockCard({
               {t("block.attachments", { count: attachments.length })}
             </summary>
             <div className="block-card-attachments">
-              {attachments.map((att) => (
-                <img
-                  key={att.attachmentId}
-                  className="block-card-attachment-thumb"
-                  src={getAttachmentUrl(att.attachmentId)}
-                  alt={att.fileName || t("common.image")}
-                  loading="lazy"
-                />
-              ))}
+              {attachments.map((att) =>
+                att.type === "document_attachment" ? (
+                  <div key={att.attachmentId} className="block-card-doc-thumb" title={att.fileName}>
+                    <span className="block-card-doc-icon">📄</span>
+                    <span className="block-card-doc-name">{att.fileName}</span>
+                  </div>
+                ) : (
+                  <img
+                    key={att.attachmentId}
+                    className="block-card-attachment-thumb"
+                    src={getAttachmentUrl(att.attachmentId)}
+                    alt={att.fileName || t("common.image")}
+                    loading="lazy"
+                  />
+                )
+              )}
             </div>
           </details>
         ) : null}

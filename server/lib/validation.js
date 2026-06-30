@@ -101,7 +101,7 @@ export const attachmentUploadSchema = z.object({
 });
 
 const promptContentBlock = z.object({
-  type: z.enum(["text", "image_url", "image_attachment"]),
+  type: z.enum(["text", "image_url", "image_attachment", "document_attachment"]),
   text: z.string().optional(),
   image_url: z.object({ url: z.string() }).optional(),
   attachmentId: z.string().optional(),

@@ -541,3 +541,25 @@
   object-fit: contain;
   border: 1px solid var(--border-light);
 }
+
+.message-doc-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-light);
+  width: fit-content;
+}
+
+.message-doc-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.message-doc-name {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  word-break: break-all;
+}

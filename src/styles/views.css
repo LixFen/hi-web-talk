@@ -334,6 +334,37 @@
   background: var(--bg-input);
 }
 
+.block-card-doc-thumb {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 120px;
+  gap: 0.3rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-light);
+  background: var(--bg-input);
+  padding: 0.5rem;
+  overflow: hidden;
+}
+
+.block-card-doc-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.block-card-doc-name {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-align: center;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .block-card-meta {
   margin-top: 0.85rem;
   border: 1px solid var(--border-light);

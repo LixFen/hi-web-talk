@@ -11,3 +11,4 @@ logs
 .kilo/
 docs
 server/services/modelCapabilities.generated.js
+.claude

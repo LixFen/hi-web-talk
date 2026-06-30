@@ -1,6 +1,11 @@
 # 1.18.4
 
 - Feat: Add Badges display using models.
+- Feat: Add document processing (PDF/DOCX/TXT) with runtime text injection
+- Feat: Model badge in message-badges area
+- Fix: extractAttachmentIds now handles document_attachment blocks
+- Refactor: attachmentResolver supports document_attachment via documentParser
+- Style: Document attachment display in composer, messages, and block card
 
 # 1.18.3
 

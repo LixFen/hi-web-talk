@@ -856,10 +856,10 @@ const MemoMessageRow = React.memo(({
           {Array.isArray(msg.text) ? (
             <div className="message-content-blocks">
               {[...msg.text].sort((a, b) => {
-                const aIsImage = a.type === "image_attachment" || a.type === "image_url";
-                const bIsImage = b.type === "image_attachment" || b.type === "image_url";
-                if (aIsImage && !bIsImage) return -1;
-                if (!aIsImage && bIsImage) return 1;
+                const aIsMedia = a.type === "image_attachment" || a.type === "image_url" || a.type === "document_attachment";
+                const bIsMedia = b.type === "image_attachment" || b.type === "image_url" || b.type === "document_attachment";
+                if (aIsMedia && !bIsMedia) return -1;
+                if (!aIsMedia && bIsMedia) return 1;
                 return 0;
               }).map((block, index) => {
                 if (block.type === "text") {
@@ -885,6 +885,14 @@ const MemoMessageRow = React.memo(({
                       className="message-image-block"
                       loading="lazy"
                     />
+                  );
+                }
+                if (block.type === "document_attachment") {
+                  return (
+                    <div key={index} className="message-doc-block">
+                      <span className="message-doc-icon">📄</span>
+                      <span className="message-doc-name">{block.fileName || t("common.document")}</span>
+                    </div>
                   );
                 }
                 return null;

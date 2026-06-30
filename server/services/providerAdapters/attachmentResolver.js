@@ -1,4 +1,5 @@
 import { readAttachment } from "../attachmentService.js";
+import { resolveDocumentBlock } from "../documentParser.js";
 
 export async function resolveAttachmentBlocks(content) {
   if (typeof content === "string" || !Array.isArray(content)) {
@@ -30,6 +31,12 @@ export async function resolveAttachmentBlocks(content) {
         });
       }
 
+      continue;
+    }
+
+    if (block.type === "document_attachment") {
+      const textBlock = await resolveDocumentBlock(block);
+      resolved.push(textBlock);
       continue;
     }
 

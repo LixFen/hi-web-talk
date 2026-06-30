@@ -23,6 +23,6 @@ export function extractPromptAttachments(prompt) {
   }
 
   return prompt.filter(
-    (block) => block.type === "image_attachment" && block.attachmentId,
+    (block) => (block.type === "image_attachment" || block.type === "document_attachment") && block.attachmentId,
   );
 }

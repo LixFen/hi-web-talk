@@ -241,7 +241,7 @@ const ChatComposer = ({
 
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    input.accept = 'image/*,.pdf,.docx,.txt';
     input.multiple = true;
     input.style.cssText = 'position:absolute;opacity:0;width:0;height:0;pointer-events:none;';
 
@@ -266,11 +266,14 @@ const ChatComposer = ({
 
       for (const file of files) {
         if (attachmentsRef.current.length >= MAX_ATTACHMENTS) break;
-        if (!file.type.startsWith("image/")) continue;
+
+        const isImage = file.type.startsWith("image/");
+        if (!isImage && file.type && !["application/pdf","application/vnd.openxmlformats-officedocument.wordprocessingml.document","text/plain"].includes(file.type) && !file.name.match(/\.(pdf|docx|txt)$/i)) continue;
 
         const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
-        let compressedBlob;
+        if (isImage) {
+          let compressedBlob;
         let previewUrl;
         try {
           compressedBlob = await compressImage(file, maxLongSide);
@@ -291,6 +294,7 @@ const ChatComposer = ({
               mimeType: 'image/jpeg',
               url: previewUrl,
               isLocal: true,
+              isDocument: false,
             },
           ];
         });
@@ -322,6 +326,7 @@ const ChatComposer = ({
                       fileName: result.fileName,
                       mimeType: result.mimeType,
                       url: getAttachmentUrl(result.attachmentId),
+                      isDocument: false,
                     }
                   : a
               )
@@ -332,6 +337,63 @@ const ChatComposer = ({
         } catch (error) {
           uploadingRef.current = false;
           console.error('[ChatComposer] upload error:', error);
+        }
+        } else {
+          // Document: upload raw, no compression
+          const previewUrl = URL.createObjectURL(file);
+
+          setAttachments((prev) => {
+            if (prev.length >= MAX_ATTACHMENTS) return prev;
+            return [
+              ...prev,
+              {
+                attachmentId: localId,
+                fileName: file.name,
+                mimeType: file.type || 'application/octet-stream',
+                url: previewUrl,
+                isLocal: true,
+                isDocument: true,
+              },
+            ];
+          });
+
+          try {
+            const base64Data = await readFileAsBase64(file);
+            const fn = onUploadAttachmentRef.current;
+            if (!fn) {
+              console.error('[ChatComposer] onUploadAttachment is not set, keeping local preview');
+              return;
+            }
+
+            uploadingRef.current = true;
+            const result = await fn({
+              fileName: file.name,
+              mimeType: file.type || 'application/octet-stream',
+              base64Data,
+            });
+            uploadingRef.current = false;
+
+            if (result?.attachmentId) {
+              setAttachments((prev) =>
+                prev.map((a) =>
+                  a.attachmentId === localId
+                    ? {
+                        attachmentId: result.attachmentId,
+                        fileName: result.fileName,
+                        mimeType: result.mimeType,
+                        url: getAttachmentUrl(result.attachmentId),
+                        isDocument: true,
+                      }
+                    : a
+                )
+              );
+            } else {
+              console.error('[ChatComposer] upload returned no attachmentId, keeping local preview');
+            }
+          } catch (error) {
+            uploadingRef.current = false;
+            console.error('[ChatComposer] upload error:', error);
+          }
         }
       }
     });
@@ -369,7 +431,7 @@ const ChatComposer = ({
       }
       for (const attachment of readyAttachments) {
         content.push({
-          type: "image_attachment",
+          type: attachment.isDocument ? "document_attachment" : "image_attachment",
           attachmentId: attachment.attachmentId,
           fileName: attachment.fileName,
           mimeType: attachment.mimeType,
@@ -439,16 +501,23 @@ const ChatComposer = ({
           <div className="composer-attachments">
             {attachments.map((attachment) => (
               <div key={attachment.attachmentId} className="composer-attachment-item">
-                <img
-                  src={attachment.url}
-                  alt={attachment.fileName}
-                  className="composer-attachment-thumb"
-                />
+                {attachment.isDocument ? (
+                  <div className="composer-attachment-doc">
+                    <span className="composer-attachment-doc-icon">📄</span>
+                    <span className="composer-attachment-doc-name">{attachment.fileName}</span>
+                  </div>
+                ) : (
+                  <img
+                    src={attachment.url}
+                    alt={attachment.fileName}
+                    className="composer-attachment-thumb"
+                  />
+                )}
                 <button
                   type="button"
                   className="composer-attachment-remove"
                   onClick={() => removeAttachment(attachment.attachmentId)}
-                    title={t('app.removeImage')}
+                    title={attachment.isDocument ? t('app.removeAttachment') : t('app.removeImage')}
                 >
                   ×
                 </button>

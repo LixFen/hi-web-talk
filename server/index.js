@@ -316,7 +316,7 @@ function extractAttachmentIds(prompt) {
   }
 
   return prompt
-    .filter((block) => block && block.type === "image_attachment" && block.attachmentId)
+    .filter((block) => block && (block.type === "image_attachment" || block.type === "document_attachment") && block.attachmentId)
     .map((block) => block.attachmentId);
 }
 
@@ -589,8 +589,13 @@ app.post("/api/attachments", authenticateToken, validateBody(attachmentUploadSch
     }
 
     const buffer = Buffer.from(base64Data, "base64");
-    const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
-    const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    const MAX_ATTACHMENT_SIZE = 20 * 1024 * 1024;
+    const ALLOWED_MIME_TYPES = [
+      "image/jpeg", "image/png", "image/webp", "image/gif",
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+    ];
 
     if (buffer.length > MAX_ATTACHMENT_SIZE) {
       response.status(413).json({ error: "附件大小超过 5MB 限制。" });
@@ -598,7 +603,7 @@ app.post("/api/attachments", authenticateToken, validateBody(attachmentUploadSch
     }
 
     if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
-      response.status(415).json({ error: "不支持的文件类型，仅允许 jpeg、png、webp、gif。" });
+      response.status(415).json({ error: "不支持的文件类型，仅允许 jpeg、png、webp、gif、pdf、docx、txt。" });
       return;
     }
 
