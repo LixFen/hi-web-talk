@@ -1,3 +1,7 @@
+# 1.18.4
+
+- Feat: Add Badges display using models.
+
 # 1.18.3
 
 - Feat: Free Bing HTML search as default engine — no API key needed out of the box.

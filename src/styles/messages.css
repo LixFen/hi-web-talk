@@ -470,6 +470,7 @@
   backdrop-filter: blur(4px);
 }
 
+
 .branch-badge.active,
 .adaptation-badge.label {
   color: var(--text-primary);

@@ -696,7 +696,7 @@ const MemoMessageRow = React.memo(({
                 </div>
               ) : null}
 
-              {(branchInfo || adaptationInfo) ? (
+              {msg.modelAlias || branchInfo || adaptationInfo ? (
                 <div className="message-tools">
                   <div className="message-badges">
                     {branchInfo?.siblingCount > 1 ? (
@@ -728,6 +728,9 @@ const MemoMessageRow = React.memo(({
                       <span className={`adaptation-badge summary ${summaryInfo.status}`}>
                         {t("msg.summaryStatus", { status: summaryInfo.status })}
                       </span>
+                    ) : null}
+                    {msg.modelAlias ? (
+                      <span className="adaptation-badge">{msg.modelAlias}</span>
                     ) : null}
                   </div>
 
