@@ -1,8 +1,153 @@
-import Database from "better-sqlite3";
 import { DATABASE_FILE, DATA_DIR } from "../constants.js";
 import { ensureDir } from "./fileStore.js";
+import fs from "fs/promises";
 
 let database = null;
+
+// ── Sql.js wrapper (used on Android via nodejs-mobile) ──
+
+function sqlJsBindings(params) {
+  if (params.length === 0) return undefined;
+  if (params.length === 1) {
+    const p = params[0];
+    if (p != null && typeof p === "object" && !Array.isArray(p)) {
+      // better-sqlite3 accepts {key} for @key in SQL; sql.js needs the prefix
+      const prefixed = {};
+      for (const k of Object.keys(p)) {
+        prefixed[k[0] === "@" || k[0] === ":" || k[0] === "$" ? k : "@" + k] = p[k];
+      }
+      return prefixed;
+    }
+    return [p];
+  }
+  return params;
+}
+
+class SqlJsStatement {
+  constructor(db, sql) {
+    this._db = db;
+    this._sql = sql;
+    this._isPragma = /^\s*PRAGMA\s/i.test(sql);
+  }
+
+  run(...params) {
+    if (this._isPragma) {
+      this._db.run(this._sql);
+      return { changes: 0, lastInsertRowid: 0 };
+    }
+    const bindings = sqlJsBindings(params);
+    if (bindings !== undefined) {
+      this._db.run(this._sql, bindings);
+    } else {
+      this._db.run(this._sql);
+    }
+    const changes = this._db.getRowsModified();
+    const rowidResult = this._db.exec("SELECT last_insert_rowid()");
+    const lastInsertRowid = rowidResult?.[0]?.values?.[0]?.[0] ?? 0;
+    return { changes, lastInsertRowid };
+  }
+
+  get(...params) {
+    if (this._isPragma) {
+      const result = this._db.exec(this._sql);
+      const rows = result?.[0];
+      if (!rows || !rows.values?.length) return undefined;
+      const obj = {};
+      rows.columns.forEach((col, i) => { obj[col] = rows.values[0][i]; });
+      return obj;
+    }
+    const stmt = this._db.prepare(this._sql);
+    const bindings = sqlJsBindings(params);
+    if (bindings !== undefined) stmt.bind(bindings);
+    const row = stmt.step() ? stmt.getAsObject() : undefined;
+    stmt.free();
+    return row;
+  }
+
+  all(...params) {
+    if (this._isPragma) {
+      const result = this._db.exec(this._sql);
+      const rows = result?.[0];
+      if (!rows) return [];
+      return rows.values.map(vals => {
+        const obj = {};
+        rows.columns.forEach((col, i) => { obj[col] = vals[i]; });
+        return obj;
+      });
+    }
+    const stmt = this._db.prepare(this._sql);
+    const bindings = sqlJsBindings(params);
+    if (bindings !== undefined) stmt.bind(bindings);
+    const rows = [];
+    while (stmt.step()) rows.push(stmt.getAsObject());
+    stmt.free();
+    return rows;
+  }
+}
+
+class SqlJsDatabase {
+  constructor(db) {
+    this._db = db;
+  }
+
+  pragma(str) {
+    this._db.run(`PRAGMA ${str}`);
+  }
+
+  exec(sql) {
+    this._db.run(sql);
+  }
+
+  prepare(sql) {
+    return new SqlJsStatement(this._db, sql);
+  }
+
+  close() {
+    this._db.close();
+  }
+}
+
+// ── Platform-aware database factory ──
+
+async function createNativeDatabase() {
+  const { default: Database } = await import("better-sqlite3");
+  const db = new Database(DATABASE_FILE);
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
+  db.pragma("busy_timeout = 5000");
+  return db;
+}
+
+async function createSqlJsDatabase() {
+  const initSqlJs = (await import("sql.js")).default;
+  const SQL = await initSqlJs();
+  let raw;
+  try {
+    const data = await fs.readFile(DATABASE_FILE);
+    raw = new SQL.Database(data);
+  } catch {
+    raw = new SQL.Database();
+  }
+  raw.run("PRAGMA foreign_keys = ON");
+  return new SqlJsDatabase(raw);
+}
+
+export async function saveDatabase() {
+  if (!database?._db) return;
+  const data = database._db.export();
+  await fs.writeFile(DATABASE_FILE, Buffer.from(data));
+}
+
+let databaseInitPromise = null;
+
+async function initDatabase() {
+  const db = process.env.IS_ANDROID === "1"
+    ? await createSqlJsDatabase()
+    : await createNativeDatabase();
+  createDatabaseSchema(db);
+  runMigrations(db);
+  database = db;
+}
 
 function createDatabaseSchema(db) {
   db.exec(`
@@ -393,22 +538,18 @@ function runMigrations(db) {
 }
 
 export function getDatabase() {
-  if (database) {
-    return database;
+  if (!database) {
+    throw new Error("Database not initialized. Call ensureDatabase() first.");
   }
-
-  database = new Database(DATABASE_FILE);
-  database.pragma("journal_mode = WAL");
-  database.pragma("foreign_keys = ON");
-  database.pragma("busy_timeout = 5000");
-  createDatabaseSchema(database);
-  runMigrations(database);
   return database;
 }
 
 export async function ensureDatabase() {
   await ensureDir(DATA_DIR);
-  getDatabase();
+  if (!databaseInitPromise) {
+    databaseInitPromise = initDatabase();
+  }
+  await databaseInitPromise;
 }
 
 function paginateClause(options = {}) {

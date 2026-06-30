@@ -22,10 +22,15 @@
     "electron:dev": "cross-env HI_WEB_TALK_RENDERER_URL=http://localhost:5173 electron .",
     "electron:dev:full": "concurrently \"npm run dev\" \"npm run electron:dev\"",
     "electron:remote": "cross-env HI_WEB_TALK_MODE=remote HI_WEB_TALK_REMOTE_URL=http://127.0.0.1:8787 electron .",
-    "electron:build": "npm run build && electron-builder --win portable"
+    "electron:build": "npm run build && electron-builder --win portable",
+    "android:deploy": "npm run build && npx cap copy && node scripts/deploy-android.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "@choreruiz/capacitor-node-js": "^1.0.2",
     "@google/genai": "^1.51.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.9.0",
@@ -47,6 +52,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.15.1",
+    "sql.js": "^1.14.1",
     "ws": "^8.20.0",
     "zod": "^3.25.76"
   },

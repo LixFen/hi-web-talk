@@ -12,3 +12,10 @@ logs
 docs
 server/services/modelCapabilities.generated.js
 .claude
+
+# Android (experimental, regenerate with `npx cap add android`)
+android/
+android-node/node_modules/
+android-node/server/
+android-node/package-lock.json
+capacitor-cordova-android-plugins

@@ -1,0 +1,30 @@
+{
+  "name": "hi-web-talk-android",
+  "private": true,
+  "type": "module",
+  "main": "main.js",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.92.0",
+    "@google/genai": "^1.51.0",
+    "bcryptjs": "^3.0.3",
+    "cheerio": "^1.2.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.4.1",
+    "helmet": "^8.1.0",
+    "highlight.js": "^11.11.1",
+    "jsonwebtoken": "^9.0.3",
+    "katex": "^0.16.45",
+    "mammoth": "^1.12.0",
+    "marked": "^17.0.1",
+    "marked-highlight": "^2.2.2",
+    "node-fetch": "^3.3.2",
+    "openai": "^5.20.2",
+    "pdf-parse": "^2.4.5",
+    "sql.js": "^1.14.1",
+    "ws": "^8.20.0",
+    "zod": "^3.25.76"
+  }
+}
