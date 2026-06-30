@@ -99,46 +99,21 @@ async function main() {
 <title>Hi Web Talk</title>
 <script src="cordova.js"></script>
 <script>
-var MAX_WAIT = 15000;
-var RETRY_MS = 500;
-var started = Date.now();
-
+// Navigate to the Express server (with fixed delay to let it start)
 function go() {
   window.location.replace("http://127.0.0.1:8787/");
 }
 
-function poll() {
-  if (Date.now() - started > MAX_WAIT) {
-    document.getElementById("status").textContent = "Server timed out. Please restart.";
-    return;
-  }
-  fetch("http://127.0.0.1:8787/", { mode: "no-cors" })
-    .then(go)
-    .catch(function () {
-      document.getElementById("dots").textContent = ".".repeat(
-        ((Date.now() - started) / 1000) | 0
-      );
-      setTimeout(poll, RETRY_MS);
-    });
-}
-
-// Listen for serverReady via Capacitor bridge (more reliable than polling)
+// Wait for bridge ready + extra delay for Express, with hard fallback
 if (window.Capacitor) {
   try {
-    Capacitor.Plugins.CapacitorNodeJS.addListener("serverReady", go);
     Capacitor.Plugins.CapacitorNodeJS.whenReady().then(function () {
-      // Engine is ready, start polling for the HTTP server
-      poll();
+      setTimeout(go, 3000);
     });
-  } catch (e) {
-    // Fallback: poll immediately
-    poll();
-  }
-} else {
-  // Capacitor not loaded yet — wait then poll
-  document.addEventListener("deviceready", poll);
-  setTimeout(poll, 2000);
+  } catch (e) {}
 }
+// Hard fallback: regardless of bridge, try after 8 seconds
+setTimeout(go, 8000);
 </script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
