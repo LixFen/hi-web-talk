@@ -68,10 +68,12 @@
       "server/**",
       "package.json"
     ],
+    "icon": "electron/favicon.ico",
     "extraMetadata": {
       "main": "electron/main.js"
     },
     "win": {
+      "icon": "electron/favicon.ico",
       "target": [
         "portable"
       ]
