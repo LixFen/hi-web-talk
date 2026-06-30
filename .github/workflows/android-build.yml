@@ -36,12 +36,18 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Generate Android native project
+        run: npx cap add android
+
       - name: Setup Android SDK & NDK
         timeout-minutes: 8
         run: |
           SDKMANAGER=$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager
           yes | $SDKMANAGER --licenses > /dev/null 2>&1 || true
           $SDKMANAGER "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.31.5"
+
+      - name: Setup Android local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
       - name: Deploy Android node project
         run: node scripts/deploy-android.mjs
