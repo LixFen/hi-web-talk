@@ -28,8 +28,15 @@ process.env.JWT_SECRET ||= "hi-web-talk-android-secret-please-change";
 await fs.mkdir(process.env.HI_WEB_TALK_DATA_DIR, { recursive: true });
 
 // Import server module (routes, middleware, ensureDataLayout)
-const { startServer } = await import("./server/index.js");
+try {
+  const { startServer } = await import("./server/index.js");
 
-// Start listening (server is already set up, just needs to bind the port)
-const port = Number(process.env.OPENAI_PORT || 8787);
-await startServer(port);
+  // Start listening (server is already set up, just needs to bind the port)
+  const port = Number(process.env.OPENAI_PORT || 8787);
+  await startServer(port);
+
+  console.log("Hi Web Talk server started on http://127.0.0.1:" + port);
+} catch (err) {
+  console.error("Server startup failed:", err?.stack || err?.message || err);
+  process.exitCode = 1;
+}
