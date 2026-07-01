@@ -60,6 +60,13 @@
 
 .sidebar.collapsed .sidebar-header {
   justify-content: center;
+  min-height: unset;
+  margin-bottom: var(--space-2);
+}
+
+.sidebar.collapsed .sidebar-toggle-btn {
+  width: 2.5rem;
+  height: 2.5rem;
 }
 
 .sidebar-toggle-btn {
@@ -68,6 +75,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   transition: background-color var(--duration-fast), color var(--duration-fast), transform var(--duration-fast);
@@ -210,12 +218,14 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   color: var(--text-secondary);
   font-weight: 500;
   font-size: 0.875rem;
   white-space: nowrap;
   overflow: hidden;
+  margin-top: auto;
   transition: background-color var(--duration-fast),
               color var(--duration-fast),
               box-shadow var(--duration-fast),
@@ -291,7 +301,7 @@
 .history-item-row {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.35rem;
   padding: 0.15rem;
   border-radius: var(--radius-md);
   transition: background-color var(--duration-fast);
@@ -312,42 +322,100 @@
   background: transparent;
 }
 
-.history-delete-btn,
-.history-rename-btn {
-  width: 2rem;
-  height: 2rem;
+.history-item-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  margin-left: 0.35rem;
+  opacity: 0.6;
+}
+
+.history-three-dots-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-full);
-  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
   opacity: 0;
   transition: all var(--duration-fast) var(--ease-out-expo);
 }
 
-.history-item-row:hover .history-delete-btn,
-.history-item-row.active .history-delete-btn,
-.history-item-row:hover .history-rename-btn,
-.history-item-row.active .history-rename-btn {
+.history-item-row:hover .history-three-dots-btn,
+.history-item-row.active .history-three-dots-btn {
+  opacity: 0.7;
+}
+
+.history-three-dots-btn:hover {
+  background-color: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  color: var(--text-primary);
   opacity: 1;
 }
 
-.history-rename-btn:hover {
-  background-color: color-mix(in srgb, var(--text-primary) 8%, transparent);
+.history-three-dots-btn:active {
+  transform: scale(0.9);
+}
+
+/* -----------------------------------------------------------------
+   Conversation Menu (popup)
+   ----------------------------------------------------------------- */
+.conversation-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.conversation-menu {
+  position: fixed;
+  min-width: 12rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: 0.35rem;
+  animation: convoMenuIn 120ms ease-out both;
+}
+
+@keyframes convoMenuIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.conversation-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
   color: var(--text-primary);
+  transition: background-color var(--duration-fast);
 }
 
-.history-rename-btn:active {
-  transform: scale(0.9);
+.conversation-menu-item:hover {
+  background-color: var(--bg-hover);
 }
 
-.history-delete-btn:hover {
-  background-color: color-mix(in srgb, #b42318 10%, transparent);
-  color: #b42318;
+.conversation-menu-item.danger {
+  color: var(--danger-color, #e74c3c);
 }
 
-.history-delete-btn:active {
-  transform: scale(0.9);
+.conversation-menu-item.danger:hover {
+  background-color: color-mix(in srgb, var(--danger-color, #e74c3c) 10%, transparent);
+}
+
+.conversation-menu-separator {
+  height: 1px;
+  background: var(--border-light);
+  margin: 0.25rem 0.35rem;
 }
 
 /* -----------------------------------------------------------------
@@ -388,7 +456,7 @@
 
 .sidebar-logout-btn {
   background: none;
-  border: none;
+  border: 1px solid var(--border-light);
   color: var(--text-secondary);
   cursor: pointer;
   padding: 0.3rem;

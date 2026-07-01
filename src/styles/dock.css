@@ -103,7 +103,7 @@
 .chat-bottom-dock-branches {
   position: relative;
   bottom: auto;
-  padding: 0.35rem 0 0.5rem;
+  padding: 0.45rem var(--space-4) 0.5rem;
   margin-bottom: 0;
   overflow: visible;
   background: transparent;

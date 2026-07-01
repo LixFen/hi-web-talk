@@ -6,6 +6,11 @@
 - Fix: extractAttachmentIds now handles document_attachment blocks
 - Refactor: attachmentResolver supports document_attachment via documentParser
 - Style: Document attachment display in composer, messages, and block card
+- Feat: Right-click user message → "Edit message" — branches from previous block and fills composer
+- Feat: Redesigned sidebar conversation list — three-dots menu for rename/delete/regenerate, added chat icon
+- Style: Added border outlines to toggle, search, and logout buttons for consistency
+- Style: Collapsed sidebar toggle and new-chat buttons unified to same size with adjusted spacing
+- Style: Added horizontal padding to bottom dock branches panel to prevent card overflow
 
 # 1.18.3
 

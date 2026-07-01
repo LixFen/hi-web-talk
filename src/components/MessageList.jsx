@@ -647,9 +647,7 @@ const MemoMessageRow = React.memo(({
 
   const handleContextMenu = (event) => {
     const hasSelection = window.getSelection()?.toString().length > 0;
-    if (msg.role !== "assistant" || !msg.blockSHA1) {
-      if (!hasSelection) return;
-    }
+    if (!hasSelection && !msg.blockSHA1 && msg.role !== "user") return;
     event.preventDefault();
     onContextMenu(msg, event.clientX, event.clientY);
   };
@@ -1335,6 +1333,28 @@ const MessageList = forwardRef(({
       items.push({ key: "sep-mobile-copy", separator: true });
     }
 
+    if (msg.role === "user" && msg.blockSHA1) {
+      const msgIndex = messages.indexOf(msg);
+      const prevMsg = msgIndex > 0 ? messages[msgIndex - 1] : null;
+      const prevBlockSHA1 = prevMsg?.blockSHA1;
+      if (prevBlockSHA1) {
+        const userText = Array.isArray(msg.text)
+          ? msg.text.filter((b) => b.type === "text").map((b) => b.text).join("\n")
+          : msg.text || "";
+        items.push({
+          key: "edit-message",
+          label: t("msg.editMessage"),
+          onClick: () => {
+            onBranchFromBlock?.(prevBlockSHA1);
+            window.dispatchEvent(
+              new CustomEvent("edit-message", { detail: { text: userText } }),
+            );
+          },
+        });
+        items.push({ key: "sep-edit-message", separator: true });
+      }
+    }
+
     if (branchInfo) {
       items.push({
         key: "continue-from-here",
@@ -1402,7 +1422,7 @@ const MessageList = forwardRef(({
     }
 
     return items;
-  }, [contextMenu.msg, isLoading, visibleToolbarDefinitions, onBranchFromBlock, onActivateBlock, onRegenerate, onToggleAdaptation, onRunAdaptation, showToast, t]);
+  }, [contextMenu.msg, messages, isLoading, visibleToolbarDefinitions, onBranchFromBlock, onActivateBlock, onRegenerate, onToggleAdaptation, onRunAdaptation, showToast, t]);
 
   return (
     <div className="messages-container" ref={containerRef}>

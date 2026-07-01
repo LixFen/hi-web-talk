@@ -99,6 +99,7 @@ const ChatComposer = ({
   onSelectBlock,
   onUploadAttachment,
   sessionHash,
+  externalEditText,
 }) => {
   const { t } = useLocale();
   const MAX_ATTACHMENTS = 10;
@@ -146,6 +147,12 @@ const ChatComposer = ({
       return [];
     });
   }, [sessionHash]);
+
+  useEffect(() => {
+    if (externalEditText) {
+      setText(externalEditText);
+    }
+  }, [externalEditText]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

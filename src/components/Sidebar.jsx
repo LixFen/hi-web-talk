@@ -1,9 +1,9 @@
-﻿import React, { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useSession } from "../contexts/SessionContext";
 import { useLocale } from "../contexts/LocaleContext";
-import ContextMenu from "./ContextMenu";
+
 
 const Sidebar = ({
   isCollapsed,
@@ -28,7 +28,7 @@ const Sidebar = ({
   } = useSession();
   const navigate = useNavigate();
 
-  const [contextMenu, setContextMenu] = useState({
+  const [conversationMenu, setConversationMenu] = useState({
     visible: false,
     x: 0,
     y: 0,
@@ -61,6 +61,7 @@ const Sidebar = ({
   };
 
   const handleDeleteConversation = async (conversation) => {
+    closeConversationMenu();
     const result = await deleteConversation(conversation);
     if (result && conversation.id === activeConversationId) {
       if (result.nextHash) {
@@ -72,6 +73,7 @@ const Sidebar = ({
   };
 
   const handleRenameClick = async (conversation) => {
+    closeConversationMenu();
     const nextTitle = window.prompt(
       t("sidebar.renamePrompt"),
       conversation.title || "",
@@ -84,50 +86,45 @@ const Sidebar = ({
     }
   };
 
-  const handleContextMenu = (event, conversation) => {
-    event.preventDefault();
+  const handleRegenerateTitle = (conversation) => {
+    closeConversationMenu();
+    const confirmed = window.confirm(t("sidebar.regenerateTitleConfirm"));
+    if (confirmed) {
+      regenerateTitle(conversation, "default", true);
+    }
+  };
+
+  const handleRegenerateTitleImportant = (conversation) => {
+    closeConversationMenu();
+    const confirmed = window.confirm(
+      t("sidebar.regenerateTitleImportantConfirm"),
+    );
+    if (confirmed) {
+      regenerateTitle(conversation, "important", true);
+    }
+  };
+
+  const openConversationMenu = (event, conversation) => {
     event.stopPropagation();
-    setContextMenu({
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = 220;
+    let x = rect.left;
+    let y = rect.bottom + 4;
+    if (x + menuWidth > window.innerWidth - 8) {
+      x = window.innerWidth - menuWidth - 8;
+    }
+    if (x < 8) x = 8;
+    setConversationMenu({
       visible: true,
-      x: event.clientX,
-      y: event.clientY,
+      x,
+      y,
       conversation,
     });
   };
 
-  const closeContextMenu = () => {
-    setContextMenu((prev) => ({ ...prev, visible: false }));
-  };
-
-  const buildContextMenuItems = () => {
-    const conversation = contextMenu.conversation;
-    if (!conversation) return [];
-    return [
-      {
-        key: "regenerate-title",
-        label: t("sidebar.regenerateTitle"),
-        onClick: () => {
-          const confirmed = window.confirm(
-            t("sidebar.regenerateTitleConfirm"),
-          );
-          if (confirmed) {
-            regenerateTitle(conversation, "default", true);
-          }
-        },
-      },
-      {
-        key: "regenerate-title-important",
-        label: t("sidebar.regenerateTitleByImportance"),
-        onClick: () => {
-          const confirmed = window.confirm(
-            t("sidebar.regenerateTitleImportantConfirm"),
-          );
-          if (confirmed) {
-            regenerateTitle(conversation, "important", true);
-          }
-        },
-      },
-    ];
+  const closeConversationMenu = () => {
+    setConversationMenu((prev) => ({ ...prev, visible: false }));
   };
 
   const toggleAriaLabel =
@@ -138,6 +135,7 @@ const Sidebar = ({
         : t("sidebar.toggleCollapse");
 
   return (
+    <>
     <div
       className={`sidebar ${isCollapsed ? "collapsed" : ""} ${className}`.trim()}
       onTouchStart={onTouchStart}
@@ -212,10 +210,25 @@ const Sidebar = ({
             <div
               key={conversation.id}
               className={`history-item-row ${conversation.id === activeConversationId ? "active" : ""}`}
-              onContextMenu={(event) =>
-                handleContextMenu(event, conversation)
-              }
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                openConversationMenu(event, conversation);
+              }}
             >
+              <svg
+                className="history-item-icon"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
               <button
                 className={`history-item ${conversation.id === activeConversationId ? "active" : ""}`}
                 type="button"
@@ -224,53 +237,21 @@ const Sidebar = ({
                 {conversation.title}
               </button>
               <button
-                className="history-rename-btn"
+                className="history-three-dots-btn"
                 type="button"
-                aria-label={`${t("sidebar.rename")} ${conversation.title}`}
-                title={t("sidebar.rename")}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleRenameClick(conversation);
-                }}
+                aria-label={t("sidebar.manageConversation")}
+                title={t("sidebar.manageConversation")}
+                onClick={(event) => openConversationMenu(event, conversation)}
               >
                 <svg
                   viewBox="0 0 24 24"
                   width="16"
                   height="16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
+                  fill="currentColor"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M16.862 3.487a2.1 2.1 0 0 1 2.97 2.97L8.5 17.788l-3.75.75.75-3.75L16.862 3.487Z"
-                  />
-                </svg>
-              </button>
-              <button
-                className="history-delete-btn"
-                type="button"
-                aria-label={`${t("sidebar.delete")} ${conversation.title}`}
-                title={t("sidebar.delete")}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleDeleteConversation(conversation);
-                }}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  width="16"
-                  height="16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 3h6m-9 4h12m-1 0-.867 12.142A2 2 0 0 1 14.138 21H9.862a2 2 0 0 1-1.995-1.858L7 7m3 4v6m4-6v6"
-                  />
+                  <circle cx="12" cy="5" r="1.5" />
+                  <circle cx="12" cy="12" r="1.5" />
+                  <circle cx="12" cy="19" r="1.5" />
                 </svg>
               </button>
             </div>
@@ -360,14 +341,69 @@ const Sidebar = ({
         </button>
       </div>
 
-      <ContextMenu
-        x={contextMenu.x}
-        y={contextMenu.y}
-        visible={contextMenu.visible}
-        items={buildContextMenuItems()}
-        onClose={closeContextMenu}
-      />
     </div>
+
+      {conversationMenu.visible ? (
+        <div
+          className="conversation-menu-overlay"
+          onClick={closeConversationMenu}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            closeConversationMenu();
+          }}
+        >
+          <div
+            className="conversation-menu"
+            style={{ left: conversationMenu.x, top: conversationMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="conversation-menu-item"
+              type="button"
+              onClick={() => handleRenameClick(conversationMenu.conversation)}
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16.862 3.487a2.1 2.1 0 0 1 2.97 2.97L8.5 17.788l-3.75.75.75-3.75L16.862 3.487Z" />
+              </svg>
+              {t("sidebar.rename")}
+            </button>
+            <button
+              className="conversation-menu-item"
+              type="button"
+              onClick={() => handleRegenerateTitle(conversationMenu.conversation)}
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              {t("sidebar.regenerateTitle")}
+            </button>
+            <button
+              className="conversation-menu-item"
+              type="button"
+              onClick={() => handleRegenerateTitleImportant(conversationMenu.conversation)}
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v4m0 4v4m0 4v4m-8-4h16" />
+                <circle cx="12" cy="12" r="10" />
+              </svg>
+              {t("sidebar.regenerateTitleByImportance")}
+            </button>
+            <div className="conversation-menu-separator" />
+            <button
+              className="conversation-menu-item danger"
+              type="button"
+              onClick={() => handleDeleteConversation(conversationMenu.conversation)}
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 3h6m-9 4h12m-1 0-.867 12.142A2 2 0 0 1 14.138 21H9.862a2 2 0 0 1-1.995-1.858L7 7m3 4v6m4-6v6" />
+              </svg>
+              {t("sidebar.delete")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 };
 

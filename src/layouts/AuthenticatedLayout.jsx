@@ -116,6 +116,13 @@ export default function AuthenticatedLayout() {
   const [isPromptPanelOpen, setIsPromptPanelOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [editText, setEditText] = useState('');
+
+  useEffect(() => {
+    const handler = (e) => setEditText(e.detail.text || '');
+    window.addEventListener('edit-message', handler);
+    return () => window.removeEventListener('edit-message', handler);
+  }, []);
 
   const drawerTouchStartRef = useRef({ x: 0, y: 0, active: false });
   const drawerSwipeDetectedRef = useRef(false);
@@ -440,6 +447,7 @@ export default function AuthenticatedLayout() {
             activeBlockSHA1={activeBlockSHA1}
             onSelectBlock={selectBlock}
             sessionHash={activeConversation?.sessionHash}
+            externalEditText={editText}
           />
         </div>
       </main>
