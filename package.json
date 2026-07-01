@@ -1,7 +1,7 @@
 {
   "name": "hi-web-talk",
   "private": true,
-  "version": "1.18.5",
+  "version": "1.19.0",
   "type": "module",
   "main": "electron/main.js",
   "engines": {

@@ -1,3 +1,11 @@
+# 1.19.0
+
+- Feat: sql.js adapter in database layer — Android uses WASM-based SQLite while desktop keeps better-sqlite3.
+- Feat: Android APK build pipeline — Capacitor + nodejs-mobile bundles Express backend and React frontend into a single app.
+- Fix: node-fetch/undici compatibility — polyfill File global for nodejs-mobile's Node 18 runtime.
+- Fix: Android edge-to-edge layout — use 100dvh instead of 100vh, add safe-area-inset padding, enable viewport-fit=cover.
+- Fix: Prevent Android WebView from opening external browser — allowNavigation config for localhost.
+
 # 1.18.5
 
 - Fix: Use 512×512 PNG icon for Electron builds — resolves "icon must be at least 256×256" build error.

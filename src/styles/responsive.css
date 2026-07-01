@@ -446,6 +446,11 @@
     padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
   }
 
+  .chat-bottom-dock-inline,
+  .chat-bottom-dock-scroll {
+    padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
+  }
+
   /* Touch feedback for interactive elements */
   .history-item-row:active,
   .message-action-btn:active,

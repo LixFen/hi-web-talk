@@ -4,6 +4,9 @@ const config: CapacitorConfig = {
   appId: 'com.hiwebtalk.android',
   appName: 'Hi Web Talk',
   webDir: 'dist',
+  server: {
+    allowNavigation: ['127.0.0.1', 'localhost'],
+  },
   plugins: {
     CapacitorNodeJS: {
       nodeDir: 'nodejs-project',
