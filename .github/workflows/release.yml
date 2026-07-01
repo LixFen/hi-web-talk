@@ -30,10 +30,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Hi-Web-Talk-${{ github.ref_name }}
-          path: release/*.exe
+          path: dist/*.exe
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*.exe
+          files: dist/*.exe
           generate_release_notes: true
