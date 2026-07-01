@@ -11,14 +11,9 @@ const require = createRequire(import.meta.url);
 // Load bridge → sends "ready" to Capacitor plugin (engine is alive)
 require("bridge");
 
-// Polyfill global fetch for nodejs-mobile (may not have native fetch)
-if (typeof globalThis.fetch === "undefined") {
-  const { default: fetch, Headers, Request, Response } = await import("node-fetch");
-  globalThis.fetch = fetch;
-  globalThis.Headers = Headers;
-  globalThis.Request = Request;
-  globalThis.Response = Response;
-}
+// Note: node-fetch v3 brings undici which crashes nodejs-mobile (SIGSEGV).
+// We rely on Node.js 18's experimental native fetch if available.
+// Web search / scraping features requiring fetch will be unavailable if native fetch is absent.
 
 // Use a writable data directory inside the nodejs project
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
