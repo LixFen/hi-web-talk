@@ -1,7 +1,7 @@
 {
   "name": "hi-web-talk",
   "private": true,
-  "version": "1.18.4",
+  "version": "1.18.5",
   "type": "module",
   "main": "electron/main.js",
   "engines": {
@@ -74,12 +74,12 @@
       "server/**",
       "package.json"
     ],
-    "icon": "electron/favicon.ico",
+    "icon": "electron/icon-high-res.png",
     "extraMetadata": {
       "main": "electron/main.js"
     },
     "win": {
-      "icon": "electron/favicon.ico",
+      "icon": "electron/icon-high-res.png",
       "target": [
         "portable"
       ]

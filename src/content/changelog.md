@@ -1,3 +1,9 @@
+# 1.18.5
+
+- Fix: Use 512×512 PNG icon for Electron builds — resolves "icon must be at least 256×256" build error.
+- Chore: Grant write permissions to CI workflows — fixes 403 error when creating GitHub Releases.
+- Chore: Upload Android APK directly to GitHub Release alongside the desktop installer.
+
 # 1.18.4
 
 - Feat: Add Badges display using models.
