@@ -8,6 +8,18 @@ import { fileURLToPath } from "url";
 
 const require = createRequire(import.meta.url);
 
+// Polyfill File global — undici v7 (used by cheerio) requires it;
+// nodejs-mobile's Node 18.20.4 doesn't provide File out of the box.
+if (typeof globalThis.File === "undefined") {
+  globalThis.File = class File extends Blob {
+    constructor(bits, name, options = {}) {
+      super(bits, options);
+      this.name = name;
+      this.lastModified = options.lastModified ?? Date.now();
+    }
+  };
+}
+
 // Load bridge → sends "ready" to Capacitor plugin (engine is alive)
 require("bridge");
 
