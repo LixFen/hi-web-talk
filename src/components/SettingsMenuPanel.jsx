@@ -10,6 +10,7 @@ export default function SettingsMenuPanel({ open, onClose, onSelectSection }) {
     { key: "behavior", label: t("settings.section.behavior"), description: t("settings.section.behaviorDesc") },
     { key: "data", label: t("settings.section.data"), description: t("settings.section.dataDesc") },
     { key: "about", label: t("settings.section.about"), description: t("settings.section.aboutDesc") },
+    { key: "account", label: t("settings.section.account"), description: t("settings.section.accountDesc") },
   ];
 
   if (!open) {
@@ -36,7 +37,8 @@ export default function SettingsMenuPanel({ open, onClose, onSelectSection }) {
               section.key === "prompt" ||
               section.key === "appearance" ||
               section.key === "behavior" ||
-              section.key === "about";
+              section.key === "about" ||
+              section.key === "account";
 
             return (
               <button

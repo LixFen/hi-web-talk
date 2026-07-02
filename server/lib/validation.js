@@ -11,6 +11,11 @@ export const loginSchema = z.object({
   password: z.string().min(1, "密码不能为空。"),
 });
 
+export const changePasswordSchema = z.object({
+  oldPassword: z.string().min(1, "当前密码不能为空。"),
+  newPassword: z.string().min(4, "新密码至少需要 4 个字符。"),
+});
+
 export const appSettingsSchema = z.object({
   showChatFocusOutline: z.boolean().optional(),
   hideWideScreenSideBranches: z.boolean().optional(),

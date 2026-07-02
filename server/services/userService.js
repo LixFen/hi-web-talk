@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { JWT_SECRET, JWT_EXPIRES_IN } from "../constants.js";
-import { createUserRecord, findUserByUsername, findUserById, getDatabase } from "../lib/database.js";
+import { createUserRecord, findUserByUsername, findUserById, updateUserPassword, getDatabase } from "../lib/database.js";
 
 function signToken(user) {
   return jwt.sign(
@@ -92,4 +92,26 @@ export function getUserById(id) {
 
 export function isAdmin(user) {
   return user?.role === "admin";
+}
+
+export async function changePassword(userId, oldPassword, newPassword) {
+  const user = findUserById(userId);
+
+  if (!user) {
+    const error = new Error("用户不存在。");
+    error.status = 404;
+    throw error;
+  }
+
+  const valid = await bcrypt.compare(oldPassword, user.passwordHash);
+
+  if (!valid) {
+    const error = new Error("当前密码错误。");
+    error.status = 401;
+    throw error;
+  }
+
+  const newHash = await bcrypt.hash(newPassword, 10);
+  updateUserPassword(userId, newHash);
+  return { ok: true };
 }

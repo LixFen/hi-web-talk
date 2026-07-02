@@ -14,6 +14,7 @@ import { validateBody, validateParams, validateQuery } from "./middleware/valida
 import {
   registerSchema,
   loginSchema,
+  changePasswordSchema,
   appSettingsSchema,
   modelCreateSchema,
   modelUpdateSchema,
@@ -41,7 +42,7 @@ import {
   pathAttachmentIdSchema,
   paginationQuerySchema,
 } from "./lib/validation.js";
-import { loginUser, registerUser, getUserById } from "./services/userService.js";
+import { loginUser, registerUser, getUserById, changePassword } from "./services/userService.js";
 import { readSessionRecord } from "./lib/database.js";
 import {
   listPromptItemRecords,
@@ -247,6 +248,18 @@ app.get("/api/auth/me", authenticateToken, async (request, response) => {
 app.post("/api/auth/logout", (request, response) => {
   response.clearCookie("auth_token", { path: "/" });
   response.json({ ok: true });
+});
+
+app.post("/api/auth/change-password", authenticateToken, authLimiter, validateBody(changePasswordSchema), async (request, response) => {
+  try {
+    const { oldPassword, newPassword } = request.body;
+    const result = await changePassword(request.user.id, oldPassword, newPassword);
+    response.json(result);
+  } catch (error) {
+    response.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "修改密码失败。",
+    });
+  }
 });
 
 function parseModelPayload(body = {}) {

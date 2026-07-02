@@ -15,6 +15,7 @@ import PromptManagerPanel from "../components/PromptManagerPanel";
 import AppearanceSettingsPanel from "../components/AppearanceSettingsPanel";
 import InteractionSettingsPanel from "../components/InteractionSettingsPanel";
 import AboutSettingsPanel from "../components/AboutSettingsPanel";
+import AccountSettingsPanel from "../components/AccountSettingsPanel";
 import SettingsMenuPanel from "../components/SettingsMenuPanel";
 import SearchModal from "../components/SearchModal";
 
@@ -113,6 +114,7 @@ export default function AuthenticatedLayout() {
   const [isAppearancePanelOpen, setIsAppearancePanelOpen] = useState(false);
   const [isInteractionPanelOpen, setIsInteractionPanelOpen] = useState(false);
   const [isAboutPanelOpen, setIsAboutPanelOpen] = useState(false);
+  const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
   const [isPromptPanelOpen, setIsPromptPanelOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -185,6 +187,8 @@ export default function AuthenticatedLayout() {
         setIsInteractionPanelOpen(true);
       } else if (section === "about") {
         setIsAboutPanelOpen(true);
+      } else if (section === "account") {
+        setIsAccountPanelOpen(true);
       }
     }
     window.addEventListener("open-settings", handleOpenSettings);
@@ -198,6 +202,7 @@ export default function AuthenticatedLayout() {
       isAppearancePanelOpen ||
       isInteractionPanelOpen ||
       isAboutPanelOpen ||
+      isAccountPanelOpen ||
       isSettingsMenuOpen,
     [
       isModelPanelOpen,
@@ -205,6 +210,7 @@ export default function AuthenticatedLayout() {
       isAppearancePanelOpen,
       isInteractionPanelOpen,
       isAboutPanelOpen,
+      isAccountPanelOpen,
       isSettingsMenuOpen,
     ],
   );
@@ -238,6 +244,8 @@ export default function AuthenticatedLayout() {
       setIsInteractionPanelOpen(true);
     } else if (sectionKey === "about") {
       setIsAboutPanelOpen(true);
+    } else if (sectionKey === "account") {
+      setIsAccountPanelOpen(true);
     }
   }, []);
 
@@ -519,6 +527,14 @@ export default function AuthenticatedLayout() {
         open={isAboutPanelOpen}
         onClose={() => {
           setIsAboutPanelOpen(false);
+          setIsSettingsMenuOpen(true);
+        }}
+      />
+
+      <AccountSettingsPanel
+        open={isAccountPanelOpen}
+        onClose={() => {
+          setIsAccountPanelOpen(false);
           setIsSettingsMenuOpen(true);
         }}
       />

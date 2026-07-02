@@ -1,3 +1,10 @@
+# 1.19.1
+
+- Feat: Password change in Account settings — users can now change their password from Settings > Account with old password verification and bcrypt re-hashing.
+- Feat: Account settings panel — new settings section with change password form (current password, new password, confirm).
+- Feat: Server-side change-password API — POST /api/auth/change-password with JWT auth, rate limiting, and Zod validation.
+- Chore: i18n keys for account section — zh-CN and en-US translations for the new password change UI.
+
 # 1.19.0
 
 - Feat: sql.js adapter in database layer — Android uses WASM-based SQLite while desktop keeps better-sqlite3.

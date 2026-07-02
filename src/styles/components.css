@@ -440,6 +440,13 @@
   font-weight: 500;
 }
 
+.login-success {
+  color: #22c55e;
+  font-size: 0.8rem;
+  text-align: center;
+  font-weight: 500;
+}
+
 .login-submit-btn {
   margin-top: 0.25rem;
 }

@@ -1389,6 +1389,12 @@ export function findUserById(id) {
   return db.prepare(`SELECT * FROM users WHERE id = ?`).get(id) ?? null;
 }
 
+export function updateUserPassword(id, newPasswordHash) {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  db.prepare("UPDATE users SET passwordHash = ?, updatedAt = ? WHERE id = ?").run(newPasswordHash, now, id);
+}
+
 export function deleteAdaptationRecordsForBlocks(sessionHash, blockSHA1s = []) {
   const db = getDatabase();
 

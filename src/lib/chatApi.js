@@ -437,6 +437,13 @@ export function logoutUser() {
   });
 }
 
+export function changePassword(oldPassword, newPassword) {
+  return requestJson("/api/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ oldPassword, newPassword }),
+  });
+}
+
 export async function subscribeToSessionStream(sessionHash, { signal, onEvent } = {}) {
   const token = getToken();
   const response = await fetch(`/api/sessions/${sessionHash}/stream`, {

@@ -5,6 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Hi Web Talk',
   webDir: 'dist',
   server: {
+    cleartext: true,
     allowNavigation: ['127.0.0.1', 'localhost'],
   },
   plugins: {
