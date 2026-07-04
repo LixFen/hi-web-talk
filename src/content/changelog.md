@@ -1,3 +1,10 @@
+# 1.19.2
+
+- Perf: Electron startup — disable GPU acceleration to eliminate 5-15s delay before launcher window appears on Windows.
+- Chore: Electron NSIS installer — build portable and installable variants with desktop/start menu shortcuts.
+- Chore: CI release workflow — upload both .exe and .exe.blockmap artifacts.
+- Chore: Ignore .npmrc in version control.
+
 # 1.19.1
 
 - Feat: Password change in Account settings — users can now change their password from Settings > Account with old password verification and bcrypt re-hashing.
