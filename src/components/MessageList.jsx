@@ -694,7 +694,7 @@ const MemoMessageRow = React.memo(({
                 </div>
               ) : null}
 
-              {msg.modelAlias || branchInfo || adaptationInfo ? (
+              {msg.modelAlias || branchInfo || adaptationInfo || msg.meta?.tikz?.svg ? (
                 <div className="message-tools">
                   <div className="message-badges">
                     {branchInfo?.siblingCount > 1 ? (
@@ -777,6 +777,53 @@ const MemoMessageRow = React.memo(({
                       >
                         <RegenerateIcon />
                         <span className="message-action-btn-label">{t("msg.regenerate")}</span>
+                      </button>
+                      {msg.meta?.tikz?.svg ? (
+                        <button
+                          className="message-action-btn"
+                          type="button"
+                          onClick={() => {
+                            window.dispatchEvent(
+                              new CustomEvent("open-tikz-preview", {
+                                detail: { tikz: msg.meta.tikz, text: msg.text }
+                              })
+                            );
+                          }}
+                          aria-label="查看 TikZ 图形"
+                          title="查看 TikZ 图形"
+                        >
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" style={{flexShrink: 0}}>
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <path d="M21 15l-5-5L5 21" />
+                          </svg>
+                          <span>查看图形</span>
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {!branchInfo && msg.meta?.tikz?.svg ? (
+                    <div className="message-actions">
+                      <button
+                        className="message-action-btn"
+                        type="button"
+                        onClick={() => {
+                          window.dispatchEvent(
+                            new CustomEvent("open-tikz-preview", {
+                              detail: { tikz: msg.meta.tikz, text: msg.text }
+                            })
+                          );
+                        }}
+                        aria-label="查看 TikZ 图形"
+                        title="查看 TikZ 图形"
+                      >
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" style={{flexShrink: 0}}>
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <path d="M21 15l-5-5L5 21" />
+                        </svg>
+                        <span>查看图形</span>
                       </button>
                     </div>
                   ) : null}
@@ -1453,31 +1500,41 @@ const MessageList = forwardRef(({
           </div>
         )}
 
-        {streamingToolState && (
+        {streamingToolState ? (
           <div className="streaming-tool-status">
-            {streamingToolState.type === "searching" ? (
-              <span className="tool-status searching">
-                <svg className="tool-status-icon spinning" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                {streamingToolState.engine
-                  ? `正在通过 ${streamingToolState.engine} 搜索: ${streamingToolState.query || "..."}`
-                  : `正在搜索: ${streamingToolState.query || "..."}`}
-              </span>
-            ) : (
-              <span className="tool-status searched">
-                <svg className="tool-status-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                {streamingToolState.sources?.length > 0
-                  ? `已从 ${streamingToolState.sources.length} 个来源找到结果`
-                  : "搜索完成，无结果"}
-              </span>
-            )}
+            {streamingToolState.toolName === "web_search" ? (
+              streamingToolState.type === "searching" ? (
+                <span className="tool-status searching">
+                  <svg className="tool-status-icon spinning" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  {streamingToolState.engine
+                    ? `正在通过 ${streamingToolState.engine} 搜索: ${streamingToolState.query || "..."}`
+                    : `正在搜索: ${streamingToolState.query || "..."}`}
+                </span>
+              ) : (
+                <span className="tool-status searched">
+                  <svg className="tool-status-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  {streamingToolState.sources?.length > 0
+                    ? `已从 ${streamingToolState.sources.length} 个来源找到结果`
+                    : "搜索完成，无结果"}
+                </span>
+              )
+            ) : streamingToolState.toolName === "draw_tikz" ? (
+              streamingToolState.type === "drawing" ? (
+                <span className="tool-status drawing">🎨 正在绘制 TikZ 图形...</span>
+              ) : streamingToolState.type === "drawn" ? (
+                <span className="tool-status drawn">🎨 TikZ 图形已绘制</span>
+              ) : (
+                <span className="tool-status failed">❌ TikZ 编译失败: {streamingToolState.error || "未知错误"}</span>
+              )
+            ) : null}
           </div>
-        )}
+        ) : null}
 
         {bottomContent}
         <ContextMenu

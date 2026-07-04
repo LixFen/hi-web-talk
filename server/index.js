@@ -74,6 +74,8 @@ import {
 import { callProviderModel, streamProviderModel, invalidateModelAdapterCache } from "./services/llmProviderService.js";
 import { getToolDefinitions } from "./services/tools/toolRegistry.js";
 import "./services/tools/webSearchTool.js"; // 注册 web_search 工具
+import "./services/tools/drawTikzTool.js"; // 注册 draw_tikz 工具
+import "./services/tools/checkDrawingTool.js"; // 注册 check_drawing 工具
 import { setPreferredEngine, setPreferredProviderConfigs } from "./services/tools/webSearchTool.js";
 import { streamSessionManager } from "./services/streamSessionManager.js";
 import { saveAttachment, readAttachment, updateAttachmentBlockSHA1 } from "./services/attachmentService.js";
@@ -119,6 +121,13 @@ import {
   listSummaries,
   updateSummaryStatus,
 } from "./services/summaryService.js";
+
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err?.message || err);
+});
+process.on("unhandledRejection", (err) => {
+  console.error("[unhandledRejection]", err?.message || err);
+});
 
 const app = express();
 const port = Number(process.env.OPENAI_PORT || 8787);
@@ -1170,7 +1179,9 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
 
     providerMessages = downgradeMessagesForModel(providerMessages, selectedModel.supportsMultimodal);
 
-    const tools = shouldUseTools ? getToolDefinitions() : undefined;
+    const tools = shouldUseTools
+      ? getToolDefinitions()
+      : undefined;
 
     const result = await callProviderModel({
       modelConfig: selectedModel,
@@ -1191,6 +1202,7 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
         model: result.model,
         responseId: result.responseId,
         ...(result.searchInfo && { search: result.searchInfo }),
+        ...(result.tikzInfo && { tikz: result.tikzInfo }),
       },
     });
 
@@ -1359,7 +1371,9 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
     streamSession.pushEvent(startEvent);
     logStream("start-sent", { sessionHash, modelAlias: selectedModel.alias });
 
-    const tools = shouldUseTools ? getToolDefinitions() : undefined;
+    const tools = shouldUseTools
+      ? getToolDefinitions()
+      : undefined;
 
     const result = await streamProviderModel({
       modelConfig: selectedModel,
@@ -1378,6 +1392,9 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
             toolName: event.toolName,
             engine: event.engine,
             sources: event.sources,
+            svg: event.svg,
+            compiled: event.compiled,
+            error: event.error,
           });
           logStream("tool-result", { toolName: event.toolName });
           return;
@@ -1422,6 +1439,7 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
         model: result.model,
         responseId: result.responseId,
         ...(result.searchInfo && { search: result.searchInfo }),
+        ...(result.tikzInfo && { tikz: result.tikzInfo }),
       },
     });
 
@@ -1613,7 +1631,9 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(
 
     providerMessages = downgradeMessagesForModel(providerMessages, selectedModel.supportsMultimodal);
 
-    const tools = shouldUseTools ? getToolDefinitions() : undefined;
+    const tools = shouldUseTools
+      ? getToolDefinitions()
+      : undefined;
 
     const result = await callProviderModel({
       modelConfig: selectedModel,
@@ -1635,6 +1655,7 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(
         responseId: result.responseId,
         regeneratedFromBlockSHA1: targetBlock.sha1,
         ...(result.searchInfo && { search: result.searchInfo }),
+        ...(result.tikzInfo && { tikz: result.tikzInfo }),
       },
     });
 

@@ -459,6 +459,10 @@ const TRANSLATIONS = {
     "search.timeMinutes": "{count} 分钟前",
     "search.timeHours": "{count} 小时前",
     "search.timeDays": "{count} 天前",
+    "tikz.previewTitle": "TikZ 图形预览",
+    "tikz.showCode": "显示 TikZ 代码",
+    "tikz.noPreview": "无预览内容",
+    "tikz.contextLabel": "对话上下文",
   },
   "en-US": {
     "app.brand": "hi web talk",
@@ -901,6 +905,10 @@ const TRANSLATIONS = {
     "search.timeMinutes": "{count} minutes ago",
     "search.timeHours": "{count} hours ago",
     "search.timeDays": "{count} days ago",
+    "tikz.previewTitle": "TikZ Preview",
+    "tikz.showCode": "Show TikZ code",
+    "tikz.noPreview": "No preview available",
+    "tikz.contextLabel": "Conversation context",
   },
 };
 

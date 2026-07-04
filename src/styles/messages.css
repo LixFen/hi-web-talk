@@ -400,8 +400,9 @@
 .reasoning-panel.open .reasoning-panel-content {
   margin-top: 0.4rem;
   padding: 0.5rem 0.75rem;
-  max-height: 1000px;
+  max-height: none;
   opacity: 1;
+  overflow: visible;
 }
 
 .reasoning-markdown {

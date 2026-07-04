@@ -114,7 +114,11 @@ export class BaseLLMAdapter {
     let totalUsage = { input: 0, output: 0, total: 0 };
     const reasoningParts = [];
     const searchInfo = { used: false, queries: [], sources: [] };
-    let isFinalCall = false;
+    let tikzInfo = null;
+    let currentTikzCode = null;
+    let currentTikzSvg = null;
+    let currentTikzPngBase64 = null;
+    let tikzAttempts = 0;
     let llmCalls = 0;
 
     while (true) {
@@ -125,13 +129,11 @@ export class BaseLLMAdapter {
       }
 
       const result = await this.withRetry(() =>
-        this.doCallWithTools(msgs, isFinalCall ? null : tools)
+        this.doCallWithTools(msgs, tools)
       );
 
-      // 累加 token usage
       totalUsage = addUsage(totalUsage, result.usage);
 
-      // 收集 reasoning
       if (result.reasoning && result.reasoning.trim()) {
         reasoningParts.push({
           round: reasoningParts.length + 1,
@@ -139,21 +141,19 @@ export class BaseLLMAdapter {
         });
       }
 
-      // 没有 tool_calls → 最终回答
       if (!result.toolCalls || result.toolCalls.length === 0) {
         return {
           reply: result.reply,
           reasoning: reasoningParts,
           usage: totalUsage,
           searchInfo: searchInfo.used ? { ...searchInfo, llmCalls } : null,
+          tikzInfo,
           responseId: result.responseId,
         };
       }
 
-      // 追加 assistant message（每轮只追加一次）
       msgs.push(result.message);
 
-      // 执行工具
       for (const toolCall of result.toolCalls) {
         const toolName = toolCall.function?.name || toolCall.name;
         const toolArgs = parseToolArgs(toolCall);
@@ -161,7 +161,6 @@ export class BaseLLMAdapter {
 
         onToolEvent?.({ type: "tool_start", toolName, arguments: toolArgs });
 
-        // 将工具调用过程写入 reasoning
         if (toolName === "web_search") {
           const query = toolArgs?.query || "";
           const reasoningContent = `> 🔍 **联网搜索** — ${query}`;
@@ -182,7 +181,6 @@ export class BaseLLMAdapter {
           toolResult = { error: `Unknown tool: ${toolName}` };
         }
 
-        // 收集搜索信息
         if (toolName === "web_search" && toolResult.sources) {
           if (toolResult.query) searchInfo.queries.push(toolResult.query);
           const startIdx = searchInfo.sources.length;
@@ -196,23 +194,71 @@ export class BaseLLMAdapter {
           );
         }
 
+        if (toolName === "draw_tikz" && toolResult.compiled) {
+          currentTikzCode = toolResult.tikzCode;
+          currentTikzSvg = toolResult.svg;
+          currentTikzPngBase64 = toolResult.pngBase64;
+          tikzAttempts++;
+          tikzInfo = {
+            code: toolResult.tikzCode,
+            svg: toolResult.svg,
+            compiled: true,
+          };
+        }
+
+        if (toolName === "check_drawing") {
+          if (!currentTikzSvg) {
+            toolResult = { isCorrect: false, error: "暂无绘制结果，请先调用 draw_tikz" };
+          } else if (toolResult.isCorrect) {
+            toolResult.svg = currentTikzSvg;
+            if (this.modelConfig.supportsMultimodal !== false && currentTikzPngBase64) {
+              toolResult.pngBase64 = currentTikzPngBase64;
+            }
+            tikzInfo = {
+              code: currentTikzCode,
+              svg: currentTikzSvg,
+              compiled: true,
+              verified: true,
+              verifyAttempts: tikzAttempts,
+            };
+          }
+        }
+
+        if (toolName === "draw_tikz") {
+          reasoningParts.push({
+            round: reasoningParts.length + 1,
+            content: toolResult.compiled
+              ? "> 🎨 **绘制 TikZ 图形**"
+              : "> ❌ **TikZ 编译失败**",
+          });
+        }
+
+        if (toolName === "check_drawing") {
+          reasoningParts.push({
+            round: reasoningParts.length + 1,
+            content: currentTikzSvg && toolResult.isCorrect
+              ? "> ✅ **TikZ 图形已确认**"
+              : "> ❌ **暂无可确认的绘制结果**",
+          });
+        }
+
         onToolEvent?.({
           type: "tool_result",
           toolName,
-          engine: toolResult.engine,
           result: toolResult,
           sources: toolResult.sources,
         });
 
-        // 追加 tool result
+        const resultForLLM = toolName === "draw_tikz" && toolResult.compiled
+          ? { compiled: true, tikzCode: toolResult.tikzCode }
+          : toolResult;
+
         msgs.push({
           role: "tool",
           tool_call_id: toolCall.id || `call_${Date.now()}`,
-          content: JSON.stringify(toolResult),
+          content: JSON.stringify(resultForLLM),
         });
       }
-
-      isFinalCall = true;
     }
   }
 
@@ -221,7 +267,11 @@ export class BaseLLMAdapter {
     let totalUsage = { input: 0, output: 0, total: 0 };
     const reasoningParts = [];
     const searchInfo = { used: false, queries: [], sources: [] };
-    let isFinalCall = false;
+    let tikzInfo = null;
+    let currentTikzCode = null;
+    let currentTikzSvg = null;
+    let currentTikzPngBase64 = null;
+    let tikzAttempts = 0;
     let llmCalls = 0;
 
     while (true) {
@@ -231,47 +281,37 @@ export class BaseLLMAdapter {
         throw new Error(`Tool calling loop exceeded maximum of ${MAX_TOOL_ROUNDS} rounds`);
       }
 
+      onChunk?.({ type: "reasoning_round", round: reasoningParts.length + 1, reasoningDelta: "" });
+
       const result = await this.collectStreamResult(
-        await this.createStreamWithTools(msgs, isFinalCall ? null : tools),
-        isFinalCall ? onChunk : undefined, // 只有最终调用才发 delta
-        !isFinalCall ? onChunk : undefined // 非最终调用发 reasoning（如有）
+        await this.createStreamWithTools(msgs, tools),
+        onChunk,
+        onChunk
       );
 
-      // 累加 token usage
       totalUsage = addUsage(totalUsage, result.usage);
 
-      // 收集 reasoning
       if (result.reasoning && result.reasoning.trim()) {
         const roundNum = reasoningParts.length + 1;
         reasoningParts.push({
           round: roundNum,
           content: result.reasoning.trim(),
         });
-        // 非最终调用的 reasoning 也通过 onChunk 发给前端
-        if (!isFinalCall) {
-          onChunk?.({
-            type: "reasoning_round",
-            round: roundNum,
-            reasoningDelta: result.reasoning.trim(),
-          });
-        }
       }
 
-      // 没有 tool_calls → 最终回答
       if (!result.toolCalls || result.toolCalls.length === 0) {
         return {
           reply: result.reply,
           reasoning: reasoningParts,
           usage: totalUsage,
           searchInfo: searchInfo.used ? { ...searchInfo, llmCalls } : null,
+          tikzInfo,
           responseId: result.responseId,
         };
       }
 
-      // 追加 assistant message（每轮只追加一次）
       msgs.push(result.message);
 
-      // 执行工具
       for (const toolCall of result.toolCalls) {
         const toolName = toolCall.function?.name || toolCall.name;
         const toolArgs = parseToolArgs(toolCall);
@@ -280,17 +320,12 @@ export class BaseLLMAdapter {
         onToolEvent?.({ type: "tool_start", toolName, arguments: toolArgs });
         onChunk?.({ type: "tool_start", toolName, arguments: toolArgs });
 
-        // 将工具调用过程写入 reasoning（流式）
         if (toolName === "web_search") {
           const query = toolArgs?.query || "";
           const roundNum = reasoningParts.length + 1;
           const reasoningContent = `> 🔍 **联网搜索** — ${query}`;
           reasoningParts.push({ round: roundNum, content: reasoningContent });
-          onChunk?.({
-            type: "reasoning_round",
-            round: roundNum,
-            reasoningDelta: reasoningContent,
-          });
+          onChunk?.({ type: "reasoning_round", round: roundNum, reasoningDelta: reasoningContent });
         }
 
         let toolResult;
@@ -304,7 +339,6 @@ export class BaseLLMAdapter {
           toolResult = { error: `Unknown tool: ${toolName}` };
         }
 
-        // 收集搜索信息
         if (toolName === "web_search" && toolResult.sources) {
           searchInfo.used = true;
           if (toolResult.query) searchInfo.queries.push(toolResult.query);
@@ -317,6 +351,64 @@ export class BaseLLMAdapter {
               snippet: s.snippet,
             }))
           );
+        }
+
+        if (toolName === "draw_tikz" && toolResult.compiled) {
+          currentTikzCode = toolResult.tikzCode;
+          currentTikzSvg = toolResult.svg;
+          currentTikzPngBase64 = toolResult.pngBase64;
+          tikzAttempts++;
+          tikzInfo = {
+            code: toolResult.tikzCode,
+            svg: toolResult.svg,
+            compiled: true,
+          };
+        }
+
+        if (toolName === "check_drawing") {
+          if (!currentTikzSvg) {
+            toolResult = { isCorrect: false, error: "暂无绘制结果，请先调用 draw_tikz" };
+          } else if (toolResult.isCorrect) {
+            toolResult.svg = currentTikzSvg;
+            if (this.modelConfig.supportsMultimodal !== false && currentTikzPngBase64) {
+              toolResult.pngBase64 = currentTikzPngBase64;
+            }
+            tikzInfo = {
+              code: currentTikzCode,
+              svg: currentTikzSvg,
+              compiled: true,
+              verified: true,
+              verifyAttempts: tikzAttempts,
+            };
+          }
+        }
+
+        if (toolName === "draw_tikz") {
+          reasoningParts.push({
+            round: reasoningParts.length + 1,
+            content: toolResult.compiled
+              ? "> 🎨 **绘制 TikZ 图形**"
+              : "> ❌ **TikZ 编译失败**",
+          });
+          onChunk?.({
+            type: "reasoning_round",
+            round: reasoningParts.length,
+            reasoningDelta: reasoningParts[reasoningParts.length - 1].content,
+          });
+        }
+
+        if (toolName === "check_drawing") {
+          reasoningParts.push({
+            round: reasoningParts.length + 1,
+            content: currentTikzSvg && toolResult.isCorrect
+              ? "> ✅ **TikZ 图形已确认**"
+              : "> ❌ **暂无可确认的绘制结果**",
+          });
+          onChunk?.({
+            type: "reasoning_round",
+            round: reasoningParts.length,
+            reasoningDelta: reasoningParts[reasoningParts.length - 1].content,
+          });
         }
 
         onToolEvent?.({
@@ -334,17 +426,21 @@ export class BaseLLMAdapter {
             url: s.url,
             snippet: s.snippet,
           })),
+          svg: toolName === "draw_tikz" ? toolResult.svg ?? null : undefined,
+          compiled: toolName === "draw_tikz" ? toolResult.compiled ?? false : undefined,
+          error: toolName === "draw_tikz" ? toolResult.error ?? null : undefined,
         });
 
-        // 追加 tool result
+        const resultForLLM = toolName === "draw_tikz" && toolResult.compiled
+          ? { compiled: true, tikzCode: toolResult.tikzCode }
+          : toolResult;
+
         msgs.push({
           role: "tool",
           tool_call_id: toolCall.id || `call_${Date.now()}`,
-          content: JSON.stringify(toolResult),
+          content: JSON.stringify(resultForLLM),
         });
       }
-
-      isFinalCall = true;
     }
   }
 

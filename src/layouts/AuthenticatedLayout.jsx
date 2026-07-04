@@ -18,6 +18,7 @@ import AboutSettingsPanel from "../components/AboutSettingsPanel";
 import AccountSettingsPanel from "../components/AccountSettingsPanel";
 import SettingsMenuPanel from "../components/SettingsMenuPanel";
 import SearchModal from "../components/SearchModal";
+import TikzPreviewPanel from "../components/TikzPreviewPanel";
 
 function resolveLayoutMode(viewportWidth) {
   if (viewportWidth < 600) return "mobile";
@@ -119,6 +120,9 @@ export default function AuthenticatedLayout() {
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editText, setEditText] = useState('');
+  const [tikzPreviewData, setTikzPreviewData] = useState(null);
+  const [tikzPreviewContext, setTikzPreviewContext] = useState("");
+  const [isTikzPreviewOpen, setIsTikzPreviewOpen] = useState(false);
 
   useEffect(() => {
     const handler = (e) => setEditText(e.detail.text || '');
@@ -128,6 +132,7 @@ export default function AuthenticatedLayout() {
 
   const drawerTouchStartRef = useRef({ x: 0, y: 0, active: false });
   const drawerSwipeDetectedRef = useRef(false);
+  const edgeSwipeRef = useRef({ startX: 0, startY: 0, active: false });
 
   const layoutMode = resolveLayoutMode(viewportWidth);
   const showSidebarMenuButton = layoutMode === "mobile";
@@ -191,8 +196,18 @@ export default function AuthenticatedLayout() {
         setIsAccountPanelOpen(true);
       }
     }
+    function handleOpenTikzPreview(event) {
+      const detail = event?.detail ?? null;
+      setTikzPreviewData(detail?.tikz ?? null);
+      setTikzPreviewContext(detail?.text ?? "");
+      setIsTikzPreviewOpen(true);
+    }
     window.addEventListener("open-settings", handleOpenSettings);
-    return () => window.removeEventListener("open-settings", handleOpenSettings);
+    window.addEventListener("open-tikz-preview", handleOpenTikzPreview);
+    return () => {
+      window.removeEventListener("open-settings", handleOpenSettings);
+      window.removeEventListener("open-tikz-preview", handleOpenTikzPreview);
+    };
   }, []);
 
   const isAnySettingsPanelOpen = useMemo(
@@ -220,8 +235,9 @@ export default function AuthenticatedLayout() {
       currentViewMode !== "chat" ||
       isAnySettingsPanelOpen ||
       isSidebarDrawerOpen ||
-      isSearchOpen,
-    [currentViewMode, isAnySettingsPanelOpen, isSidebarDrawerOpen, isSearchOpen],
+      isSearchOpen ||
+      isTikzPreviewOpen,
+    [currentViewMode, isAnySettingsPanelOpen, isSidebarDrawerOpen, isSearchOpen, isTikzPreviewOpen],
   );
 
   useEffect(() => {
@@ -298,6 +314,33 @@ export default function AuthenticatedLayout() {
     drawerSwipeDetectedRef.current = false;
   };
 
+  const handleEdgeTouchStart = (e) => {
+    if (isSidebarDrawerOpen || layoutMode === "desktop") return;
+    const touch = e.touches[0];
+    if (touch.clientX <= 36) {
+      edgeSwipeRef.current = { startX: touch.clientX, startY: touch.clientY, active: true };
+    }
+  };
+
+  const handleEdgeTouchMove = (e) => {
+    if (!edgeSwipeRef.current.active) return;
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - edgeSwipeRef.current.startX;
+    const deltaY = touch.clientY - edgeSwipeRef.current.startY;
+    if (Math.abs(deltaY) > Math.abs(deltaX)) {
+      edgeSwipeRef.current.active = false;
+      return;
+    }
+    if (deltaX >= 40) {
+      edgeSwipeRef.current.active = false;
+      setIsSidebarDrawerOpen(true);
+    }
+  };
+
+  const handleEdgeTouchEnd = () => {
+    edgeSwipeRef.current.active = false;
+  };
+
   const isLoading =
     sessionLoading ||
     sessionBootstrapping ||
@@ -310,9 +353,12 @@ export default function AuthenticatedLayout() {
   const displayError = sessionError || appError;
 
   return (
-    <div
-      className={`app-shell layout-${layoutMode} ${appSettings.showChatFocusOutline !== false ? "" : "hide-chat-focus-outline"}`.trim()}
-    >
+      <div
+        className={`app-shell layout-${layoutMode} ${appSettings.showChatFocusOutline !== false ? "" : "hide-chat-focus-outline"}`.trim()}
+        onTouchStart={handleEdgeTouchStart}
+        onTouchMove={handleEdgeTouchMove}
+        onTouchEnd={handleEdgeTouchEnd}
+      >
       {layoutMode !== "mobile" ? (
         <Sidebar
           isCollapsed={
@@ -548,6 +594,13 @@ export default function AuthenticatedLayout() {
       <SearchModal
         open={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
+      />
+
+      <TikzPreviewPanel
+        open={isTikzPreviewOpen}
+        tikzData={tikzPreviewData}
+        contextText={tikzPreviewContext}
+        onClose={() => setIsTikzPreviewOpen(false)}
       />
     </div>
   );

@@ -23,6 +23,7 @@ export default function useStreaming({
   const [streamingReasoning, setStreamingReasoning] = useState("");
   const [pendingPrompt, setPendingPrompt] = useState("");
   const [streamingToolState, setStreamingToolState] = useState(null);
+  const [streamingTikzSvg, setStreamingTikzSvg] = useState(null);
   const streamAbortControllerRef = useRef(null);
   const streamReconnectControllerRef = useRef(null);
   const streamBufferRef = useRef("");
@@ -49,6 +50,7 @@ export default function useStreaming({
       setStreamingReply("");
       setStreamingReasoning("");
       setStreamingToolState(null);
+      setStreamingTikzSvg(null);
       streamBufferRef.current = "";
       streamReasoningBufferRef.current = "";
 
@@ -58,19 +60,39 @@ export default function useStreaming({
           onEvent: (event) => {
             // 处理工具事件
             if (event?.type === "tool_start") {
-              setStreamingToolState({ type: "searching", toolName: event.toolName, query: event.arguments?.query });
+              if (event.toolName === "web_search") {
+                setStreamingToolState({ type: "searching", toolName: event.toolName, query: event.arguments?.query });
+              }
+              if (event.toolName === "draw_tikz") {
+                setStreamingToolState({ type: "drawing", toolName: event.toolName });
+                setStreamingTikzSvg(null);
+              }
               return;
             }
             if (event?.type === "tool_result") {
-              setStreamingToolState({ type: "searched", toolName: event.toolName, engine: event.engine, sources: event.sources });
+              if (event.toolName === "web_search") {
+                setStreamingToolState({ type: "searched", toolName: event.toolName, engine: event.engine, sources: event.sources });
+              }
+              if (event.toolName === "draw_tikz") {
+                if (event.compiled && event.svg) {
+                  setStreamingTikzSvg(event.svg);
+                }
+                setStreamingToolState({
+                  type: event.compiled ? "drawn" : "failed",
+                  toolName: event.toolName,
+                  error: event.error,
+                });
+              }
               return;
             }
             // 处理 reasoning round 事件
             if (event?.type === "reasoning_round") {
               if (event.reasoningDelta) {
                 streamReasoningBufferRef.current += `\n\n---\n\n${event.reasoningDelta}`;
-                scheduleFlush();
+              } else if (streamReasoningBufferRef.current) {
+                streamReasoningBufferRef.current += `\n\n---\n\n`;
               }
+              scheduleFlush();
               return;
             }
             if (event?.type === "delta") {
@@ -98,6 +120,7 @@ export default function useStreaming({
           setStreamingReply("");
           setStreamingReasoning("");
           setStreamingToolState(null);
+          setStreamingTikzSvg(null);
         }
       } catch (err) {
         if (err?.name !== "AbortError") {
@@ -117,6 +140,7 @@ export default function useStreaming({
         setStreamingReply("");
         setStreamingReasoning("");
         setStreamingToolState(null);
+        setStreamingTikzSvg(null);
         streamReconnectControllerRef.current = null;
       }
     },
@@ -156,6 +180,7 @@ export default function useStreaming({
       setPendingPrompt(rawContent);
       setStreamingReply("");
       setStreamingToolState(null);
+      setStreamingTikzSvg(null);
       streamReconnectControllerRef.current?.abort();
       streamReconnectControllerRef.current = null;
 
@@ -203,19 +228,39 @@ export default function useStreaming({
           onEvent: async (event) => {
             // 处理工具事件
             if (event?.type === "tool_start") {
-              setStreamingToolState({ type: "searching", toolName: event.toolName, query: event.arguments?.query });
+              if (event.toolName === "web_search") {
+                setStreamingToolState({ type: "searching", toolName: event.toolName, query: event.arguments?.query });
+              }
+              if (event.toolName === "draw_tikz") {
+                setStreamingToolState({ type: "drawing", toolName: event.toolName });
+                setStreamingTikzSvg(null);
+              }
               return;
             }
             if (event?.type === "tool_result") {
-              setStreamingToolState({ type: "searched", toolName: event.toolName, engine: event.engine, sources: event.sources });
+              if (event.toolName === "web_search") {
+                setStreamingToolState({ type: "searched", toolName: event.toolName, engine: event.engine, sources: event.sources });
+              }
+              if (event.toolName === "draw_tikz") {
+                if (event.compiled && event.svg) {
+                  setStreamingTikzSvg(event.svg);
+                }
+                setStreamingToolState({
+                  type: event.compiled ? "drawn" : "failed",
+                  toolName: event.toolName,
+                  error: event.error,
+                });
+              }
               return;
             }
             // 处理 reasoning round 事件
             if (event?.type === "reasoning_round") {
               if (event.reasoningDelta) {
                 streamReasoningBufferRef.current += `\n\n---\n\n${event.reasoningDelta}`;
-                scheduleFlush();
+              } else if (streamReasoningBufferRef.current) {
+                streamReasoningBufferRef.current += `\n\n---\n\n`;
               }
+              scheduleFlush();
               return;
             }
             if (event?.type === "delta") {
@@ -262,6 +307,7 @@ export default function useStreaming({
         setStreamingReply("");
         setStreamingReasoning("");
         setStreamingToolState(null);
+        setStreamingTikzSvg(null);
         streamAbortControllerRef.current = null;
       }
     },
@@ -279,6 +325,7 @@ export default function useStreaming({
     streamingReasoning,
     pendingPrompt,
     streamingToolState,
+    streamingTikzSvg,
     abortControllerRef: abortControllerValue,
     subscribeToStream,
     handleSend,
