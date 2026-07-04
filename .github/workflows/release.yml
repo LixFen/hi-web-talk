@@ -24,16 +24,20 @@ jobs:
 
       - run: npm run build
 
-      - run: npx electron-builder --win portable --publish never
+      - run: npx electron-builder --win --publish never
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Hi-Web-Talk-${{ github.ref_name }}
-          path: dist/*.exe
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.exe
+          files: |
+            release/*.exe
+            release/*.exe.blockmap
           generate_release_notes: true

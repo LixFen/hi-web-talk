@@ -12,6 +12,7 @@ logs
 docs
 server/services/modelCapabilities.generated.js
 .claude
+.npmrc
 
 # Android (experimental, regenerate with `npx cap add android`)
 android/

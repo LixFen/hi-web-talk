@@ -22,7 +22,7 @@
     "electron:dev": "cross-env HI_WEB_TALK_RENDERER_URL=http://localhost:5173 electron .",
     "electron:dev:full": "concurrently \"npm run dev\" \"npm run electron:dev\"",
     "electron:remote": "cross-env HI_WEB_TALK_MODE=remote HI_WEB_TALK_REMOTE_URL=http://127.0.0.1:8787 electron .",
-    "electron:build": "npm run build && electron-builder --win portable",
+    "electron:build": "npm run build && electron-builder",
     "android:deploy": "npm run build && npx cap copy && node scripts/deploy-android.mjs"
   },
   "dependencies": {
@@ -78,9 +78,20 @@
     "extraMetadata": {
       "main": "electron/main.js"
     },
+    "directories": {
+      "output": "release"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
     "win": {
       "icon": "electron/icon-high-res.png",
       "target": [
+        "nsis",
         "portable"
       ]
     }
