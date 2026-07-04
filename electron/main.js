@@ -4,6 +4,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { app, BrowserWindow, ipcMain, Menu, shell } from "electron";
 
+app.disableHardwareAcceleration();
+
 const rendererUrl = process.env.HI_WEB_TALK_RENDERER_URL || process.env.VITE_DEV_SERVER_URL || "";
 const localPort = Number(process.env.OPENAI_PORT || 8787);
 
