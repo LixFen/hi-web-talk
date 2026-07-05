@@ -1,5 +1,16 @@
 import { getToolExecutor } from "../tools/toolRegistry.js";
 
+/**
+ * Strip internal-only fields before sending messages to the LLM provider.
+ * Currently strips `source` (harness-internal tracking field).
+ */
+function stripInternalFields(msgs) {
+  return msgs.map((msg) => {
+    const { source, ...clean } = msg;
+    return clean;
+  });
+}
+
 const MAX_TOOL_ROUNDS = 10;
 
 /**
@@ -119,6 +130,7 @@ export class BaseLLMAdapter {
     let currentTikzSvg = null;
     let currentTikzPngBase64 = null;
     let tikzAttempts = 0;
+    const preservedArtifacts = [];
     let llmCalls = 0;
 
     while (true) {
@@ -128,8 +140,10 @@ export class BaseLLMAdapter {
         throw new Error(`Tool calling loop exceeded maximum of ${MAX_TOOL_ROUNDS} rounds`);
       }
 
+      // Strip internal fields before sending to provider
+      const cleanMsgs = stripInternalFields(msgs);
       const result = await this.withRetry(() =>
-        this.doCallWithTools(msgs, tools)
+        this.doCallWithTools(cleanMsgs, tools)
       );
 
       totalUsage = addUsage(totalUsage, result.usage);
@@ -138,6 +152,7 @@ export class BaseLLMAdapter {
         reasoningParts.push({
           round: reasoningParts.length + 1,
           content: result.reasoning.trim(),
+          type: "thinking",
         });
       }
 
@@ -149,6 +164,7 @@ export class BaseLLMAdapter {
           searchInfo: searchInfo.used ? { ...searchInfo, llmCalls } : null,
           tikzInfo,
           responseId: result.responseId,
+          preservedArtifacts,
         };
       }
 
@@ -163,24 +179,49 @@ export class BaseLLMAdapter {
 
         if (toolName === "web_search") {
           const query = toolArgs?.query || "";
-          const reasoningContent = `> 🔍 **联网搜索** — ${query}`;
           reasoningParts.push({
             round: reasoningParts.length + 1,
-            content: reasoningContent,
+            content: `> 🔍 **联网搜索** — ${query}`,
+            type: "tool",
           });
         }
 
-        let toolResult;
+        let rawResult;
         if (executor) {
           try {
-            toolResult = await executor(toolArgs);
+            rawResult = await executor(toolArgs);
           } catch (err) {
-            toolResult = { error: err.message };
+            rawResult = { toolResult: { error: err.message }, artifacts: [] };
           }
         } else {
-          toolResult = { error: `Unknown tool: ${toolName}` };
+          rawResult = { toolResult: { error: `Unknown tool: ${toolName}` }, artifacts: [] };
         }
 
+        // Destructure: tools now return { toolResult, artifacts[] }
+        const { toolResult = rawResult, artifacts = [] } = rawResult || {};
+
+        // ── Artifact-driven processing ──
+        for (const artifact of artifacts) {
+          switch (artifact.type) {
+            case "image":
+              if (this.modelConfig.supportsMultimodal !== false) {
+                msgs.push({
+                  role: "user",
+                  source: "harness",
+                  content: [
+                    { type: "text", text: artifact.label || "[图]" },
+                    { type: "image_url", image_url: { url: `data:${artifact.mime};base64,${artifact.data}` } },
+                  ],
+                });
+              }
+              if (artifact.contextPolicy === "preserve") {
+                preservedArtifacts.push(artifact);
+              }
+              break;
+          }
+        }
+
+        // ── Response metadata collection (tool-name based, for frontend) ──
         if (toolName === "web_search" && toolResult.sources) {
           if (toolResult.query) searchInfo.queries.push(toolResult.query);
           const startIdx = searchInfo.sources.length;
@@ -190,30 +231,27 @@ export class BaseLLMAdapter {
               title: s.title,
               url: s.url,
               snippet: s.snippet,
-            }))
+            })),
           );
         }
 
         if (toolName === "draw_tikz" && toolResult.compiled) {
           currentTikzCode = toolResult.tikzCode;
-          currentTikzSvg = toolResult.svg;
-          currentTikzPngBase64 = toolResult.pngBase64;
+          const imageArtifact = artifacts.find((a) => a.type === "image");
+          currentTikzSvg = imageArtifact?.meta?.svg || null;
+          currentTikzPngBase64 = imageArtifact?.data || null;
           tikzAttempts++;
           tikzInfo = {
             code: toolResult.tikzCode,
-            svg: toolResult.svg,
+            svg: currentTikzSvg,
             compiled: true,
           };
         }
 
         if (toolName === "check_drawing") {
           if (!currentTikzSvg) {
-            toolResult = { isCorrect: false, error: "暂无绘制结果，请先调用 draw_tikz" };
-          } else if (toolResult.isCorrect) {
-            toolResult.svg = currentTikzSvg;
-            if (this.modelConfig.supportsMultimodal !== false && currentTikzPngBase64) {
-              toolResult.pngBase64 = currentTikzPngBase64;
-            }
+            toolResult.error = "暂无绘制结果，请先调用 draw_tikz";
+          } else {
             tikzInfo = {
               code: currentTikzCode,
               svg: currentTikzSvg,
@@ -230,15 +268,17 @@ export class BaseLLMAdapter {
             content: toolResult.compiled
               ? "> 🎨 **绘制 TikZ 图形**"
               : "> ❌ **TikZ 编译失败**",
+            type: "tool",
           });
         }
 
         if (toolName === "check_drawing") {
           reasoningParts.push({
             round: reasoningParts.length + 1,
-            content: currentTikzSvg && toolResult.isCorrect
-              ? "> ✅ **TikZ 图形已确认**"
-              : "> ❌ **暂无可确认的绘制结果**",
+            content: currentTikzSvg
+              ? "> ✅ **TikZ 图形已检查**"
+              : "> ❌ **暂无可检查的绘制结果**",
+            type: "tool",
           });
         }
 
@@ -249,14 +289,10 @@ export class BaseLLMAdapter {
           sources: toolResult.sources,
         });
 
-        const resultForLLM = toolName === "draw_tikz" && toolResult.compiled
-          ? { compiled: true, tikzCode: toolResult.tikzCode }
-          : toolResult;
-
         msgs.push({
           role: "tool",
           tool_call_id: toolCall.id || `call_${Date.now()}`,
-          content: JSON.stringify(resultForLLM),
+          content: JSON.stringify(toolResult),
         });
       }
     }
@@ -272,6 +308,7 @@ export class BaseLLMAdapter {
     let currentTikzSvg = null;
     let currentTikzPngBase64 = null;
     let tikzAttempts = 0;
+    const preservedArtifacts = [];
     let llmCalls = 0;
 
     while (true) {
@@ -283,10 +320,12 @@ export class BaseLLMAdapter {
 
       onChunk?.({ type: "reasoning_round", round: reasoningParts.length + 1, reasoningDelta: "" });
 
+      // Strip internal fields before sending to provider
+      const cleanMsgs = stripInternalFields(msgs);
       const result = await this.collectStreamResult(
-        await this.createStreamWithTools(msgs, tools),
+        await this.createStreamWithTools(cleanMsgs, tools),
         onChunk,
-        onChunk
+        onChunk,
       );
 
       totalUsage = addUsage(totalUsage, result.usage);
@@ -296,6 +335,7 @@ export class BaseLLMAdapter {
         reasoningParts.push({
           round: roundNum,
           content: result.reasoning.trim(),
+          type: "thinking",
         });
       }
 
@@ -307,6 +347,7 @@ export class BaseLLMAdapter {
           searchInfo: searchInfo.used ? { ...searchInfo, llmCalls } : null,
           tikzInfo,
           responseId: result.responseId,
+          preservedArtifacts,
         };
       }
 
@@ -324,21 +365,46 @@ export class BaseLLMAdapter {
           const query = toolArgs?.query || "";
           const roundNum = reasoningParts.length + 1;
           const reasoningContent = `> 🔍 **联网搜索** — ${query}`;
-          reasoningParts.push({ round: roundNum, content: reasoningContent });
+          reasoningParts.push({ round: roundNum, content: reasoningContent, type: "tool" });
           onChunk?.({ type: "reasoning_round", round: roundNum, reasoningDelta: reasoningContent });
         }
 
-        let toolResult;
+        let rawResult;
         if (executor) {
           try {
-            toolResult = await executor(toolArgs);
+            rawResult = await executor(toolArgs);
           } catch (err) {
-            toolResult = { error: err.message };
+            rawResult = { toolResult: { error: err.message }, artifacts: [] };
           }
         } else {
-          toolResult = { error: `Unknown tool: ${toolName}` };
+          rawResult = { toolResult: { error: `Unknown tool: ${toolName}` }, artifacts: [] };
         }
 
+        // Destructure: tools now return { toolResult, artifacts[] }
+        const { toolResult = rawResult, artifacts = [] } = rawResult || {};
+
+        // ── Artifact-driven processing ──
+        for (const artifact of artifacts) {
+          switch (artifact.type) {
+            case "image":
+              if (this.modelConfig.supportsMultimodal !== false) {
+                msgs.push({
+                  role: "user",
+                  source: "harness",
+                  content: [
+                    { type: "text", text: artifact.label || "[图]" },
+                    { type: "image_url", image_url: { url: `data:${artifact.mime};base64,${artifact.data}` } },
+                  ],
+                });
+              }
+              if (artifact.contextPolicy === "preserve") {
+                preservedArtifacts.push(artifact);
+              }
+              break;
+          }
+        }
+
+        // ── Response metadata collection (tool-name based, for frontend) ──
         if (toolName === "web_search" && toolResult.sources) {
           searchInfo.used = true;
           if (toolResult.query) searchInfo.queries.push(toolResult.query);
@@ -349,30 +415,27 @@ export class BaseLLMAdapter {
               title: s.title,
               url: s.url,
               snippet: s.snippet,
-            }))
+            })),
           );
         }
 
         if (toolName === "draw_tikz" && toolResult.compiled) {
           currentTikzCode = toolResult.tikzCode;
-          currentTikzSvg = toolResult.svg;
-          currentTikzPngBase64 = toolResult.pngBase64;
+          const imageArtifact = artifacts.find((a) => a.type === "image");
+          currentTikzSvg = imageArtifact?.meta?.svg || null;
+          currentTikzPngBase64 = imageArtifact?.data || null;
           tikzAttempts++;
           tikzInfo = {
             code: toolResult.tikzCode,
-            svg: toolResult.svg,
+            svg: currentTikzSvg,
             compiled: true,
           };
         }
 
         if (toolName === "check_drawing") {
           if (!currentTikzSvg) {
-            toolResult = { isCorrect: false, error: "暂无绘制结果，请先调用 draw_tikz" };
-          } else if (toolResult.isCorrect) {
-            toolResult.svg = currentTikzSvg;
-            if (this.modelConfig.supportsMultimodal !== false && currentTikzPngBase64) {
-              toolResult.pngBase64 = currentTikzPngBase64;
-            }
+            toolResult.error = "暂无绘制结果，请先调用 draw_tikz";
+          } else {
             tikzInfo = {
               code: currentTikzCode,
               svg: currentTikzSvg,
@@ -389,6 +452,7 @@ export class BaseLLMAdapter {
             content: toolResult.compiled
               ? "> 🎨 **绘制 TikZ 图形**"
               : "> ❌ **TikZ 编译失败**",
+            type: "tool",
           });
           onChunk?.({
             type: "reasoning_round",
@@ -400,9 +464,10 @@ export class BaseLLMAdapter {
         if (toolName === "check_drawing") {
           reasoningParts.push({
             round: reasoningParts.length + 1,
-            content: currentTikzSvg && toolResult.isCorrect
-              ? "> ✅ **TikZ 图形已确认**"
-              : "> ❌ **暂无可确认的绘制结果**",
+            content: currentTikzSvg
+              ? "> ✅ **TikZ 图形已检查**"
+              : "> ❌ **暂无可检查的绘制结果**",
+            type: "tool",
           });
           onChunk?.({
             type: "reasoning_round",
@@ -426,19 +491,15 @@ export class BaseLLMAdapter {
             url: s.url,
             snippet: s.snippet,
           })),
-          svg: toolName === "draw_tikz" ? toolResult.svg ?? null : undefined,
+          svg: toolName === "draw_tikz" ? currentTikzSvg ?? null : undefined,
           compiled: toolName === "draw_tikz" ? toolResult.compiled ?? false : undefined,
           error: toolName === "draw_tikz" ? toolResult.error ?? null : undefined,
         });
 
-        const resultForLLM = toolName === "draw_tikz" && toolResult.compiled
-          ? { compiled: true, tikzCode: toolResult.tikzCode }
-          : toolResult;
-
         msgs.push({
           role: "tool",
           tool_call_id: toolCall.id || `call_${Date.now()}`,
-          content: JSON.stringify(resultForLLM),
+          content: JSON.stringify(toolResult),
         });
       }
     }
@@ -508,7 +569,7 @@ function wrapReasoning(reasoning) {
   if (!reasoning) return [];
   if (Array.isArray(reasoning)) return reasoning;
   if (typeof reasoning === "string" && reasoning.trim()) {
-    return [{ round: 1, content: reasoning.trim() }];
+    return [{ round: 1, content: reasoning.trim(), type: "thinking" }];
   }
   return [];
 }

@@ -15,7 +15,7 @@ const drawTikzDefinition = {
   function: {
     name: "draw_tikz",
     description:
-      "根据用户需求绘制 TikZ 图形。调用后系统会自动编译并展示渲染结果供用户检查。可用的 TikZ 库和 LaTeX 包：tikz 基础库默认已加载；circuitikz（电路图）、pgfplots（函数图）、amsmath/amssymb（数学符号）等可通过 packages 参数加载。确认正确后请调用 check_drawing 记录确认状态。注意：多次调用会覆写上一次的绘制结果。",
+      "根据用户需求绘制 TikZ 图形。可用的 TikZ 库和 LaTeX 包：tikz 基础库默认已加载；circuitikz（电路图）、pgfplots（函数图）、amsmath/amssymb（数学符号）等可通过 packages 参数加载。注意：多次调用会覆写上一次的绘制结果，不可用中文。图形正常绘制后，调用 check_drawing来观察绘制结果。",
     parameters: {
       type: "object",
       properties: {
@@ -38,9 +38,14 @@ const drawTikzDefinition = {
   },
 };
 
+let artIdCounter = 0;
+function nextArtifactId() {
+  return `art_${Date.now().toString(36)}_${(++artIdCounter).toString(36)}`;
+}
+
 async function execute({ description, tikzCode, packages }) {
   if (!tikzCode || typeof tikzCode !== "string") {
-    return { error: "tikzCode 参数无效", compiled: false };
+    return { toolResult: { error: "tikzCode 参数无效", compiled: false }, artifacts: [] };
   }
 
   let source = tikzCode;
@@ -70,14 +75,28 @@ async function execute({ description, tikzCode, packages }) {
       const dvi = await tikz.tex(source, { texPackages, showConsole: true });
       const svg = await tikz.dvi2svg(dvi);
 
-      const pngBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
+      const pngBuffer = await sharp(Buffer.from(svg))
+        .flatten({ background: "#ffffff" })
+        .png()
+        .toBuffer();
       const pngBase64 = pngBuffer.toString("base64");
 
       return {
-        tikzCode: source,
-        svg,
-        pngBase64,
-        compiled: true,
+        toolResult: {
+          tikzCode: source,
+          compiled: true,
+        },
+        artifacts: [
+          {
+            id: nextArtifactId(),
+            type: "image",
+            mime: "image/png",
+            contextPolicy: "preserve",
+            label: "[绘制的图形]",
+            data: pngBase64,
+            meta: { svg },
+          },
+        ],
       };
     } finally {
       console.log = originalLog;
@@ -86,10 +105,12 @@ async function execute({ description, tikzCode, packages }) {
     const errorDetail = err.message;
     const texError = logs.find((l) => l.includes("! ")) || "";
     return {
-      tikzCode: source,
-      svg: null,
-      compiled: false,
-      error: `TikZ 编译失败: ${texError || errorDetail}`,
+      toolResult: {
+        tikzCode: source,
+        compiled: false,
+        error: `TikZ 编译失败: ${texError || errorDetail}`,
+      },
+      artifacts: [],
     };
   }
 }

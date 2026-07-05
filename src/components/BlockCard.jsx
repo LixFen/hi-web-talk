@@ -28,7 +28,17 @@ function ReasoningIcon({ isOpen }) {
 function normalizeReasoning(reasoning) {
   if (Array.isArray(reasoning)) return reasoning.filter(r => r.content && r.content.trim());
   if (typeof reasoning === "string" && reasoning.trim()) {
-    return [{ round: 1, content: reasoning.trim() }];
+    const trimmed = reasoning.trim();
+    // 流式传输中多轮内容用 \n\n---\n\n 拼接，拆分为独立轮次
+    const parts = trimmed.split(/\n\n---\n\n/).filter(Boolean);
+    if (parts.length > 1) {
+      return parts.map((content, i) => ({
+        round: i + 1,
+        content: content.trim(),
+        type: content.trim().startsWith(">") ? "tool" : "thinking",
+      }));
+    }
+    return [{ round: 1, content: trimmed }];
   }
   return [];
 }
@@ -114,7 +124,7 @@ function ReasoningPanel({ reasoning, defaultOpen = false }) {
       <div className="reasoning-panel-content" aria-hidden={!isOpen}>
         {parts.map((part, i) => (
           <div key={i} className="reasoning-round">
-            <div className="reasoning-round-header">第 {part.round} 轮思考</div>
+            <div className="reasoning-round-header">第 {part.round} 轮{part.type === "tool" ? "工具运行结果" : "思考"}</div>
             <SafeMarkdown className="reasoning-markdown">
               {part.content}
             </SafeMarkdown>

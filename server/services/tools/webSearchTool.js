@@ -46,7 +46,7 @@ const webSearchDefinition = {
  */
 async function execute({ query }) {
   if (!query || typeof query !== "string") {
-    return { error: "query 参数无效", sources: [] };
+    return { toolResult: { error: "query 参数无效", sources: [] }, artifacts: [] };
   }
 
   try {
@@ -58,21 +58,27 @@ async function execute({ query }) {
     });
 
     return {
-      query: result.query,
-      engine: result.engine,
-      sources: result.sources.map((s) => ({
-        title: s.title,
-        url: s.url,
-        snippet: s.snippet,
-        content: s.content || "",
-      })),
+      toolResult: {
+        query: result.query,
+        engine: result.engine,
+        sources: result.sources.map((s) => ({
+          title: s.title,
+          url: s.url,
+          snippet: s.snippet,
+          content: s.content || "",
+        })),
+      },
+      artifacts: [],
     };
   } catch (err) {
     return {
-      query: query,
-      engine: preferredEngine,
-      error: err.message,
-      sources: [],
+      toolResult: {
+        query: query,
+        engine: preferredEngine,
+        error: err.message,
+        sources: [],
+      },
+      artifacts: [],
     };
   }
 }

@@ -342,6 +342,51 @@ function extractAttachmentIds(prompt) {
     .map((block) => block.attachmentId);
 }
 
+/**
+ * Inject artifact messages (images, etc.) from chain blocks into provider messages.
+ * This ensures artifacts preserved from previous rounds are visible to the LLM.
+ */
+function injectArtifactMessages(messages, chainBlocks, adaptationMap, supportsMultimodal) {
+  if (supportsMultimodal === false) return messages;
+
+  // Filter to dialogue blocks that aren't hidden from context
+  const dialogueBlocks = [];
+  for (const block of chainBlocks) {
+    if (block.blockType !== "dialogue") continue;
+    const records = adaptationMap?.get(block.sha1) || [];
+    const contextIgnore = records.some((r) => r.key === "context.ignore" && r.enabled);
+    if (block.flags?.ignoreInContext || contextIgnore) continue;
+    dialogueBlocks.push(block);
+  }
+
+  const result = [];
+  let blockIdx = 0;
+
+  for (const msg of messages) {
+    result.push(msg);
+    if (msg.role !== "assistant") continue;
+
+    const block = dialogueBlocks[blockIdx];
+    if (block?.meta?.artifacts) {
+      for (const a of block.meta.artifacts) {
+        if (a.type === "image" && a.contextPolicy === "preserve") {
+          result.push({
+            role: "user",
+            source: "harness",
+            content: [
+              { type: "text", text: a.label || "[这是上一轮绘制的图形]" },
+              { type: "image_url", image_url: { url: `data:${a.mime};base64,${a.data}` } },
+            ],
+          });
+        }
+      }
+    }
+    blockIdx++;
+  }
+
+  return result;
+}
+
 async function tryAppendErrorLog(payload) {
   if (!payload?.sessionHash) {
     return;
@@ -1179,6 +1224,14 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
 
     providerMessages = downgradeMessagesForModel(providerMessages, selectedModel.supportsMultimodal);
 
+    // Rebuild artifact messages from previous rounds
+    providerMessages = injectArtifactMessages(
+      providerMessages,
+      context.chainBlocks,
+      context.adaptationMap,
+      selectedModel.supportsMultimodal,
+    );
+
     const tools = shouldUseTools
       ? getToolDefinitions()
       : undefined;
@@ -1203,6 +1256,7 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
         responseId: result.responseId,
         ...(result.searchInfo && { search: result.searchInfo }),
         ...(result.tikzInfo && { tikz: result.tikzInfo }),
+        ...(result.preservedArtifacts?.length > 0 && { artifacts: result.preservedArtifacts }),
       },
     });
 
@@ -1363,6 +1417,14 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
 
     providerMessages = downgradeMessagesForModel(providerMessages, selectedModel.supportsMultimodal);
 
+    // Rebuild artifact messages from previous rounds
+    providerMessages = injectArtifactMessages(
+      providerMessages,
+      context.chainBlocks,
+      context.adaptationMap,
+      selectedModel.supportsMultimodal,
+    );
+
     const startEvent = {
       type: "start",
       sessionHash,
@@ -1440,6 +1502,7 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
         responseId: result.responseId,
         ...(result.searchInfo && { search: result.searchInfo }),
         ...(result.tikzInfo && { tikz: result.tikzInfo }),
+        ...(result.preservedArtifacts?.length > 0 && { artifacts: result.preservedArtifacts }),
       },
     });
 
@@ -1631,6 +1694,16 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(
 
     providerMessages = downgradeMessagesForModel(providerMessages, selectedModel.supportsMultimodal);
 
+    // Rebuild artifact messages from previous rounds
+    if (context.chainBlocks && context.adaptationMap) {
+      providerMessages = injectArtifactMessages(
+        providerMessages,
+        context.chainBlocks,
+        context.adaptationMap,
+        selectedModel.supportsMultimodal,
+      );
+    }
+
     const tools = shouldUseTools
       ? getToolDefinitions()
       : undefined;
@@ -1656,6 +1729,7 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(
         regeneratedFromBlockSHA1: targetBlock.sha1,
         ...(result.searchInfo && { search: result.searchInfo }),
         ...(result.tikzInfo && { tikz: result.tikzInfo }),
+        ...(result.preservedArtifacts?.length > 0 && { artifacts: result.preservedArtifacts }),
       },
     });
 
