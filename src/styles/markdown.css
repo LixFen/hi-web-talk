@@ -97,13 +97,12 @@
 }
 
 .markdown-body blockquote {
-  border-left: 3px solid var(--accent-color);
-  padding-left: 0.85rem;
+  border-left: 4px solid var(--border-color);
+  margin-left: 0.75rem;
+  padding-left: 1rem;
   color: var(--text-secondary);
   font-style: italic;
-  background: linear-gradient(90deg, var(--accent-color-alpha), transparent);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  padding-top: 0.4rem;
+  padding-top: 0.6rem;
   padding-bottom: 0.4rem;
 }
 
