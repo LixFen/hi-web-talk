@@ -3,7 +3,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN npm ci --ignore-scripts --legacy-peer-deps
 
 COPY . .
 RUN npm run build
@@ -15,7 +15,7 @@ WORKDIR /app
 RUN apk add --no-cache tini
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts && npm rebuild better-sqlite3
+RUN npm ci --omit=dev --ignore-scripts --legacy-peer-deps && npm rebuild better-sqlite3
 
 COPY --from=builder /app/dist ./dist
 COPY server ./server
