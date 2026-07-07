@@ -42,3 +42,4 @@ class MemoryCache {
 }
 
 export const sessionDetailCache = new MemoryCache(20000);
+export { MemoryCache };

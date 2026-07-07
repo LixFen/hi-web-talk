@@ -339,7 +339,6 @@
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   opacity: 0;
-  transition: all var(--duration-fast) var(--ease-out-expo);
 }
 
 .history-item-row:hover .history-three-dots-btn,
