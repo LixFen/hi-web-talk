@@ -238,7 +238,7 @@ export function SessionProvider({ children }) {
   const handleSelectBlock = useCallback(
     (sha1) => {
       if (!sha1 || sha1 === focusedBlockSHA1) return;
-      issueChatNavigationRequest("block-selector", "smooth", sha1);
+      issueChatNavigationRequest("block-selector", "auto", sha1);
     },
     [focusedBlockSHA1, issueChatNavigationRequest],
   );
