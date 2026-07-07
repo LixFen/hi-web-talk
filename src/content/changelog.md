@@ -1,3 +1,13 @@
+# 2.0.0
+
+- Feat: TikZ drawing panel — new preview panel for LaTeX/TikZ diagrams with syntax checking, image generation, and display in message list.
+- Feat: Drawing tools infrastructure — checkDrawing and drawTikz server tools with i18n support and session integration.
+- Refactor: Harness adapter improvements — enhanced baseLLMAdapter, web search tool integration, and tool infrastructure refinements.
+- Style: Blockquote styling — refined borders, padding, and visual spacing in markdown CSS for improved readability.
+- Feat: Comprehensive test suite — vitest setup with unit tests for user service, memory cache, model capabilities, and schema validation.
+- Chore: vitest configuration and test scripts added to package.json.
+- Fix: Block selector navigation scroll — changed smooth scrolling to auto scrolling to prevent scroll behavior issues.
+
 # 1.19.2
 
 - Perf: Electron startup — disable GPU acceleration to eliminate 5-15s delay before launcher window appears on Windows.
