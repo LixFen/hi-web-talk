@@ -223,6 +223,7 @@ export const DEFAULT_APP_SETTINGS = {
   showPendingOrganizeLabelButton: true,
   titleModelAlias: "",
   summaryModelAlias: "",
+  autoGenerateTitle: true,
   inviteCodeRequired: false,
   inviteCode: "",
   searchEngine: "bing_html",

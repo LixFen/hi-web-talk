@@ -139,6 +139,9 @@ const GraphView = memo(function GraphView(props) {
   const canvasScrollRef = useRef(null);
   const selectedNodeRef = useRef(null);
   const zoomAnchorRef = useRef(null);
+  const initialScrollDone = useRef(false);
+  const offsetRef = useRef({ x: 0, y: 0 });
+  const [viewportSize, setViewportSize] = useState({ w: 0, h: 0 });
   const dragStateRef = useRef({
     isDragging: false,
     startX: 0,
@@ -166,6 +169,17 @@ const GraphView = memo(function GraphView(props) {
   }, []);
 
   useEffect(() => {
+    const el = canvasScrollRef.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setViewportSize((prev) => (prev.w === width && prev.h === height ? prev : { w: width, h: height }));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
     const fallbackSHA1 = focusedBlockSHA1 || graph?.rootBlockSHA1 || blocks[0]?.sha1 || "";
     setSelectedSHA1((currentSelectedSHA1) => {
       if (fallbackSHA1 && currentSelectedSHA1 === fallbackSHA1) {
@@ -182,15 +196,51 @@ const GraphView = memo(function GraphView(props) {
     });
   }, [blocks, focusedBlockSHA1, graph?.rootBlockSHA1]);
 
-  useEffect(() => {
-    const element = selectedNodeRef.current;
+  const hiddenNodeSHA1s = useMemo(
+    () =>
+      new Set(
+        blocks
+          .filter((block) =>
+            block.adaptationInfo?.labels?.some((label) => label.key === "label.hidden"),
+          )
+          .map((block) => block.sha1),
+      ),
+    [blocks],
+  );
 
-    if (!element) {
+  const hiddenCount = hiddenNodeSHA1s.size;
+
+  const visibleBlocks = showHidden ? blocks : blocks.filter((block) => !hiddenNodeSHA1s.has(block.sha1));
+  const layout = buildGraphLayout(visibleBlocks, zoomLevel);
+  const fitsViewport = layout.width <= viewportSize.w && layout.height <= viewportSize.h;
+  const offsetX = fitsViewport ? 0 : Math.max(0, (viewportSize.w - layout.width) / 2);
+  const offsetY = fitsViewport ? 0 : Math.max(0, (viewportSize.h - layout.height) / 2);
+  offsetRef.current = { x: offsetX, y: offsetY };
+  const canvasW = fitsViewport ? layout.width : Math.max(layout.width, viewportSize.w);
+  const canvasH = fitsViewport ? layout.height : Math.max(layout.height, viewportSize.h);
+
+  useEffect(() => {
+    const el = canvasScrollRef.current;
+    if (!el || !layout.width) return;
+
+    if (fitsViewport) {
+      el.scrollLeft = 0;
+      el.scrollTop = 0;
       return;
     }
 
-    element.scrollIntoView({ block: "center", inline: "center", behavior: "auto" });
-  }, [selectedSHA1, focusedBlockSHA1, blocks.length]);
+    if (!initialScrollDone.current) {
+      initialScrollDone.current = true;
+      el.scrollLeft = offsetX + layout.width / 2 - viewportSize.w / 2;
+      el.scrollTop = offsetY + layout.height / 2 - viewportSize.h / 2;
+      return;
+    }
+
+    const node = selectedNodeRef.current;
+    if (node) {
+      node.scrollIntoView({ block: "center", inline: "center", behavior: "auto" });
+    }
+  }, [selectedSHA1, focusedBlockSHA1, blocks.length, offsetX, offsetY, viewportSize.w, viewportSize.h, fitsViewport]);
 
   useEffect(() => {
     if (!isDraggingCanvas) {
@@ -268,14 +318,12 @@ const GraphView = memo(function GraphView(props) {
         }
 
         const rect = scrollElement.getBoundingClientRect();
-        const canvas = scrollElement.querySelector(".graph-canvas");
-        const contentW = canvas ? canvas.scrollWidth : scrollElement.scrollWidth;
-        const contentH = canvas ? canvas.scrollHeight : scrollElement.scrollHeight;
+        const off = offsetRef.current;
 
         zoomAnchorRef.current = {
           next,
-          ratioX: (scrollElement.scrollLeft + (event.clientX - rect.left)) / contentW,
-          ratioY: (scrollElement.scrollTop + (event.clientY - rect.top)) / contentH,
+          graphX: scrollElement.scrollLeft + (event.clientX - rect.left) - off.x,
+          graphY: scrollElement.scrollTop + (event.clientY - rect.top) - off.y,
         };
 
         return next;
@@ -294,6 +342,11 @@ const GraphView = memo(function GraphView(props) {
     }
 
     zoomAnchorRef.current = null;
+
+    if (fitsViewport) {
+      return;
+    }
+
     const scrollElement = canvasScrollRef.current;
 
     if (!scrollElement) {
@@ -301,13 +354,11 @@ const GraphView = memo(function GraphView(props) {
     }
 
     requestAnimationFrame(() => {
-      const canvas = scrollElement.querySelector(".graph-canvas");
-      const contentW = canvas ? canvas.scrollWidth : scrollElement.scrollWidth;
-      const contentH = canvas ? canvas.scrollHeight : scrollElement.scrollHeight;
       const rect = scrollElement.getBoundingClientRect();
+      const off = offsetRef.current;
 
-      scrollElement.scrollLeft = anchor.ratioX * contentW - rect.width / 2;
-      scrollElement.scrollTop = anchor.ratioY * contentH - rect.height / 2;
+      scrollElement.scrollLeft = anchor.graphX + off.x - rect.width / 2;
+      scrollElement.scrollTop = anchor.graphY + off.y - rect.height / 2;
     });
   }, [zoomLevel]);
 
@@ -447,21 +498,7 @@ const GraphView = memo(function GraphView(props) {
     [blocks],
   );
 
-  const hiddenNodeSHA1s = useMemo(
-    () =>
-      new Set(
-        blocks
-          .filter((block) =>
-            block.adaptationInfo?.labels?.some((label) => label.key === "label.hidden"),
-          )
-          .map((block) => block.sha1),
-      ),
-    [blocks],
-  );
-
-  const hiddenCount = hiddenNodeSHA1s.size;
-
-  if (blocks.length === 0) {
+  if (layout.nodes.length === 0) {
     return (
       <div className="view-empty-state">
         <h2>{t("msg.noGraphToShow")}</h2>
@@ -470,8 +507,6 @@ const GraphView = memo(function GraphView(props) {
     );
   }
 
-  const visibleBlocks = showHidden ? blocks : blocks.filter((block) => !hiddenNodeSHA1s.has(block.sha1));
-  const layout = buildGraphLayout(visibleBlocks, zoomLevel);
   const selectedBlock = blocks.find((block) => block.sha1 === selectedSHA1) ?? blocks[0];
   const isCompact = zoomLevel === 0;
   const { nodeW, nodeH } = layout;
@@ -503,18 +538,18 @@ const GraphView = memo(function GraphView(props) {
           {[t("graph.layoutCompact"), t("graph.layoutStandard")][zoomLevel]}
         </div>
         <div
-          className={`graph-canvas-scroll ${isDraggingCanvas ? "dragging" : ""}`.trim()}
+          className={`graph-canvas-scroll ${isDraggingCanvas ? "dragging" : ""} ${fitsViewport ? "centering" : ""}`.trim()}
           ref={canvasScrollRef}
           onMouseDown={handleCanvasMouseDown}
           onClickCapture={handleCanvasClickCapture}
         >
-          <div className="graph-canvas" style={{ width: `${layout.width}px`, height: `${layout.height}px` }}>
-            <svg className="graph-svg" width={layout.width} height={layout.height}>
+          <div className="graph-canvas" style={{ width: `${canvasW}px`, height: `${canvasH}px` }}>
+            <svg className="graph-svg" width={canvasW} height={canvasH}>
               {layout.edges.map((edge) => {
-                const startX = edge.from.x + nodeW / 2;
-                const startY = edge.from.y + nodeH;
-                const endX = edge.to.x + nodeW / 2;
-                const endY = edge.to.y;
+                const startX = offsetX + edge.from.x + nodeW / 2;
+                const startY = offsetY + edge.from.y + nodeH;
+                const endX = offsetX + edge.to.x + nodeW / 2;
+                const endY = offsetY + edge.to.y;
                 const middleY = startY + (endY - startY) / 2;
                 const path = `M ${startX} ${startY} C ${startX} ${middleY}, ${endX} ${middleY}, ${endX} ${endY}`;
                 const isImportant =
@@ -544,7 +579,7 @@ const GraphView = memo(function GraphView(props) {
                 data-node-sha1={node.sha1}
                 type="button"
                 className={`graph-node ${isCompact ? "compact" : ""} ${selectedSHA1 === node.sha1 ? "selected" : ""} ${node.graphInfo?.isActiveBlock ? "active" : ""} ${node.sha1 === focusedBlockSHA1 ? "focused" : ""} ${node.graphInfo?.isInActiveChain ? "in-chain" : ""} ${isImportant ? "important" : ""} ${isHidden ? "hidden-node" : ""}`}
-                style={{ left: `${node.x}px`, top: `${node.y}px`, width: `${nodeW}px`, height: `${nodeH}px` }}
+                style={{ left: `${offsetX + node.x}px`, top: `${offsetY + node.y}px`, width: `${nodeW}px`, height: `${nodeH}px` }}
                 disabled={isLoading}
                 onClick={() => {
                   setSelectedSHA1(node.sha1);

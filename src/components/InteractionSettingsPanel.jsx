@@ -234,6 +234,34 @@ export default function InteractionSettingsPanel({
                 </select>
               </section>
 
+              <section className="settings-appearance-card" aria-label={t("interaction.autoGenerateTitle")}>
+                <div>
+                  <h4 className="settings-appearance-card-title">{t("interaction.autoGenerateTitle")}</h4>
+                  <p className="settings-appearance-card-desc">
+                    {t("interaction.autoGenerateTitleDesc")}
+                  </p>
+                </div>
+
+                <label className="settings-switch" htmlFor="auto-generate-title-toggle">
+                  <input
+                    id="auto-generate-title-toggle"
+                    type="checkbox"
+                    className="settings-switch-input"
+                    checked={settings.autoGenerateTitle !== false}
+                    disabled={isSaving}
+                    onChange={(event) =>
+                      onUpdateInteractionSettings?.({ autoGenerateTitle: event.target.checked })
+                    }
+                  />
+                  <span className="settings-switch-track" aria-hidden="true">
+                    <span className="settings-switch-thumb" />
+                  </span>
+                  <span className="settings-switch-label">
+                    {settings.autoGenerateTitle !== false ? t("interaction.enabled") : t("interaction.disabled")}
+                  </span>
+                </label>
+              </section>
+
               <section className="settings-appearance-card" aria-label={t("interaction.summaryModel")}>
                 <div>
                   <h4 className="settings-appearance-card-title">{t("interaction.summaryModel")}</h4>

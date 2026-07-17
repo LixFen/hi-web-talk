@@ -7,7 +7,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { DEFAULT_SYSTEM_PROMPT, JWT_SECRET, JWT_EXPIRES_IN, MAX_COMBO_COUNT, MAX_ITEM_LENGTH } from "./constants.js";
+import { DEFAULT_SYSTEM_PROMPT, DEFAULT_SESSION_TITLE, JWT_SECRET, JWT_EXPIRES_IN, MAX_COMBO_COUNT, MAX_ITEM_LENGTH } from "./constants.js";
 import { getDatabase } from "./lib/database.js";
 import { authenticateToken, requireSessionOwnership } from "./middleware/auth.js";
 import { validateBody, validateParams, validateQuery } from "./middleware/validate.js";
@@ -1271,6 +1271,18 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
       activeBlockSHA1: block.sha1,
     });
 
+    // Auto-generate title before fetching detail so the response includes the new title
+    if (session.title === DEFAULT_SESSION_TITLE) {
+      const appSettings = await getAppSettings(request.user.id);
+      if (appSettings.autoGenerateTitle !== false) {
+        try {
+          await generateTitleForSession(sessionHash, { role: request.user.role });
+        } catch (err) {
+          console.error("[auto-title] 自动生成标题失败:", err?.message || err);
+        }
+      }
+    }
+
     const attachmentPromise = attachmentIds.length > 0
       ? Promise.all(attachmentIds.map((id) => updateAttachmentBlockSHA1(sessionHash, id, block.sha1)))
       : Promise.resolve();
@@ -1514,6 +1526,19 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
       activeBlockSHA1: block.sha1,
     });
     logStream("session-updated", { sessionHash, blockSHA1: block.sha1 });
+
+    // Auto-generate title before fetching detail so the complete event includes the new title
+    if (session.title === DEFAULT_SESSION_TITLE) {
+      const appSettings = await getAppSettings(request.user.id);
+      if (appSettings.autoGenerateTitle !== false) {
+        try {
+          await generateTitleForSession(sessionHash, { role: request.user.role });
+          logStream("auto-title-done", { sessionHash });
+        } catch (err) {
+          logStream("auto-title-failed", { sessionHash, error: err?.message || String(err) });
+        }
+      }
+    }
 
     const attachmentPromise = streamAttachmentIds.length > 0
       ? Promise.all(streamAttachmentIds.map((id) => updateAttachmentBlockSHA1(sessionHash, id, block.sha1)))

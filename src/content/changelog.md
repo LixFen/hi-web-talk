@@ -1,3 +1,8 @@
+# 2.0.1
+
+- Fix: GraphView crash caused by referencing offsetX/offsetY before initialization.
+- Feat: Auto-generate session title after the first AI response (toggle in Interaction Settings).
+
 # 2.0.0
 
 - Feat: TikZ drawing panel — new preview panel for LaTeX/TikZ diagrams with syntax checking, image generation, and display in message list.

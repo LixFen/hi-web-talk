@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Outlet,
+  useLocation,
 } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useApp } from "../contexts/AppContext";
@@ -129,6 +130,14 @@ export default function AuthenticatedLayout() {
     window.addEventListener('edit-message', handler);
     return () => window.removeEventListener('edit-message', handler);
   }, []);
+
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    document.title = pathname.startsWith("/chat/") && activeConversation?.title
+      ? `${activeConversation.title} - Hi Web Talk`
+      : "Hi Web Talk";
+  }, [pathname, activeConversation?.title]);
 
   const drawerTouchStartRef = useRef({ x: 0, y: 0, active: false });
   const drawerSwipeDetectedRef = useRef(false);

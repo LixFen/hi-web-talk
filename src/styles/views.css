@@ -441,6 +441,12 @@
   cursor: grab;
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
+  display: flex;
+}
+
+.graph-canvas-scroll.centering {
+  align-items: center;
+  justify-content: center;
 }
 
 .graph-canvas-scroll.dragging {
@@ -450,8 +456,6 @@
 
 .graph-canvas {
   position: relative;
-  min-width: 100%;
-  min-height: 100%;
   background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--border-color) 70%, transparent) 1px, transparent 0);
   background-size: 24px 24px;
 }

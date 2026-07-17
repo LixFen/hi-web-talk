@@ -736,6 +736,10 @@ export async function updateAppSettings(partialSettings = {}, userId = null) {
     nextSettings.summaryModelAlias = `${partialSettings.summaryModelAlias ?? ""}`.trim();
   }
 
+  if (Object.prototype.hasOwnProperty.call(partialSettings, "autoGenerateTitle")) {
+    nextSettings.autoGenerateTitle = partialSettings.autoGenerateTitle === true;
+  }
+
   if (Object.prototype.hasOwnProperty.call(partialSettings, "darkMode")) {
     nextSettings.darkMode = partialSettings.darkMode;
   }

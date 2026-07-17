@@ -28,6 +28,7 @@ export const appSettingsSchema = z.object({
   showPendingOrganizeLabelButton: z.boolean().optional(),
   titleModelAlias: z.string().optional(),
   summaryModelAlias: z.string().optional(),
+  autoGenerateTitle: z.boolean().optional(),
   darkMode: z.enum(["dark", "system"]).optional(),
   inviteCodeRequired: z.boolean().optional(),
   inviteCode: z.string().optional(),
