@@ -324,6 +324,34 @@ export async function deleteProvider(providerId, userId = null, role = "user") {
     throw error;
   }
 
+  // ── Cascade: disassociate models linked to this provider ──
+  const { readStoredModels, writeModels } = await import("./modelConfigService.js");
+  try {
+    const models = await readStoredModels(targetUserId);
+    const linkedModels = models.filter((m) => m.providerId === providerId);
+    if (linkedModels.length > 0) {
+      const disassociated = models.map((m) => {
+        if (m.providerId !== providerId) return m;
+        // Copy provider-level settings inline, clear providerId
+        return {
+          ...m,
+          providerId: null,
+          providerType: m.providerType || existing.providerType,
+          baseURL: m.baseURL || existing.baseURL,
+          apiKeySource: m.apiKeySource || existing.apiKeySource,
+          apiKeyEnvName: m.apiKeyEnvName || existing.apiKeyEnvName,
+          apiKeyEncrypted: m.apiKeyEncrypted || existing.apiKeyEncrypted || "",
+          systemPromptRole: m.systemPromptRole || existing.systemPromptRole,
+          requestOptions: { ...(existing.requestOptions ?? {}), ...(m.requestOptions ?? {}) },
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      await writeModels(disassociated, targetUserId);
+    }
+  } catch (cascadeError) {
+    console.warn("[deleteProvider] cascade model cleanup failed:", cascadeError.message);
+  }
+
   const nextProviders = providers.filter((p) => p.providerId !== providerId);
   await writeProviders(nextProviders, targetUserId);
   return existing;

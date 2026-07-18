@@ -10,10 +10,7 @@ const PUBLIC_DIR = path.join(ROOT, "android", "app", "src", "main", "assets", "p
 const PUBLIC_NODE = path.join(PUBLIC_DIR, "nodejs-project");
 const SERVER_SRC = path.join(ROOT, "server");
 
-const SKIP_SERVER_FILES = new Set([
-  "migrateLegacyData.js",
-  "migrateProviderModelSplit.js",
-]);
+const SKIP_SERVER_FILES = new Set();
 
 async function copyDir(src, dest, filter = () => true) {
   await fs.mkdir(dest, { recursive: true });

@@ -486,12 +486,44 @@ export default function ModelSettingsPanel({
   const renderLegacyModels = () => {
     const legacyModels = providerModelMap.get("__legacy__") || [];
     if (legacyModels.length === 0) return null;
+    const isExpanded = expandedProviders.has("__legacy__");
     return (
       <div className="settings-tree-provider">
-        <div className="settings-tree-provider-header" style={{ opacity: 0.6 }}>
-          <span className="settings-tree-expand">▶</span>
+        <div
+          className="settings-tree-provider-header"
+          style={{ opacity: 0.7 }}
+          onClick={() => toggleExpand("__legacy__")}
+        >
+          <button
+            type="button"
+            className="settings-tree-expand"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleExpand("__legacy__");
+            }}
+          >
+            {isExpanded ? "▼" : "▶"}
+          </button>
           <span className="settings-tree-provider-name">{t("model.ungrouped")}</span>
         </div>
+        {isExpanded && (
+          <div className="settings-tree-models">
+            {legacyModels.map((model) => (
+              <button
+                key={model.alias}
+                type="button"
+                className={`settings-tree-model ${selection?.type === "model" && selection.alias === model.alias ? "active" : ""}`}
+                onClick={() => handleSelectModel(model.alias)}
+              >
+                <span className="settings-tree-model-name">{model.label}</span>
+                <span className="settings-tree-model-meta">
+                  {model.enabled ? "" : "⏸ "}
+                  {model.modelName}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     );
   };

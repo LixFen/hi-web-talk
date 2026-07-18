@@ -1982,17 +1982,6 @@ function validateEnvironment() {
 
 await ensureDataLayout();
 
-// Auto-migrate: split flat models into Provider + Model
-try {
-  const { migrateProviderModelSplit } = await import("./scripts/migrateProviderModelSplit.js");
-  const migrationResult = await migrateProviderModelSplit();
-  if (migrationResult.migrated) {
-    console.log("[startup] Provider-Model 迁移完成:", migrationResult);
-  }
-} catch (error) {
-  console.error("[startup] Provider-Model 迁移失败（非致命）:", error.message);
-}
-
 streamSessionManager.startCleanupTimer();
 
 // Serve built frontend (for both Docker and packaged Electron)

@@ -196,13 +196,14 @@ async function normalizeModelRecord(record = {}, index = 0) {
   // If providerId is set, inherit from the Provider entity.
   // Otherwise, use inline providerType (legacy / flat mode).
   let provider = null;
+  let effectiveProviderId = record.providerId || null;
   if (record.providerId) {
     const { getProviderById } = await import("./providerConfigService.js");
     provider = await getProviderById(record.providerId);
     if (!provider) {
-      const error = new Error(`找不到 providerId: ${record.providerId}`);
-      error.status = 400;
-      throw error;
+      // Provider was deleted — gracefully degrade to legacy inline mode
+      console.warn(`[normalizeModelRecord] providerId ${record.providerId} not found, treating as legacy model`);
+      effectiveProviderId = null;
     }
   }
 
@@ -262,7 +263,7 @@ async function normalizeModelRecord(record = {}, index = 0) {
     modelId: record.modelId ?? crypto.randomUUID(),
     alias,
     label: sanitizeOptionalText(record.label) || alias,
-    providerId: record.providerId || null,
+    providerId: effectiveProviderId,
     // Provider-inherited or inline fields (model overrides take precedence)
     providerType: base.providerType,
     baseURL: record.baseURL ?? base.baseURL,
@@ -350,7 +351,7 @@ function assertRequiredFields(payload, isCreate = false) {
   }
 }
 
-async function readStoredModels(userId = null) {
+export async function readStoredModels(userId = null) {
   await ensureConfigFiles();
 
   if (userId != null) {
@@ -389,7 +390,7 @@ async function readStoredModels(userId = null) {
   return normalizedModels;
 }
 
-async function writeModels(models, userId = null) {
+export async function writeModels(models, userId = null) {
   const normalizedModels = [];
 
   for (let index = 0; index < models.length; index += 1) {
