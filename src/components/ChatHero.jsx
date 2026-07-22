@@ -1,7 +1,9 @@
+import { useNavigate } from "react-router-dom";
 import { useLocale } from "../contexts/LocaleContext";
 
 export default function ChatHero({ hasModels, onOpenSettings, children }) {
   const { t } = useLocale();
+  const navigate = useNavigate();
 
   return (
     <div className="empty-state" style={{ padding: '0 2rem', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.9 }}>
@@ -17,7 +19,19 @@ export default function ChatHero({ hasModels, onOpenSettings, children }) {
           justifyContent: 'center',
           background: 'var(--bg-glass)',
           borderRadius: '24px',
-          boxShadow: 'var(--shadow-sm), inset 0 2px 4px rgba(255,255,255,0.4)'
+          boxShadow: 'var(--shadow-sm), inset 0 2px 4px rgba(255,255,255,0.4)',
+          cursor: 'pointer',
+          transition: 'all var(--duration-fast) var(--ease-out-expo)'
+        }}
+        onClick={() => navigate('/work')}
+        title="打开 WorkStation"
+        onMouseOver={(e) => {
+          e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+          e.currentTarget.style.transform = 'translateY(-2px)';
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.boxShadow = 'var(--shadow-sm), inset 0 2px 4px rgba(255,255,255,0.4)';
+          e.currentTarget.style.transform = 'translateY(0)';
         }}
       >
         {hasModels ? (

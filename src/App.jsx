@@ -9,6 +9,7 @@ import LoginPage from "./pages/LoginPage";
 import AuthenticatedLayout from "./layouts/AuthenticatedLayout";
 import ChatHomePage from "./pages/ChatHomePage";
 import ChatPage from "./pages/ChatPage";
+import WorkStationPage from "./pages/WorkStationPage";
 import "./styles/styles.css";
 
 function AppContent() {
@@ -23,6 +24,14 @@ function AppContent() {
                 <RedirectIfAuth>
                   <LoginPage />
                 </RedirectIfAuth>
+              }
+            />
+            <Route
+              path="/work"
+              element={
+                <RequireAuth>
+                  <WorkStationPage />
+                </RequireAuth>
               }
             />
             <Route

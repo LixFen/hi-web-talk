@@ -305,6 +305,64 @@ function createDatabaseSchema(db) {
       FOREIGN KEY (comboId) REFERENCES prompt_combos(id) ON DELETE CASCADE,
       FOREIGN KEY (itemId) REFERENCES prompt_items(id) ON DELETE CASCADE
     );
+
+    -- WorkStation tables
+    CREATE TABLE IF NOT EXISTS workstation_groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      isCollapsed INTEGER NOT NULL DEFAULT 0,
+      columnWidth INTEGER NOT NULL DEFAULT 280,
+      posX INTEGER,
+      posY INTEGER,
+      height INTEGER,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ws_groups_user_position
+      ON workstation_groups(userId, position);
+
+    CREATE TABLE IF NOT EXISTS workstation_session_groups (
+      sessionHash TEXT NOT NULL,
+      groupId INTEGER NOT NULL,
+      addedAt TEXT NOT NULL,
+      PRIMARY KEY (sessionHash, groupId),
+      FOREIGN KEY (sessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE,
+      FOREIGN KEY (groupId) REFERENCES workstation_groups(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ws_sg_group
+      ON workstation_session_groups(groupId);
+
+    CREATE INDEX IF NOT EXISTS idx_ws_sg_session
+      ON workstation_session_groups(sessionHash);
+
+    CREATE TABLE IF NOT EXISTS workstation_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      sourceSessionHash TEXT NOT NULL,
+      targetSessionHash TEXT NOT NULL,
+      label TEXT NOT NULL DEFAULT '',
+      annotation TEXT NOT NULL DEFAULT '',
+      arrowType TEXT NOT NULL DEFAULT 'forward',
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (sourceSessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE,
+      FOREIGN KEY (targetSessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ws_conn_user
+      ON workstation_connections(userId);
+
+    CREATE INDEX IF NOT EXISTS idx_ws_conn_source
+      ON workstation_connections(sourceSessionHash);
+
+    CREATE INDEX IF NOT EXISTS idx_ws_conn_target
+      ON workstation_connections(targetSessionHash);
   `);
 }
 
@@ -532,6 +590,33 @@ function runMigrations(db) {
   const hasSystemPrompt = sessionColumns.some((col) => col.name === "systemPrompt");
   if (!hasSystemPrompt) {
     db.exec(`ALTER TABLE sessions ADD COLUMN systemPrompt TEXT NOT NULL DEFAULT ''`);
+  }
+
+  // WorkStation group free-positioning columns (added after initial release)
+  const wsGroupTable = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'workstation_groups'")
+    .all();
+  if (wsGroupTable.length > 0) {
+    const wsGroupColumns = db.prepare("PRAGMA table_info(workstation_groups)").all();
+    for (const col of ["posX", "posY", "height"]) {
+      if (!wsGroupColumns.some((c) => c.name === col)) {
+        db.exec(`ALTER TABLE workstation_groups ADD COLUMN ${col} INTEGER`);
+      }
+    }
+  }
+
+  // WorkStation connection annotation and arrowType columns
+  const wsConnTable = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'workstation_connections'")
+    .all();
+  if (wsConnTable.length > 0) {
+    const wsConnColumns = db.prepare("PRAGMA table_info(workstation_connections)").all();
+    if (!wsConnColumns.some((c) => c.name === "annotation")) {
+      db.exec(`ALTER TABLE workstation_connections ADD COLUMN annotation TEXT NOT NULL DEFAULT ''`);
+    }
+    if (!wsConnColumns.some((c) => c.name === "arrowType")) {
+      db.exec(`ALTER TABLE workstation_connections ADD COLUMN arrowType TEXT NOT NULL DEFAULT 'forward'`);
+    }
   }
 
   addForeignKeysToExistingTables(db);

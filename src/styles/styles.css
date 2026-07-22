@@ -35,6 +35,9 @@
 @import "./tikz-preview.css";
 @import "./responsive.css";
 
+/* WorkStation */
+@import "./workstation.css";
+
 /* =================================================================
    NOTE: Markdown styles are imported separately via main.jsx
    (src/styles/markdown.css — includes highlight.js styles)

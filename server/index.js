@@ -121,6 +121,28 @@ import {
   listSummaries,
   updateSummaryStatus,
 } from "./services/summaryService.js";
+import {
+  listGroups,
+  createGroup,
+  updateGroup,
+  deleteGroup,
+  reorderGroups,
+  listConnections,
+  createConnection,
+  updateConnection,
+  deleteConnection,
+  addSessionToGroup,
+  removeSessionFromGroup,
+  getSessionGroups,
+  getGroupSessions,
+  listUngroupedSessions,
+  getAllWorkstationSessions,
+  cleanupDeletedSession,
+  getPresetLabels,
+  clearAllConnections,
+  clearAllGroups,
+  listAllLabels,
+} from "./services/workstationService.js";
 
 process.on("uncaughtException", (err) => {
   console.error("[uncaughtException]", err?.message || err);
@@ -1996,6 +2018,270 @@ if (isProduction) {
     res.sendFile(path.join(distDir, "index.html"));
   });
 }
+
+// ============================================================
+// WorkStation API
+// ============================================================
+
+// Groups
+app.get("/api/workstation/groups", authenticateToken, async (request, response) => {
+  try {
+    const groups = await listGroups(request.user.id);
+    response.json({ groups });
+  } catch (error) {
+    console.error("List workstation groups error:", error);
+    response.status(500).json({ error: "获取分组列表失败。" });
+  }
+});
+
+app.post("/api/workstation/groups", authenticateToken, async (request, response) => {
+  try {
+    const { name } = request.body;
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      return response.status(400).json({ error: "分组名称不能为空。" });
+    }
+    const group = await createGroup(request.user.id, name.trim());
+    response.status(201).json({ group });
+  } catch (error) {
+    console.error("Create workstation group error:", error);
+    response.status(500).json({ error: "创建分组失败。" });
+  }
+});
+
+app.patch("/api/workstation/groups/:groupId", authenticateToken, async (request, response) => {
+  try {
+    const groupId = Number(request.params.groupId);
+    if (isNaN(groupId)) {
+      return response.status(400).json({ error: "无效的分组ID。" });
+    }
+    const group = await updateGroup(groupId, request.user.id, request.body);
+    if (!group) {
+      return response.status(404).json({ error: "分组不存在。" });
+    }
+    response.json({ group });
+  } catch (error) {
+    console.error("Update workstation group error:", error);
+    response.status(500).json({ error: "更新分组失败。" });
+  }
+});
+
+app.delete("/api/workstation/groups/:groupId", authenticateToken, async (request, response) => {
+  try {
+    const groupId = Number(request.params.groupId);
+    if (isNaN(groupId)) {
+      return response.status(400).json({ error: "无效的分组ID。" });
+    }
+    await deleteGroup(groupId, request.user.id);
+    response.json({ success: true });
+  } catch (error) {
+    console.error("Delete workstation group error:", error);
+    response.status(500).json({ error: "删除分组失败。" });
+  }
+});
+
+app.patch("/api/workstation/groups/reorder", authenticateToken, async (request, response) => {
+  try {
+    const { groupIds } = request.body;
+    if (!Array.isArray(groupIds)) {
+      return response.status(400).json({ error: "无效的分组ID列表。" });
+    }
+    await reorderGroups(request.user.id, groupIds);
+    response.json({ success: true });
+  } catch (error) {
+    console.error("Reorder workstation groups error:", error);
+    response.status(500).json({ error: "重排序分组失败。" });
+  }
+});
+
+// Sessions in groups
+app.post("/api/workstation/sessions/:sessionHash/groups", authenticateToken, async (request, response) => {
+  try {
+    const { sessionHash } = request.params;
+    const { groupId } = request.body;
+    if (!groupId) {
+      return response.status(400).json({ error: "分组ID不能为空。" });
+    }
+    const added = await addSessionToGroup(sessionHash, groupId, request.user.id);
+    response.json({ added });
+  } catch (error) {
+    console.error("Add session to group error:", error);
+    response.status(500).json({ error: "添加session到分组失败。" });
+  }
+});
+
+app.delete("/api/workstation/sessions/:sessionHash/groups/:groupId", authenticateToken, async (request, response) => {
+  try {
+    const { sessionHash, groupId } = request.params;
+    await removeSessionFromGroup(sessionHash, Number(groupId), request.user.id);
+    response.json({ success: true });
+  } catch (error) {
+    console.error("Remove session from group error:", error);
+    response.status(500).json({ error: "从分组移除session失败。" });
+  }
+});
+
+app.get("/api/workstation/sessions/:sessionHash/groups", authenticateToken, async (request, response) => {
+  try {
+    const { sessionHash } = request.params;
+    const groups = await getSessionGroups(sessionHash);
+    response.json({ groups });
+  } catch (error) {
+    console.error("Get session groups error:", error);
+    response.status(500).json({ error: "获取session所属分组失败。" });
+  }
+});
+
+app.get("/api/workstation/groups/:groupId/sessions", authenticateToken, async (request, response) => {
+  try {
+    const groupId = Number(request.params.groupId);
+    if (isNaN(groupId)) {
+      return response.status(400).json({ error: "无效的分组ID。" });
+    }
+    const sessions = await getGroupSessions(groupId, request.user.id);
+    response.json({ sessions });
+  } catch (error) {
+    console.error("Get group sessions error:", error);
+    response.status(500).json({ error: "获取分组session列表失败。" });
+  }
+});
+
+app.get("/api/workstation/ungrouped", authenticateToken, async (request, response) => {
+  try {
+    const sessions = await listUngroupedSessions(request.user.id);
+    response.json({ sessions });
+  } catch (error) {
+    console.error("List ungrouped sessions error:", error);
+    response.status(500).json({ error: "获取未分组session列表失败。" });
+  }
+});
+
+app.get("/api/workstation/all-sessions", authenticateToken, async (request, response) => {
+  try {
+    const sessions = await getAllWorkstationSessions(request.user.id);
+    response.json({ sessions });
+  } catch (error) {
+    console.error("List all workstation sessions error:", error);
+    response.status(500).json({ error: "获取所有session列表失败。" });
+  }
+});
+
+// Connections
+app.get("/api/workstation/connections", authenticateToken, async (request, response) => {
+  try {
+    const connections = await listConnections(request.user.id);
+    response.json({ connections });
+  } catch (error) {
+    console.error("List connections error:", error);
+    response.status(500).json({ error: "获取连线列表失败。" });
+  }
+});
+
+app.get("/api/workstation/connections/labels", authenticateToken, async (request, response) => {
+  try {
+    const labels = await listAllLabels(request.user.id);
+    response.json({ labels });
+  } catch (error) {
+    console.error("List connection labels error:", error);
+    response.status(500).json({ error: "获取标签列表失败。" });
+  }
+});
+
+app.post("/api/workstation/connections", authenticateToken, async (request, response) => {
+  try {
+    const { sourceSessionHash, targetSessionHash, label } = request.body;
+    if (!sourceSessionHash || !targetSessionHash) {
+      return response.status(400).json({ error: "源session和目标session不能为空。" });
+    }
+    const connection = await createConnection(
+      request.user.id,
+      sourceSessionHash,
+      targetSessionHash,
+      label || ""
+    );
+    response.status(201).json({ connection });
+  } catch (error) {
+    console.error("Create connection error:", error);
+    if (error.message === "Cannot connect a session to itself") {
+      return response.status(400).json({ error: "不能将session连接到自身。" });
+    }
+    response.status(500).json({ error: "创建连线失败。" });
+  }
+});
+
+app.patch("/api/workstation/connections/:connId", authenticateToken, async (request, response) => {
+  try {
+    const connId = Number(request.params.connId);
+    if (isNaN(connId)) {
+      return response.status(400).json({ error: "无效的连线ID。" });
+    }
+    const connection = await updateConnection(connId, request.user.id, request.body);
+    if (!connection) {
+      return response.status(404).json({ error: "连线不存在。" });
+    }
+    response.json({ connection });
+  } catch (error) {
+    console.error("Update connection error:", error);
+    response.status(500).json({ error: "更新连线失败。" });
+  }
+});
+
+app.delete("/api/workstation/connections/:connId", authenticateToken, async (request, response) => {
+  try {
+    const connId = Number(request.params.connId);
+    if (isNaN(connId)) {
+      return response.status(400).json({ error: "无效的连线ID。" });
+    }
+    await deleteConnection(connId, request.user.id);
+    response.json({ success: true });
+  } catch (error) {
+    console.error("Delete connection error:", error);
+    response.status(500).json({ error: "删除连线失败。" });
+  }
+});
+
+// Cleanup deleted session
+app.delete("/api/workstation/sessions/:sessionHash", authenticateToken, async (request, response) => {
+  try {
+    const { sessionHash } = request.params;
+    await cleanupDeletedSession(sessionHash);
+    response.json({ success: true });
+  } catch (error) {
+    console.error("Cleanup deleted session error:", error);
+    response.status(500).json({ error: "清理已删除session失败。" });
+  }
+});
+
+// Preset labels
+app.get("/api/workstation/preset-labels", authenticateToken, async (request, response) => {
+  try {
+    const labels = await getPresetLabels();
+    response.json({ labels });
+  } catch (error) {
+    console.error("Get preset labels error:", error);
+    response.status(500).json({ error: "获取预设标签失败。" });
+  }
+});
+
+// DevTools
+app.delete("/api/workstation/dev/connections", authenticateToken, async (request, response) => {
+  try {
+    await clearAllConnections(request.user.id);
+    response.json({ success: true });
+  } catch (error) {
+    console.error("Clear all connections error:", error);
+    response.status(500).json({ error: "清除连线失败。" });
+  }
+});
+
+app.delete("/api/workstation/dev/groups", authenticateToken, async (request, response) => {
+  try {
+    await clearAllGroups(request.user.id);
+    response.json({ success: true });
+  } catch (error) {
+    console.error("Clear all groups error:", error);
+    response.status(500).json({ error: "清除分组失败。" });
+  }
+});
 
 let httpServer = null;
 
