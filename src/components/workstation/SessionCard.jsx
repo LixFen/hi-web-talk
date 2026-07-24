@@ -4,6 +4,7 @@ import { useWorkStation } from "../../contexts/WorkStationContext";
 export default function SessionCard({
   session,
   groupId,
+  sessionHeight,
   onContextMenu,
   onPreview,
   onDragStart,
@@ -12,6 +13,13 @@ export default function SessionCard({
   onStartConnection,
   onCompleteConnection,
   onRemoveFromGroup,
+  areaMode,
+  posX,
+  posY,
+  cardWidth,
+  cardHeight,
+  onDragMoveStart,
+  onResizeStart,
 }) {
   const { cleanupDeletedSession } = useWorkStation();
 
@@ -28,21 +36,38 @@ export default function SessionCard({
   // Handle drag start
   const handleDragStart = useCallback(
     (e) => {
-      if (isDeleted) {
+      if (isDeleted || areaMode) {
         e.preventDefault();
         return;
       }
       onDragStart(e, session.sessionHash);
     },
-    [isDeleted, onDragStart, session.sessionHash]
+    [isDeleted, areaMode, onDragStart, session.sessionHash]
+  );
+
+  const handleMouseDown = useCallback(
+    (e) => {
+      if (isDeleted || !areaMode) return;
+      if (e.target.closest(".session-card-resize-handle")) return;
+      onDragMoveStart?.(session.sessionHash, e);
+    },
+    [isDeleted, areaMode, onDragMoveStart, session.sessionHash]
+  );
+
+  const handleResizeMouseDown = useCallback(
+    (e) => {
+      e.stopPropagation();
+      onResizeStart?.(session.sessionHash, e);
+    },
+    [onResizeStart, session.sessionHash]
   );
 
   // Handle click during connection mode
   const handleClick = useCallback(() => {
     if (isConnecting && !isSource) {
-      onCompleteConnection(session.sessionHash);
+      onCompleteConnection(session.sessionHash, groupId);
     }
-  }, [isConnecting, isSource, onCompleteConnection, session.sessionHash]);
+  }, [isConnecting, isSource, onCompleteConnection, session.sessionHash, groupId]);
 
   // Handle context menu
   const handleContextMenu = useCallback(
@@ -54,7 +79,7 @@ export default function SessionCard({
         sessionTitle: session.title,
         groupId,
         isDeleted,
-        onStartConnection: () => onStartConnection(session.sessionHash),
+        onStartConnection: () => onStartConnection(session.sessionHash, groupId),
         onRemoveFromGroup: () => onRemoveFromGroup(session.sessionHash, groupId),
         onCleanupDeleted: () => cleanupDeletedSession(session.sessionHash),
       });
@@ -75,8 +100,17 @@ export default function SessionCard({
     <div
       className={`session-card ${isDeleted ? "deleted" : ""} ${isConnecting ? "connecting" : ""} ${isSource ? "connection-source" : ""}`}
       data-session-hash={session.sessionHash}
-      draggable={!isDeleted}
+      data-group-id={groupId}
+      draggable={!isDeleted && !areaMode}
+      style={
+        areaMode
+          ? { position: "absolute", left: posX, top: posY, width: cardWidth, height: cardHeight, overflow: "hidden" }
+          : sessionHeight
+          ? { height: sessionHeight, overflow: "hidden" }
+          : undefined
+      }
       onDragStart={handleDragStart}
+      onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
@@ -119,6 +153,10 @@ export default function SessionCard({
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
         </div>
+      )}
+
+      {areaMode && !isDeleted && (
+        <div className="session-card-resize-handle" onMouseDown={handleResizeMouseDown} />
       )}
     </div>
   );

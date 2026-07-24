@@ -157,7 +157,7 @@ export default function PreviewModal({ session, onClose }) {
                   graphBlocks={graph?.blocks || []}
                   activeBlockSHA1={graph?.activeBlockSHA1 || ""}
                   focusedBlockSHA1={sessionDetail?.focusedBlockSHA1 || ""}
-                  messages={sessionDetail?.displayMessages || []}
+                  messages={sessionDetail?.messages || []}
                   isReplyPending={false}
                   bottomDockMode="hidden"
                   hideChatBottomDock

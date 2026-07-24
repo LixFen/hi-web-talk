@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWorkStation } from "../../contexts/WorkStationContext";
 import { listSessions } from "../../lib/chatApi";
+import { CARD_W, CARD_H, CARD_GAP, findFreeSpot } from "./GroupColumn";
 
 export default function BatchImportModal({ groupId, onClose }) {
-  const { addSessionToGroup, groups, groupSessions } = useWorkStation();
+  const { addSessionToGroup, updateSessionPosition, groups, groupSessions } = useWorkStation();
 
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState(new Set());
@@ -145,17 +146,33 @@ export default function BatchImportModal({ groupId, onClose }) {
 
     setIsImporting(true);
     try {
-      const promises = Array.from(selected).map((sessionHash) =>
-        addSessionToGroup(sessionHash, groupId)
-      );
-      await Promise.all(promises);
+      const hashes = Array.from(selected);
+      await Promise.all(hashes.map((sessionHash) => addSessionToGroup(sessionHash, groupId)));
+
+      if (targetGroup?.viewMode === "area") {
+        const existing = (groupSessions[groupId] || [])
+          .filter((s) => s.posX != null && s.posY != null)
+          .map((s) => ({ x: s.posX, y: s.posY, w: s.width || CARD_W, h: s.height || CARD_H }));
+
+        for (const sessionHash of hashes) {
+          const spot = findFreeSpot(0, existing.length ? 0 : 0, CARD_W, CARD_H, existing);
+          await updateSessionPosition(sessionHash, groupId, {
+            posX: spot.x,
+            posY: spot.y,
+            width: CARD_W,
+            height: CARD_H,
+          });
+          existing.push({ x: spot.x, y: spot.y, w: CARD_W, h: CARD_H });
+        }
+      }
+
       onClose();
     } catch (err) {
       console.error("Import error:", err);
     } finally {
       setIsImporting(false);
     }
-  }, [selected, groupId, addSessionToGroup, onClose]);
+  }, [selected, groupId, targetGroup, groupSessions, addSessionToGroup, updateSessionPosition, onClose]);
 
   // Handle backdrop click
   const handleBackdropClick = useCallback(

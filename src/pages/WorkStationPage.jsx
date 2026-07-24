@@ -58,6 +58,7 @@ function WorkStationContent() {
   const [contextMenu, setContextMenu] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionSource, setConnectionSource] = useState(null);
+  const [connectionSourceGroupId, setConnectionSourceGroupId] = useState(null);
 
   // Ungrouped drawer state (persisted to localStorage)
   const [isUngroupedOpen, setIsUngroupedOpen] = useState(() => {
@@ -117,27 +118,30 @@ function WorkStationContent() {
   }, []);
 
   // Handle connection mode
-  const handleStartConnection = useCallback((sessionHash) => {
+  const handleStartConnection = useCallback((sessionHash, groupId = null) => {
     setIsConnecting(true);
     setConnectionSource(sessionHash);
+    setConnectionSourceGroupId(groupId);
   }, []);
 
   const handleCompleteConnection = useCallback(
-    async (targetSessionHash) => {
+    async (targetSessionHash, targetGroupId = null) => {
       if (connectionSource && targetSessionHash !== connectionSource) {
         try {
-          await createConnection(connectionSource, targetSessionHash);
+          await createConnection(connectionSource, targetSessionHash, "", connectionSourceGroupId, targetGroupId);
         } catch {}
       }
       setIsConnecting(false);
       setConnectionSource(null);
+      setConnectionSourceGroupId(null);
     },
-    [connectionSource, createConnection]
+    [connectionSource, connectionSourceGroupId, createConnection]
   );
 
   const handleCancelConnection = useCallback(() => {
     setIsConnecting(false);
     setConnectionSource(null);
+    setConnectionSourceGroupId(null);
   }, []);
 
   // Handle preview
@@ -245,6 +249,7 @@ function WorkStationContent() {
           onOpenBatchImport={handleOpenBatchImport}
           isConnecting={isConnecting}
           connectionSource={connectionSource}
+          connectionSourceGroupId={connectionSourceGroupId}
           onStartConnection={handleStartConnection}
           onCompleteConnection={handleCompleteConnection}
           onCancelConnection={handleCancelConnection}
@@ -255,7 +260,6 @@ function WorkStationContent() {
         <WorkstationContextMenu
           {...contextMenu}
           onClose={handleCloseContextMenu}
-          onStartConnection={handleStartConnection}
           onOpenBatchImport={handleOpenBatchImport}
         />
       )}

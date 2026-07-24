@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GroupColumn from "./GroupColumn";
 import ConnectionLine from "./ConnectionLine";
 
@@ -17,6 +17,7 @@ export default function Canvas({
   onOpenBatchImport,
   isConnecting,
   connectionSource,
+  connectionSourceGroupId,
   onStartConnection,
   onCompleteConnection,
   onCancelConnection,
@@ -27,6 +28,29 @@ export default function Canvas({
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   // Local live positions during a group drag (id -> {x, y})
   const [movingPos, setMovingPos] = useState({});
+
+  // Hide connections only when BOTH endpoints are exclusively in collapsed groups
+  const visibleConnections = useMemo(() => {
+    // Count how many groups each session belongs to, and how many of those are collapsed
+    const groupCount = new Map(); // sessionHash -> { total, collapsed }
+    for (const group of groups) {
+      const sessions = groupSessions[group.id] || [];
+      for (const s of sessions) {
+        const entry = groupCount.get(s.sessionHash) || { total: 0, collapsed: 0 };
+        entry.total++;
+        if (group.isCollapsed) entry.collapsed++;
+        groupCount.set(s.sessionHash, entry);
+      }
+    }
+    // A session is "hidden" only if every group it belongs to is collapsed
+    const isHidden = (hash) => {
+      const e = groupCount.get(hash);
+      return e && e.collapsed === e.total;
+    };
+    return connections.filter(
+      (c) => !isHidden(c.sourceSessionHash) && !isHidden(c.targetSessionHash)
+    );
+  }, [groups, groupSessions, connections]);
 
   // Fallback grid position for groups without a stored posX/posY.
   // ponytail: movingPos overrides persist for the session; single-user so no cross-client sync needed.
@@ -133,7 +157,10 @@ export default function Canvas({
   // Get connection source position
   const getConnectionSourcePos = useCallback(() => {
     if (!connectionSource) return null;
-    const el = document.querySelector(`[data-session-hash="${connectionSource}"]`);
+    const selector = connectionSourceGroupId
+      ? `[data-session-hash="${connectionSource}"][data-group-id="${connectionSourceGroupId}"]`
+      : `[data-session-hash="${connectionSource}"]`;
+    const el = document.querySelector(selector);
     if (!el) return null;
     const rect = el.getBoundingClientRect();
     const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -142,7 +169,7 @@ export default function Canvas({
       x: (rect.right - canvasRect.left - pan.x) / zoom,
       y: (rect.top + rect.height / 2 - canvasRect.top - pan.y) / zoom,
     };
-  }, [connectionSource, pan, zoom]);
+  }, [connectionSource, connectionSourceGroupId, pan, zoom]);
 
   const sourcePos = getConnectionSourcePos();
 
@@ -166,7 +193,7 @@ export default function Canvas({
       >
         {/* SVG layer for connections */}
         <svg className="canvas-connections" style={{ overflow: "visible" }}>
-          {connections.map((conn) => (
+          {visibleConnections.map((conn) => (
             <ConnectionLine
               key={conn.id}
               connection={conn}

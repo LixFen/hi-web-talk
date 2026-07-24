@@ -317,6 +317,7 @@ function createDatabaseSchema(db) {
       posX INTEGER,
       posY INTEGER,
       height INTEGER,
+      viewMode TEXT NOT NULL DEFAULT 'list',
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
       FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
@@ -329,6 +330,10 @@ function createDatabaseSchema(db) {
       sessionHash TEXT NOT NULL,
       groupId INTEGER NOT NULL,
       addedAt TEXT NOT NULL,
+      posX INTEGER,
+      posY INTEGER,
+      width INTEGER,
+      height INTEGER,
       PRIMARY KEY (sessionHash, groupId),
       FOREIGN KEY (sessionHash) REFERENCES sessions(sessionHash) ON DELETE CASCADE,
       FOREIGN KEY (groupId) REFERENCES workstation_groups(id) ON DELETE CASCADE
@@ -603,6 +608,22 @@ function runMigrations(db) {
         db.exec(`ALTER TABLE workstation_groups ADD COLUMN ${col} INTEGER`);
       }
     }
+    if (!wsGroupColumns.some((c) => c.name === "viewMode")) {
+      db.exec(`ALTER TABLE workstation_groups ADD COLUMN viewMode TEXT NOT NULL DEFAULT 'list'`);
+    }
+  }
+
+  // WorkStation session-group free-positioning columns (area mode)
+  const wsSessionGroupTable = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'workstation_session_groups'")
+    .all();
+  if (wsSessionGroupTable.length > 0) {
+    const wsSessionGroupColumns = db.prepare("PRAGMA table_info(workstation_session_groups)").all();
+    for (const col of ["posX", "posY", "width", "height"]) {
+      if (!wsSessionGroupColumns.some((c) => c.name === col)) {
+        db.exec(`ALTER TABLE workstation_session_groups ADD COLUMN ${col} INTEGER`);
+      }
+    }
   }
 
   // WorkStation connection annotation and arrowType columns
@@ -616,6 +637,12 @@ function runMigrations(db) {
     }
     if (!wsConnColumns.some((c) => c.name === "arrowType")) {
       db.exec(`ALTER TABLE workstation_connections ADD COLUMN arrowType TEXT NOT NULL DEFAULT 'forward'`);
+    }
+    if (!wsConnColumns.some((c) => c.name === "sourceGroupId")) {
+      db.exec(`ALTER TABLE workstation_connections ADD COLUMN sourceGroupId INTEGER`);
+    }
+    if (!wsConnColumns.some((c) => c.name === "targetGroupId")) {
+      db.exec(`ALTER TABLE workstation_connections ADD COLUMN targetGroupId INTEGER`);
     }
   }
 

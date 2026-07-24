@@ -15,14 +15,16 @@ export default function ConnectionLine({ connection, zoom, layoutVersion, onCont
   const [positions, setPositions] = useState({ source: null, target: null });
 
   useEffect(() => {
-    const updatePositions = () => {
-      const sourceEl = document.querySelector(
-        `[data-session-hash="${connection.sourceSessionHash}"]`
-      );
-      const targetEl = document.querySelector(
-        `[data-session-hash="${connection.targetSessionHash}"]`
-      );
+    const sourceSelector = connection.sourceGroupId
+      ? `[data-session-hash="${connection.sourceSessionHash}"][data-group-id="${connection.sourceGroupId}"]`
+      : `[data-session-hash="${connection.sourceSessionHash}"]`;
+    const targetSelector = connection.targetGroupId
+      ? `[data-session-hash="${connection.targetSessionHash}"][data-group-id="${connection.targetGroupId}"]`
+      : `[data-session-hash="${connection.targetSessionHash}"]`;
+    const sourceEl = document.querySelector(sourceSelector);
+    const targetEl = document.querySelector(targetSelector);
 
+    const updatePositions = () => {
       if (sourceEl && targetEl) {
         const sourceRect = sourceEl.getBoundingClientRect();
         const targetRect = targetEl.getBoundingClientRect();
@@ -52,12 +54,6 @@ export default function ConnectionLine({ connection, zoom, layoutVersion, onCont
     updatePositions();
     window.addEventListener("resize", updatePositions);
 
-    const sourceEl = document.querySelector(
-      `[data-session-hash="${connection.sourceSessionHash}"]`
-    );
-    const targetEl = document.querySelector(
-      `[data-session-hash="${connection.targetSessionHash}"]`
-    );
     const resizeObserver = new ResizeObserver(updatePositions);
     if (sourceEl) resizeObserver.observe(sourceEl);
     if (targetEl) resizeObserver.observe(targetEl);
@@ -66,7 +62,7 @@ export default function ConnectionLine({ connection, zoom, layoutVersion, onCont
       window.removeEventListener("resize", updatePositions);
       resizeObserver.disconnect();
     };
-  }, [connection.sourceSessionHash, connection.targetSessionHash, zoom, layoutVersion]);
+  }, [connection.sourceSessionHash, connection.targetSessionHash, connection.sourceGroupId, connection.targetGroupId, zoom, layoutVersion]);
 
   const handleDelete = useCallback(async () => {
     await deleteConnection(connection.id);

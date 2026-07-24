@@ -108,6 +108,13 @@ export async function getGroupSessions(groupId) {
   return requestJson(`/api/workstation/groups/${groupId}/sessions`);
 }
 
+export async function updateSessionPosition(sessionHash, groupId, data) {
+  return requestJson(`/api/workstation/sessions/${sessionHash}/groups/${groupId}/position`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function listUngroupedSessions() {
   return requestJson("/api/workstation/ungrouped");
 }
@@ -124,10 +131,10 @@ export async function listAllLabels() {
   return requestJson("/api/workstation/connections/labels");
 }
 
-export async function createConnection(sourceSessionHash, targetSessionHash, label = "") {
+export async function createConnection(sourceSessionHash, targetSessionHash, label = "", sourceGroupId = null, targetGroupId = null) {
   return requestJson("/api/workstation/connections", {
     method: "POST",
-    body: JSON.stringify({ sourceSessionHash, targetSessionHash, label }),
+    body: JSON.stringify({ sourceSessionHash, targetSessionHash, label, sourceGroupId, targetGroupId }),
   });
 }
 

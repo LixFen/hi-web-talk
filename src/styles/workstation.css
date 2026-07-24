@@ -578,6 +578,37 @@
   background: var(--accent-color);
 }
 
+.group-area-content {
+  position: relative;
+  overflow: hidden;
+  padding: 8px;
+}
+
+.session-card-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  background: transparent;
+}
+
+.session-card-resize-handle::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid var(--border-color);
+  border-bottom: 2px solid var(--border-color);
+}
+
+.session-card-resize-handle:hover::after {
+  border-color: var(--accent-color);
+}
+
 /* Session Card */
 .session-card {
   padding: 10px 12px;
@@ -586,7 +617,7 @@
   border: 1px solid var(--border-color);
   border-radius: 8px;
   cursor: pointer;
-  transition: all var(--duration-fast);
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
   position: relative;
 }
 
@@ -1216,6 +1247,18 @@
   height: 100%;
   overflow-y: auto;
   padding: 20px;
+}
+
+/* In preview mode, disable the inner scroll containers so the outer
+   .preview-scroll-content handles all scrolling (avoids nested scroll contexts). */
+.preview-scroll-content .chat-view-shell {
+  flex: none;
+  min-height: 0;
+}
+
+.preview-scroll-content .messages-container {
+  overflow-y: visible;
+  padding-bottom: 0;
 }
 
 .preview-messages {

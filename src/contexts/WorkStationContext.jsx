@@ -17,6 +17,7 @@ import {
   removeSessionFromGroup as apiRemoveSessionFromGroup,
   getSessionGroups as apiGetSessionGroups,
   getGroupSessions as apiGetGroupSessions,
+  updateSessionPosition as apiUpdateSessionPosition,
   listUngroupedSessions as apiListUngroupedSessions,
   listConnections as apiListConnections,
   createConnection as apiCreateConnection,
@@ -198,6 +199,23 @@ export function WorkStationProvider({ children }) {
     }
   }, []);
 
+  const updateSessionPosition = useCallback(async (sessionHash, groupId, data) => {
+    try {
+      const result = await apiUpdateSessionPosition(sessionHash, groupId, data);
+      const updated = result.position;
+      setGroupSessions((prev) => ({
+        ...prev,
+        [groupId]: (prev[groupId] || []).map((s) =>
+          s.sessionHash === sessionHash ? { ...s, ...updated } : s
+        ),
+      }));
+      return updated;
+    } catch (err) {
+      setError(err.message || "更新session位置失败。");
+      throw err;
+    }
+  }, []);
+
   const refreshGroupSessions = useCallback(async (groupId) => {
     try {
       const result = await apiGetGroupSessions(groupId);
@@ -223,9 +241,9 @@ export function WorkStationProvider({ children }) {
   // Connections
   // ============================================================
 
-  const createConnection = useCallback(async (sourceSessionHash, targetSessionHash, label = "") => {
+  const createConnection = useCallback(async (sourceSessionHash, targetSessionHash, label = "", sourceGroupId = null, targetGroupId = null) => {
     try {
-      const result = await apiCreateConnection(sourceSessionHash, targetSessionHash, label);
+      const result = await apiCreateConnection(sourceSessionHash, targetSessionHash, label, sourceGroupId, targetGroupId);
       const newConn = result.connection;
       setConnections((prev) => [...prev, newConn]);
       return newConn;
@@ -339,6 +357,7 @@ export function WorkStationProvider({ children }) {
       reorderGroups: reorderGroupsAction,
       addSessionToGroup,
       removeSessionFromGroup,
+      updateSessionPosition,
       getSessionGroups: apiGetSessionGroups,
       refreshGroupSessions,
       refreshUngroupedSessions,
@@ -365,6 +384,7 @@ export function WorkStationProvider({ children }) {
       reorderGroupsAction,
       addSessionToGroup,
       removeSessionFromGroup,
+      updateSessionPosition,
       apiGetSessionGroups,
       refreshGroupSessions,
       refreshUngroupedSessions,

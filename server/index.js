@@ -135,6 +135,7 @@ import {
   removeSessionFromGroup,
   getSessionGroups,
   getGroupSessions,
+  updateSessionPositionInGroup,
   listUngroupedSessions,
   getAllWorkstationSessions,
   cleanupDeletedSession,
@@ -2120,6 +2121,21 @@ app.delete("/api/workstation/sessions/:sessionHash/groups/:groupId", authenticat
   }
 });
 
+app.patch("/api/workstation/sessions/:sessionHash/groups/:groupId/position", authenticateToken, async (request, response) => {
+  try {
+    const { sessionHash } = request.params;
+    const groupId = Number(request.params.groupId);
+    if (isNaN(groupId)) {
+      return response.status(400).json({ error: "无效的分组ID。" });
+    }
+    const position = await updateSessionPositionInGroup(sessionHash, groupId, request.user.id, request.body);
+    response.json({ position });
+  } catch (error) {
+    console.error("Update session position error:", error);
+    response.status(500).json({ error: "更新session位置失败。" });
+  }
+});
+
 app.get("/api/workstation/sessions/:sessionHash/groups", authenticateToken, async (request, response) => {
   try {
     const { sessionHash } = request.params;
@@ -2188,7 +2204,7 @@ app.get("/api/workstation/connections/labels", authenticateToken, async (request
 
 app.post("/api/workstation/connections", authenticateToken, async (request, response) => {
   try {
-    const { sourceSessionHash, targetSessionHash, label } = request.body;
+    const { sourceSessionHash, targetSessionHash, label, annotation, arrowType, sourceGroupId, targetGroupId } = request.body;
     if (!sourceSessionHash || !targetSessionHash) {
       return response.status(400).json({ error: "源session和目标session不能为空。" });
     }
@@ -2196,7 +2212,11 @@ app.post("/api/workstation/connections", authenticateToken, async (request, resp
       request.user.id,
       sourceSessionHash,
       targetSessionHash,
-      label || ""
+      label || "",
+      annotation || "",
+      arrowType || "forward",
+      sourceGroupId ?? null,
+      targetGroupId ?? null
     );
     response.status(201).json({ connection });
   } catch (error) {

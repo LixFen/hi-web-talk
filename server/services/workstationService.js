@@ -9,7 +9,7 @@ export async function listGroups(userId) {
   const db = getDatabase();
   return db
     .prepare(
-      `SELECT id, userId, name, position, isCollapsed, columnWidth, posX, posY, height, createdAt, updatedAt
+      `SELECT id, userId, name, position, isCollapsed, columnWidth, posX, posY, height, viewMode, createdAt, updatedAt
        FROM workstation_groups
        WHERE userId = ?
        ORDER BY position ASC`
@@ -50,6 +50,7 @@ export async function createGroup(userId, name) {
     posX: null,
     posY: null,
     height: null,
+    viewMode: "list",
     createdAt: now,
     updatedAt: now,
   };
@@ -91,6 +92,10 @@ export async function updateGroup(groupId, userId, data) {
     fields.push("height = ?");
     values.push(data.height);
   }
+  if (data.viewMode !== undefined) {
+    fields.push("viewMode = ?");
+    values.push(data.viewMode);
+  }
 
   if (fields.length === 0) {
     return getGroup(groupId, userId);
@@ -115,7 +120,7 @@ export async function getGroup(groupId, userId) {
   const db = getDatabase();
   return db
     .prepare(
-      `SELECT id, userId, name, position, isCollapsed, columnWidth, posX, posY, height, createdAt, updatedAt
+      `SELECT id, userId, name, position, isCollapsed, columnWidth, posX, posY, height, viewMode, createdAt, updatedAt
        FROM workstation_groups
        WHERE id = ? AND userId = ?`
     )
@@ -221,13 +226,65 @@ export async function getGroupSessions(groupId, userId) {
 
   return db
     .prepare(
-      `SELECT s.sessionHash, s.title, s.createdAt, s.updatedAt, s.deletedAt
+      `SELECT s.sessionHash, s.title, s.createdAt, s.updatedAt, s.deletedAt,
+              sg.posX, sg.posY, sg.width, sg.height
        FROM sessions s
        INNER JOIN workstation_session_groups sg ON s.sessionHash = sg.sessionHash
        WHERE sg.groupId = ?
        ORDER BY s.updatedAt DESC`
     )
     .all(groupId);
+}
+
+export async function updateSessionPositionInGroup(sessionHash, groupId, userId, data) {
+  await ensureDatabase();
+  const db = getDatabase();
+
+  // Verify ownership
+  const group = await getGroup(groupId, userId);
+  if (!group) {
+    throw new Error("Group not found");
+  }
+
+  const fields = [];
+  const values = [];
+
+  if (data.posX !== undefined) {
+    fields.push("posX = ?");
+    values.push(data.posX);
+  }
+  if (data.posY !== undefined) {
+    fields.push("posY = ?");
+    values.push(data.posY);
+  }
+  if (data.width !== undefined) {
+    fields.push("width = ?");
+    values.push(data.width);
+  }
+  if (data.height !== undefined) {
+    fields.push("height = ?");
+    values.push(data.height);
+  }
+
+  if (fields.length === 0) {
+    return { sessionHash, groupId };
+  }
+
+  values.push(sessionHash, groupId);
+
+  db.prepare(
+    `UPDATE workstation_session_groups
+     SET ${fields.join(", ")}
+     WHERE sessionHash = ? AND groupId = ?`
+  ).run(...values);
+
+  return db
+    .prepare(
+      `SELECT sessionHash, groupId, posX, posY, width, height
+       FROM workstation_session_groups
+       WHERE sessionHash = ? AND groupId = ?`
+    )
+    .get(sessionHash, groupId);
 }
 
 export async function listUngroupedSessions(userId) {
@@ -271,7 +328,7 @@ export async function listConnections(userId) {
   const db = getDatabase();
   return db
     .prepare(
-      `SELECT id, userId, sourceSessionHash, targetSessionHash, label, annotation, arrowType, createdAt, updatedAt
+      `SELECT id, userId, sourceSessionHash, targetSessionHash, sourceGroupId, targetGroupId, label, annotation, arrowType, createdAt, updatedAt
        FROM workstation_connections
        WHERE userId = ?
        ORDER BY createdAt ASC`
@@ -279,7 +336,7 @@ export async function listConnections(userId) {
     .all(userId);
 }
 
-export async function createConnection(userId, sourceSessionHash, targetSessionHash, label = "", annotation = "", arrowType = "forward") {
+export async function createConnection(userId, sourceSessionHash, targetSessionHash, label = "", annotation = "", arrowType = "forward", sourceGroupId = null, targetGroupId = null) {
   await ensureDatabase();
   const db = getDatabase();
   const now = new Date().toISOString();
@@ -289,13 +346,14 @@ export async function createConnection(userId, sourceSessionHash, targetSessionH
     throw new Error("Cannot connect a session to itself");
   }
 
-  // Check for duplicate
+  // Check for duplicate (same group context)
   const existing = db
     .prepare(
       `SELECT id FROM workstation_connections
-       WHERE userId = ? AND sourceSessionHash = ? AND targetSessionHash = ?`
+       WHERE userId = ? AND sourceSessionHash = ? AND targetSessionHash = ?
+         AND sourceGroupId IS ? AND targetGroupId IS ?`
     )
-    .get(userId, sourceSessionHash, targetSessionHash);
+    .get(userId, sourceSessionHash, targetSessionHash, sourceGroupId, targetGroupId);
 
   if (existing) {
     return existing;
@@ -303,16 +361,18 @@ export async function createConnection(userId, sourceSessionHash, targetSessionH
 
   const result = db
     .prepare(
-      `INSERT INTO workstation_connections (userId, sourceSessionHash, targetSessionHash, label, annotation, arrowType, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO workstation_connections (userId, sourceSessionHash, targetSessionHash, sourceGroupId, targetGroupId, label, annotation, arrowType, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(userId, sourceSessionHash, targetSessionHash, label, annotation, arrowType, now, now);
+    .run(userId, sourceSessionHash, targetSessionHash, sourceGroupId, targetGroupId, label, annotation, arrowType, now, now);
 
   return {
     id: result.lastInsertRowid,
     userId,
     sourceSessionHash,
     targetSessionHash,
+    sourceGroupId,
+    targetGroupId,
     label,
     annotation,
     arrowType,
