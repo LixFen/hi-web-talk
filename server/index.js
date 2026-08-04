@@ -2020,9 +2020,8 @@ if (isProduction) {
   });
 }
 
-// ============================================================
-// WorkStation API
-// ============================================================
+// WorkStation API (dev only)
+if (!isProduction) {
 
 // Groups
 app.get("/api/workstation/groups", authenticateToken, async (request, response) => {
@@ -2302,6 +2301,7 @@ app.delete("/api/workstation/dev/groups", authenticateToken, async (request, res
     response.status(500).json({ error: "清除分组失败。" });
   }
 });
+} // end WorkStation dev-only
 
 let httpServer = null;
 

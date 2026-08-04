@@ -8,6 +8,7 @@ export default function ChatHero({ hasModels, onOpenSettings, children }) {
   return (
     <div className="empty-state" style={{ padding: '0 2rem', textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.9 }}>
       {/* Icon Graphic */}
+      {import.meta.env.DEV && (
       <div
         className="hero-logo-container"
         style={{
@@ -24,7 +25,7 @@ export default function ChatHero({ hasModels, onOpenSettings, children }) {
           transition: 'all var(--duration-fast) var(--ease-out-expo)'
         }}
         onClick={() => navigate('/work')}
-        title="打开 WorkStation"
+        title="打开 WorkStation (开发模式)"
         onMouseOver={(e) => {
           e.currentTarget.style.boxShadow = 'var(--shadow-md)';
           e.currentTarget.style.transform = 'translateY(-2px)';
@@ -45,6 +46,7 @@ export default function ChatHero({ hasModels, onOpenSettings, children }) {
           </svg>
         )}
       </div>
+      )}
 
       <h2 className="hero-title" style={{
         fontSize: '2rem',

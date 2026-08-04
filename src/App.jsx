@@ -26,14 +26,16 @@ function AppContent() {
                 </RedirectIfAuth>
               }
             />
-            <Route
-              path="/work"
-              element={
-                <RequireAuth>
-                  <WorkStationPage />
-                </RequireAuth>
-              }
-            />
+            {import.meta.env.DEV && (
+              <Route
+                path="/work"
+                element={
+                  <RequireAuth>
+                    <WorkStationPage />
+                  </RequireAuth>
+                }
+              />
+            )}
             <Route
               element={
                 <RequireAuth>
