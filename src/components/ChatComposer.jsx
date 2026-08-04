@@ -110,6 +110,7 @@ const ChatComposer = ({
   const prevSessionHashRef = useRef(sessionHash);
   const onUploadAttachmentRef = useRef(onUploadAttachment);
   const uploadingRef = useRef(false);
+  const sendingRef = useRef(false);
   const attachmentsRef = useRef(attachments);
   onUploadAttachmentRef.current = onUploadAttachment;
   attachmentsRef.current = attachments;
@@ -422,30 +423,38 @@ const ChatComposer = ({
     });
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmedText = text.trim();
     const readyAttachments = attachments.filter((a) => !a.isLocal);
     const hasContent = trimmedText || readyAttachments.length > 0;
 
-    if (!hasContent || isLoading) return;
+    if (!hasContent || isLoading || sendingRef.current) return;
 
-    if (readyAttachments.length === 0) {
-      onSend(trimmedText);
-    } else {
-      const content = [];
-      if (trimmedText) {
-        content.push({ type: "text", text: trimmedText });
+    let sent = false;
+    sendingRef.current = true;
+    try {
+      if (readyAttachments.length === 0) {
+        sent = await onSend(trimmedText);
+      } else {
+        const content = [];
+        if (trimmedText) {
+          content.push({ type: "text", text: trimmedText });
+        }
+        for (const attachment of readyAttachments) {
+          content.push({
+            type: attachment.isDocument ? "document_attachment" : "image_attachment",
+            attachmentId: attachment.attachmentId,
+            fileName: attachment.fileName,
+            mimeType: attachment.mimeType,
+          });
+        }
+        sent = await onSend(content);
       }
-      for (const attachment of readyAttachments) {
-        content.push({
-          type: attachment.isDocument ? "document_attachment" : "image_attachment",
-          attachmentId: attachment.attachmentId,
-          fileName: attachment.fileName,
-          mimeType: attachment.mimeType,
-        });
-      }
-      onSend(content);
+    } finally {
+      sendingRef.current = false;
     }
+
+    if (!sent) return;
 
     setText('');
     setAttachments((prev) => {

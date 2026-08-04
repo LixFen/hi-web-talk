@@ -118,6 +118,7 @@ export function SessionProvider({ children }) {
   const activeSessionHashRef = useRef("");
   const viewSwitchVersionRef = useRef(0);
   const chatNavigationRequestIdRef = useRef(0);
+  const sessionSelectionRequestRef = useRef(0);
 
   const startNewChatDraft = useCallback(() => {
     setError("");
@@ -256,26 +257,25 @@ export function SessionProvider({ children }) {
 
   const handleSelectConversation = useCallback(
     async (sessionHash) => {
-      if (isLoading) return;
+      const requestId = ++sessionSelectionRequestRef.current;
       setError("");
-      setIsLoading(true);
       try {
         const detail = await loadSessionDetail(sessionHash);
+        if (requestId !== sessionSelectionRequestRef.current) return null;
         applySessionDetail(detail, {
           reason: "select-session",
           behavior: "auto",
         });
         return detail;
       } catch (err) {
+        if (requestId !== sessionSelectionRequestRef.current) return null;
         setError(
           err instanceof Error ? err.message : tRef.current("session.loadFailed"),
         );
         return null;
-      } finally {
-        setIsLoading(false);
       }
     },
-    [isLoading, loadSessionDetail, applySessionDetail],
+    [loadSessionDetail, applySessionDetail],
   );
 
   const handleDeleteConversation = useCallback(

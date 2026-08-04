@@ -18,11 +18,12 @@ import {
   appSettingsSchema,
   modelCreateSchema,
   modelUpdateSchema,
+  modelConnectivityTestSchema,
   providerCreateSchema,
   providerUpdateSchema,
   attachmentUploadSchema,
   blockReplySchema,
-  blockReplyStreamSchema,
+  blockReplyStreamWithOperationSchema,
   blockBranchSchema,
   blockRegenerateSchema,
   sessionUpdateSchema,
@@ -40,7 +41,10 @@ import {
   pathProviderIdSchema,
   pathAdaptationKeySchema,
   pathAttachmentIdSchema,
+  pathOperationIdSchema,
   paginationQuerySchema,
+  streamCancellationQuerySchema,
+  streamOperationQuerySchema,
 } from "./lib/validation.js";
 import { loginUser, registerUser, getUserById, changePassword } from "./services/userService.js";
 import { readSessionRecord } from "./lib/database.js";
@@ -72,11 +76,11 @@ import {
   listErrorLogs,
 } from "./services/errorLogService.js";
 import { callProviderModel, streamProviderModel, invalidateModelAdapterCache } from "./services/llmProviderService.js";
+import { testModelConnectivity } from "./services/modelConnectivityService.js";
 import { getToolDefinitions } from "./services/tools/toolRegistry.js";
 import "./services/tools/webSearchTool.js"; // 注册 web_search 工具
 import "./services/tools/drawTikzTool.js"; // 注册 draw_tikz 工具
 import "./services/tools/checkDrawingTool.js"; // 注册 check_drawing 工具
-import { setPreferredEngine, setPreferredProviderConfigs } from "./services/tools/webSearchTool.js";
 import { streamSessionManager } from "./services/streamSessionManager.js";
 import { saveAttachment, readAttachment, updateAttachmentBlockSHA1 } from "./services/attachmentService.js";
 import { resolveAttachmentMessages } from "./services/providerAdapters/attachmentResolver.js";
@@ -355,6 +359,22 @@ function normalizePrompt(prompt) {
   return String(prompt ?? "").trim();
 }
 
+async function getSearchToolContext(userId, searchEngine) {
+  const settings = await getAppSettings(userId);
+  return {
+    searchEngine: searchEngine || null,
+    searchProviderConfigs: settings.searchProviderConfigs || {},
+  };
+}
+
+function throwIfStreamCancelled(streamSession) {
+  if (streamSession.abortController.signal.aborted) {
+    const error = new Error("回复已取消。");
+    error.name = "AbortError";
+    throw error;
+  }
+}
+
 function extractAttachmentIds(prompt) {
   if (!Array.isArray(prompt)) {
     return [];
@@ -503,6 +523,17 @@ app.get("/api/model-capabilities", (request, response) => {
     return;
   }
   response.json({ capabilities: inferModelCapabilities(modelName), snapshot: getSnapshotInfo() });
+});
+
+app.post("/api/model-connectivity-test", authenticateToken, validateBody(modelConnectivityTestSchema), async (request, response) => {
+  try {
+    const result = await testModelConnectivity(request.body, request.user.id, request.user.role);
+    response.json(result);
+  } catch (error) {
+    response.status(error?.status || 500).json({
+      error: error instanceof Error ? error.message : "模型连通性测试失败。",
+    });
+  }
 });
 
 // ── Provider CRUD ──
@@ -1182,8 +1213,6 @@ app.post("/api/blocks/:blockSHA1/branch", authenticateToken, validateParams(path
 
 app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema), async (request, response) => {
   const { sessionHash, prompt, modelAlias, searchMode, searchEngine } = request.body;
-  setPreferredEngine(searchEngine || null);
-  getAppSettings(request.user.id).then((s) => setPreferredProviderConfigs(s.searchProviderConfigs)).catch(() => {});
 
   const session = readSessionRecord(sessionHash);
 
@@ -1258,11 +1287,15 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
     const tools = shouldUseTools
       ? getToolDefinitions()
       : undefined;
+    const toolContext = shouldUseTools
+      ? await getSearchToolContext(request.user.id, searchEngine)
+      : undefined;
 
     const result = await callProviderModel({
       modelConfig: selectedModel,
       messages: providerMessages,
       tools,
+      toolContext,
     });
 
     const block = await createDialogueBlock(sessionHash, {
@@ -1335,10 +1368,8 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
   }
 });
 
-app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyStreamSchema), async (request, response) => {
-  const { sessionHash, prompt, modelAlias, searchMode, searchEngine } = request.body;
-  setPreferredEngine(searchEngine || null);
-  getAppSettings(request.user.id).then((s) => setPreferredProviderConfigs(s.searchProviderConfigs)).catch(() => {});
+app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyStreamWithOperationSchema), async (request, response) => {
+  const { sessionHash, prompt, modelAlias, searchMode, searchEngine, operationId } = request.body;
 
   const session = readSessionRecord(sessionHash);
 
@@ -1376,6 +1407,19 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
     ? normalizedPrompt
     : normalizedPrompt.map((b) => b.text ?? "").join(" ");
 
+  let streamSession;
+  try {
+    const created = streamSessionManager.create(sessionHash, operationId);
+    streamSession = created.session;
+    if (!created.created) {
+      response.status(202).json({ operationId, status: "in_progress" });
+      return;
+    }
+  } catch (error) {
+    response.status(error?.status || 500).json({ error: error instanceof Error ? error.message : "无法创建流式回复。" });
+    return;
+  }
+
   prepareSSE(response);
   response.write(":ok\n\n");
   logStream("sse-prepared", { sessionHash, activeBlockSHA1: session.activeBlockSHA1 });
@@ -1400,7 +1444,6 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
   request.on("close", handleAbort);
   response.on("finish", handleFinish);
 
-  const streamSession = streamSessionManager.create(sessionHash);
   const unsubscribe = streamSession.subscribe((event) => {
     if (clientConnected && !response.writableEnded && !response.destroyed) {
       try {
@@ -1471,11 +1514,16 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
     const tools = shouldUseTools
       ? getToolDefinitions()
       : undefined;
+    const toolContext = shouldUseTools
+      ? await getSearchToolContext(request.user.id, searchEngine)
+      : undefined;
 
     const result = await streamProviderModel({
       modelConfig: selectedModel,
       messages: providerMessages,
       tools,
+      signal: streamSession.abortController.signal,
+      toolContext,
       onChunk: async (event) => {
         // 处理工具事件
         if (event?.type === "tool_start") {
@@ -1516,6 +1564,8 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
         }
       },
     });
+
+    throwIfStreamCancelled(streamSession);
 
     logStream("provider-finished", {
       replyLength: result.reply.length,
@@ -1583,26 +1633,31 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
     logStream("done-sent", { sessionHash });
     response.end();
   } catch (error) {
+    const cancelled = streamSession.abortController.signal.aborted;
     logStream("error", {
       sessionHash,
       modelAlias,
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
-    await tryAppendErrorLog({
-      sessionHash,
-      operation: "reply-stream",
-      parentBlockSHA1: null,
-      blockSHA1: null,
-      prompt: typeof normalizedPrompt === "string" ? normalizedPrompt : JSON.stringify(normalizedPrompt),
-      modelAlias: modelAlias ?? "",
-      error,
-      meta: {
-        stage: "reply-stream",
-      },
-    });
-
-    streamSession.fail(error);
+    if (cancelled) {
+      streamSession.pushEvent({ type: "cancelled" });
+      streamSession.complete(null);
+    } else {
+      await tryAppendErrorLog({
+        sessionHash,
+        operation: "reply-stream",
+        parentBlockSHA1: null,
+        blockSHA1: null,
+        prompt: typeof normalizedPrompt === "string" ? normalizedPrompt : JSON.stringify(normalizedPrompt),
+        modelAlias: modelAlias ?? "",
+        error,
+        meta: {
+          stage: "reply-stream",
+        },
+      });
+      streamSession.fail(error);
+    }
 
     if (!response.headersSent) {
       response.status(error?.status || 500).json({
@@ -1620,12 +1675,14 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
     request.off("close", handleAbort);
     response.off("finish", handleFinish);
     unsubscribe();
+    streamSessionManager.finish(streamSession);
   }
 });
 
-app.get("/api/sessions/:sessionHash/stream", authenticateToken, validateParams(pathSessionHashSchema), requireSessionOwnership(), async (request, response) => {
+app.get("/api/sessions/:sessionHash/stream", authenticateToken, validateParams(pathSessionHashSchema), validateQuery(streamOperationQuerySchema), requireSessionOwnership(), async (request, response) => {
   const { sessionHash } = request.params;
-  const streamSession = streamSessionManager.get(sessionHash);
+  const { operationId } = request.query;
+  const streamSession = streamSessionManager.getForReconnect(sessionHash, operationId);
 
   if (!streamSession) {
     response.status(204).end();
@@ -1671,7 +1728,7 @@ app.get("/api/sessions/:sessionHash/stream", authenticateToken, validateParams(p
     }
     try {
       writeRawSSE(response, JSON.stringify(event));
-      if (event.type === "complete") {
+      if (event.type === "complete" || event.type === "cancelled") {
         writeDoneSSE(response);
         response.end();
       } else if (event.type === "error") {
@@ -1684,10 +1741,19 @@ app.get("/api/sessions/:sessionHash/stream", authenticateToken, validateParams(p
   });
 });
 
+app.delete("/api/blocks/reply/stream/:operationId", authenticateToken, validateParams(pathOperationIdSchema), validateQuery(streamCancellationQuerySchema), requireSessionOwnership(), async (request, response) => {
+  const { operationId } = request.params;
+  const { sessionHash } = request.query;
+  const cancelled = streamSessionManager.cancel(sessionHash, operationId);
+  if (!cancelled) {
+    response.status(204).end();
+    return;
+  }
+  response.json({ operationId, cancelled: true });
+});
+
 app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(pathBlockSHA1Schema), validateBody(blockRegenerateSchema), async (request, response) => {
   const { sessionHash, modelAlias, searchMode, searchEngine } = request.body;
-  setPreferredEngine(searchEngine || null);
-  getAppSettings(request.user.id).then((s) => setPreferredProviderConfigs(s.searchProviderConfigs)).catch(() => {});
 
   const session = readSessionRecord(sessionHash);
 
@@ -1755,11 +1821,15 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(
     const tools = shouldUseTools
       ? getToolDefinitions()
       : undefined;
+    const toolContext = shouldUseTools
+      ? await getSearchToolContext(request.user.id, searchEngine)
+      : undefined;
 
     const result = await callProviderModel({
       modelConfig: selectedModel,
       messages: providerMessages,
       tools,
+      toolContext,
     });
 
     const regeneratedBlock = await createDialogueBlock(sessionHash, {

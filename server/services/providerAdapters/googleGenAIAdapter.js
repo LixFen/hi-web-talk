@@ -122,8 +122,8 @@ class GoogleGenAIAdapter extends BaseLLMAdapter {
 
   // ── 原有方法（向后兼容） ──
 
-  async doCall(messages) {
-    const options = this.buildOptions(messages);
+  async doCall(messages, signal) {
+    const options = withAbortSignal(this.buildOptions(messages), signal);
     const result = await this.client.models.generateContent(options);
 
     const candidate = result.candidates?.[0];
@@ -147,8 +147,8 @@ class GoogleGenAIAdapter extends BaseLLMAdapter {
     });
   }
 
-  async doStream(messages, onChunk) {
-    const options = this.buildOptions(messages);
+  async doStream(messages, onChunk, signal) {
+    const options = withAbortSignal(this.buildOptions(messages), signal);
     const streamResult = await this.client.models.generateContentStream(options);
 
     let reply = "";
@@ -190,8 +190,8 @@ class GoogleGenAIAdapter extends BaseLLMAdapter {
 
   // ── Tool Calling 方法 ──
 
-  async doCallWithTools(messages, tools) {
-    const options = this.buildOptions(messages, { tools });
+  async doCallWithTools(messages, tools, signal) {
+    const options = withAbortSignal(this.buildOptions(messages, { tools }), signal);
     const result = await this.client.models.generateContent(options);
 
     const candidate = result.candidates?.[0];
@@ -246,14 +246,14 @@ class GoogleGenAIAdapter extends BaseLLMAdapter {
     };
   }
 
-  async doStreamWithTools(messages, tools, onChunk) {
-    const options = this.buildOptions(messages, { tools });
+  async doStreamWithTools(messages, tools, onChunk, signal) {
+    const options = withAbortSignal(this.buildOptions(messages, { tools }), signal);
     const streamResult = await this.client.models.generateContentStream(options);
     return this.collectStreamResult(streamResult, onChunk);
   }
 
-  async createStreamWithTools(messages, tools) {
-    const options = this.buildOptions(messages, { tools });
+  async createStreamWithTools(messages, tools, signal) {
+    const options = withAbortSignal(this.buildOptions(messages, { tools }), signal);
     return this.client.models.generateContentStream(options);
   }
 
@@ -322,6 +322,17 @@ class GoogleGenAIAdapter extends BaseLLMAdapter {
       message: assistantMessage,
     };
   }
+}
+
+function withAbortSignal(options, signal) {
+  if (!signal) return options;
+  return {
+    ...options,
+    config: {
+      ...(options.config ?? {}),
+      abortSignal: signal,
+    },
+  };
 }
 
 export function createGoogleGenAIAdapter(modelConfig, credential) {

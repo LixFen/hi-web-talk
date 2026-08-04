@@ -64,8 +64,8 @@ class OpenAIResponsesAdapter extends BaseLLMAdapter {
 
   // ── 原有方法（向后兼容） ──
 
-  async doCall(messages) {
-    const result = await this.client.responses.create(this.buildRequestOptions(messages));
+  async doCall(messages, signal) {
+    const result = await this.client.responses.create(this.buildRequestOptions(messages), signal ? { signal } : undefined);
 
     let reasoning = "";
     const reasoningItems = result.output?.filter((item) => item.type === "reasoning") ?? [];
@@ -88,11 +88,11 @@ class OpenAIResponsesAdapter extends BaseLLMAdapter {
     });
   }
 
-  async doStream(messages, onChunk) {
+  async doStream(messages, onChunk, signal) {
     const stream = await this.client.responses.create({
       ...this.buildRequestOptions(messages),
       stream: true,
-    });
+    }, signal ? { signal } : undefined);
 
     let reply = "";
     let reasoning = "";
@@ -137,9 +137,10 @@ class OpenAIResponsesAdapter extends BaseLLMAdapter {
 
   // ── Tool Calling 方法 ──
 
-  async doCallWithTools(messages, tools) {
+  async doCallWithTools(messages, tools, signal) {
     const result = await this.client.responses.create(
-      this.buildRequestOptions(messages, { tools })
+      this.buildRequestOptions(messages, { tools }),
+      signal ? { signal } : undefined,
     );
 
     let reasoning = "";
@@ -190,19 +191,19 @@ class OpenAIResponsesAdapter extends BaseLLMAdapter {
     };
   }
 
-  async doStreamWithTools(messages, tools, onChunk) {
+  async doStreamWithTools(messages, tools, onChunk, signal) {
     const stream = await this.client.responses.create({
       ...this.buildRequestOptions(messages, { tools }),
       stream: true,
-    });
+    }, signal ? { signal } : undefined);
     return this.collectStreamResult(stream, onChunk);
   }
 
-  async createStreamWithTools(messages, tools) {
+  async createStreamWithTools(messages, tools, signal) {
     return this.client.responses.create({
       ...this.buildRequestOptions(messages, { tools }),
       stream: true,
-    });
+    }, signal ? { signal } : undefined);
   }
 
   async collectStreamResult(stream, onChunk) {

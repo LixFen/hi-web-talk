@@ -130,9 +130,9 @@ class OpenAIChatCompletionsAdapter extends BaseLLMAdapter {
 
   // ── 原有方法（向后兼容） ──
 
-  async doCall(messages) {
+  async doCall(messages, signal) {
     const requestBody = this.buildRequestBody(messages, { stream: false });
-    const completion = await this.client.chat.completions.create(requestBody);
+    const completion = await this.client.chat.completions.create(requestBody, signal ? { signal } : undefined);
 
     const message = completion.choices?.[0]?.message ?? {};
 
@@ -144,9 +144,9 @@ class OpenAIChatCompletionsAdapter extends BaseLLMAdapter {
     });
   }
 
-  async doStream(messages, onChunk) {
+  async doStream(messages, onChunk, signal) {
     const requestBody = this.buildRequestBody(messages, { stream: true });
-    const stream = await this.client.chat.completions.create(requestBody);
+    const stream = await this.client.chat.completions.create(requestBody, signal ? { signal } : undefined);
 
     let reply = "";
     let reasoning = "";
@@ -184,9 +184,9 @@ class OpenAIChatCompletionsAdapter extends BaseLLMAdapter {
 
   // ── Tool Calling 方法 ──
 
-  async doCallWithTools(messages, tools) {
+  async doCallWithTools(messages, tools, signal) {
     const requestBody = this.buildRequestBody(messages, { stream: false, tools });
-    const completion = await this.client.chat.completions.create(requestBody);
+    const completion = await this.client.chat.completions.create(requestBody, signal ? { signal } : undefined);
 
     const choice = completion.choices?.[0] ?? {};
     const message = choice.message ?? {};
@@ -208,15 +208,15 @@ class OpenAIChatCompletionsAdapter extends BaseLLMAdapter {
     };
   }
 
-  async doStreamWithTools(messages, tools, onChunk) {
+  async doStreamWithTools(messages, tools, onChunk, signal) {
     const requestBody = this.buildRequestBody(messages, { stream: true, tools });
-    const stream = await this.client.chat.completions.create(requestBody);
+    const stream = await this.client.chat.completions.create(requestBody, signal ? { signal } : undefined);
     return this.collectStreamResult(stream, onChunk);
   }
 
-  async createStreamWithTools(messages, tools) {
+  async createStreamWithTools(messages, tools, signal) {
     const requestBody = this.buildRequestBody(messages, { stream: true, tools });
-    return this.client.chat.completions.create(requestBody);
+    return this.client.chat.completions.create(requestBody, signal ? { signal } : undefined);
   }
 
   async collectStreamResult(stream, onChunk) {

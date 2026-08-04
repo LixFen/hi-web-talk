@@ -189,7 +189,7 @@ function buildConfiguredAt(record, fallbackNow) {
   return record.createdAt ?? fallbackNow;
 }
 
-async function normalizeModelRecord(record = {}, index = 0) {
+async function normalizeModelRecord(record = {}, index = 0, userId = null) {
   const timestamp = nowIso();
 
   // ── Resolve provider context ──
@@ -199,7 +199,7 @@ async function normalizeModelRecord(record = {}, index = 0) {
   let effectiveProviderId = record.providerId || null;
   if (record.providerId) {
     const { getProviderById } = await import("./providerConfigService.js");
-    provider = await getProviderById(record.providerId);
+    provider = await getProviderById(record.providerId, userId);
     if (!provider) {
       // Provider was deleted — gracefully degrade to legacy inline mode
       console.warn(`[normalizeModelRecord] providerId ${record.providerId} not found, treating as legacy model`);
@@ -363,7 +363,7 @@ export async function readStoredModels(userId = null) {
       const normalizedModels = [];
 
       for (let index = 0; index < sourceModels.length; index += 1) {
-        normalizedModels.push(await normalizeModelRecord(sourceModels[index], index));
+        normalizedModels.push(await normalizeModelRecord(sourceModels[index], index, userId));
       }
 
       normalizedModels.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
@@ -394,7 +394,7 @@ export async function writeModels(models, userId = null) {
   const normalizedModels = [];
 
   for (let index = 0; index < models.length; index += 1) {
-    normalizedModels.push(await normalizeModelRecord(models[index], index));
+    normalizedModels.push(await normalizeModelRecord(models[index], index, userId));
   }
 
   normalizedModels.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
@@ -537,6 +537,7 @@ export async function createModel(payload, userId = null, role = "user") {
       updatedAt: nowIso(),
     },
     models.length,
+    targetUserId,
   );
 
   let alias = nextModel.alias;
@@ -605,6 +606,7 @@ export async function updateModel(alias, payload, userId = null, role = "user") 
   const nextModel = await normalizeModelRecord(
     mergedRecord,
     models.findIndex((model) => model.alias === alias),
+    targetUserId,
   );
   const nextModels = await writeModels(
     models.map((model) => (model.alias === alias ? nextModel : model)),

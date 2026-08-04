@@ -76,11 +76,11 @@ class AnthropicMessagesAdapter extends BaseLLMAdapter {
 
   // ── 原有方法（向后兼容） ──
 
-  async doCall(messages) {
+  async doCall(messages, signal) {
     const result = await this.client.messages.create({
       ...this.buildRequestBody(messages),
       stream: false,
-    });
+    }, signal ? { signal } : undefined);
 
     const textBlocks = result.content?.filter((block) => block.type === "text") ?? [];
     const reply = textBlocks.map((block) => block.text).join("");
@@ -96,11 +96,11 @@ class AnthropicMessagesAdapter extends BaseLLMAdapter {
     });
   }
 
-  async doStream(messages, onChunk) {
+  async doStream(messages, onChunk, signal) {
     const stream = await this.client.messages.create({
       ...this.buildRequestBody(messages),
       stream: true,
-    });
+    }, signal ? { signal } : undefined);
 
     let reply = "";
     let reasoning = "";
@@ -147,11 +147,11 @@ class AnthropicMessagesAdapter extends BaseLLMAdapter {
 
   // ── Tool Calling 方法 ──
 
-  async doCallWithTools(messages, tools) {
+  async doCallWithTools(messages, tools, signal) {
     const result = await this.client.messages.create({
       ...this.buildRequestBody(messages, { tools }),
       stream: false,
-    });
+    }, signal ? { signal } : undefined);
 
     const textBlocks = result.content?.filter((block) => block.type === "text") ?? [];
     const reply = textBlocks.map((block) => block.text).join("");
@@ -197,19 +197,19 @@ class AnthropicMessagesAdapter extends BaseLLMAdapter {
     };
   }
 
-  async doStreamWithTools(messages, tools, onChunk) {
+  async doStreamWithTools(messages, tools, onChunk, signal) {
     const stream = await this.client.messages.create({
       ...this.buildRequestBody(messages, { tools }),
       stream: true,
-    });
+    }, signal ? { signal } : undefined);
     return this.collectStreamResult(stream, onChunk);
   }
 
-  async createStreamWithTools(messages, tools) {
+  async createStreamWithTools(messages, tools, signal) {
     return this.client.messages.create({
       ...this.buildRequestBody(messages, { tools }),
       stream: true,
-    });
+    }, signal ? { signal } : undefined);
   }
 
   async collectStreamResult(stream, onChunk) {

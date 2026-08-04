@@ -4,6 +4,7 @@ import {
   loginSchema,
   changePasswordSchema,
   blockReplySchema,
+  blockReplyStreamWithOperationSchema,
   sessionUpdateSchema,
   providerCreateSchema,
   providerUpdateSchema,
@@ -13,6 +14,8 @@ import {
   pathProviderIdSchema,
   paginationQuerySchema,
   attachmentUploadSchema,
+  streamCancellationQuerySchema,
+  streamOperationQuerySchema,
 } from "../lib/validation.js";
 
 describe("registerSchema", () => {
@@ -105,6 +108,31 @@ describe("blockReplySchema", () => {
       searchMode: "auto",
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe("stream operation schemas", () => {
+  const operationId = "550e8400-e29b-41d4-a716-446655440000";
+
+  it("requires an operation id for a streaming reply", () => {
+    const result = blockReplyStreamWithOperationSchema.safeParse({
+      sessionHash: "abc123def456abc123def456",
+      prompt: "hello",
+      operationId,
+    });
+    expect(result.success).toBe(true);
+    expect(blockReplyStreamWithOperationSchema.safeParse({
+      sessionHash: "abc123def456abc123def456",
+      prompt: "hello",
+    }).success).toBe(false);
+  });
+
+  it("validates reconnect and cancellation identifiers", () => {
+    expect(streamOperationQuerySchema.safeParse({ operationId }).success).toBe(true);
+    expect(streamOperationQuerySchema.safeParse({}).success).toBe(true);
+    expect(streamCancellationQuerySchema.safeParse({
+      sessionHash: "a".repeat(24),
+    }).success).toBe(true);
   });
 });
 

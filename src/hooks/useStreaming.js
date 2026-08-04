@@ -1,12 +1,25 @@
 import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  cancelReplyStream,
   createSession,
   sendReply,
   sendReplyStream,
   subscribeToSessionStream,
   uploadAttachment,
 } from "../lib/chatApi";
+
+function createOperationId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = character === "x" ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
 
 export default function useStreaming({
   getSessionHash,
@@ -24,127 +37,229 @@ export default function useStreaming({
   const [pendingPrompt, setPendingPrompt] = useState("");
   const [streamingToolState, setStreamingToolState] = useState(null);
   const [streamingTikzSvg, setStreamingTikzSvg] = useState(null);
+  const currentOperationRef = useRef(null);
   const streamAbortControllerRef = useRef(null);
-  const streamReconnectControllerRef = useRef(null);
-  const streamBufferRef = useRef("");
-  const streamReasoningBufferRef = useRef("");
-  const streamFlushRafRef = useRef(0);
+  const operationIdsBySessionRef = useRef(new Map());
 
-  function scheduleFlush() {
-    if (streamFlushRafRef.current) return;
-    streamFlushRafRef.current = requestAnimationFrame(() => {
-      streamFlushRafRef.current = 0;
-      setStreamingReply(streamBufferRef.current);
-      setStreamingReasoning(streamReasoningBufferRef.current);
-    });
-  }
+  const isCurrentOperation = useCallback((operation) => currentOperationRef.current === operation, []);
 
-  const subscribeToStream = useCallback(
-    async (sessionHash) => {
-      streamReconnectControllerRef.current?.abort();
+  const clearSessionOperation = useCallback((operation) => {
+    if (!operation.sessionHash) return;
 
-      const abortController = new AbortController();
-      streamReconnectControllerRef.current = abortController;
+    const currentOperationId = operationIdsBySessionRef.current.get(operation.sessionHash);
+    if (currentOperationId === operation.serverOperationId || currentOperationId === operation.id) {
+      operationIdsBySessionRef.current.delete(operation.sessionHash);
+    }
+  }, []);
 
+  const clearStreamingState = useCallback(() => {
+    setPendingPrompt("");
+    setStreamingReply("");
+    setStreamingReasoning("");
+    setStreamingToolState(null);
+    setStreamingTikzSvg(null);
+  }, []);
+
+  const finishOperation = useCallback(
+    (operation) => {
+      if (!isCurrentOperation(operation)) return;
+
+      if (operation.flushRaf) {
+        cancelAnimationFrame(operation.flushRaf);
+      }
+      currentOperationRef.current = null;
+      if (streamAbortControllerRef.current === operation.controller) {
+        streamAbortControllerRef.current = null;
+      }
+      clearStreamingState();
+      onSetLoading(false);
+    },
+    [clearStreamingState, isCurrentOperation, onSetLoading],
+  );
+
+  const startOperation = useCallback(
+    (type, sessionHash = "", serverOperationId = null) => {
+      const previous = currentOperationRef.current;
+      if (previous) {
+        if (previous.flushRaf) {
+          cancelAnimationFrame(previous.flushRaf);
+        }
+        previous.controller.abort();
+      }
+
+      const operationId = createOperationId();
+      const operation = {
+        id: operationId,
+        type,
+        sessionHash,
+        controller: new AbortController(),
+        flushRaf: 0,
+        reply: "",
+        reasoning: "",
+        serverOperationId: type === "send" ? operationId : serverOperationId,
+      };
+      currentOperationRef.current = operation;
+      if (type === "send") {
+        streamAbortControllerRef.current = operation.controller;
+      }
       onSetLoading(true);
+      clearStreamingState();
+      return operation;
+    },
+    [clearStreamingState, onSetLoading],
+  );
+
+  const scheduleFlush = useCallback(
+    (operation) => {
+      if (!isCurrentOperation(operation) || operation.flushRaf) return;
+
+      operation.flushRaf = requestAnimationFrame(() => {
+        operation.flushRaf = 0;
+        if (!isCurrentOperation(operation)) return;
+        setStreamingReply(operation.reply);
+        setStreamingReasoning(operation.reasoning);
+      });
+    },
+    [isCurrentOperation],
+  );
+
+  const resetReplayState = useCallback(
+    (operation) => {
+      if (!isCurrentOperation(operation)) return;
+      if (operation.flushRaf) {
+        cancelAnimationFrame(operation.flushRaf);
+        operation.flushRaf = 0;
+      }
+      operation.reply = "";
+      operation.reasoning = "";
       setStreamingReply("");
       setStreamingReasoning("");
       setStreamingToolState(null);
       setStreamingTikzSvg(null);
-      streamBufferRef.current = "";
-      streamReasoningBufferRef.current = "";
+    },
+    [isCurrentOperation],
+  );
+
+  const applyStreamEvent = useCallback(
+    (operation, event, { onComplete } = {}) => {
+      if (!isCurrentOperation(operation)) return;
+
+      if (event?.operationId) {
+        if (operation.serverOperationId && operation.serverOperationId !== event.operationId) {
+          return;
+        }
+        operation.serverOperationId = event.operationId;
+        if (operation.sessionHash) {
+          operationIdsBySessionRef.current.set(operation.sessionHash, event.operationId);
+        }
+      }
+
+      if (event?.type === "tool_start") {
+        if (event.toolName === "web_search") {
+          setStreamingToolState({ type: "searching", toolName: event.toolName, query: event.arguments?.query });
+        }
+        if (event.toolName === "draw_tikz") {
+          setStreamingToolState({ type: "drawing", toolName: event.toolName });
+          setStreamingTikzSvg(null);
+        }
+        return;
+      }
+
+      if (event?.type === "tool_result") {
+        if (event.toolName === "web_search") {
+          setStreamingToolState({ type: "searched", toolName: event.toolName, engine: event.engine, sources: event.sources });
+        }
+        if (event.toolName === "draw_tikz") {
+          if (event.compiled && event.svg) {
+            setStreamingTikzSvg(event.svg);
+          }
+          setStreamingToolState({
+            type: event.compiled ? "drawn" : "failed",
+            toolName: event.toolName,
+            error: event.error,
+          });
+        }
+        return;
+      }
+
+      if (event?.type === "reasoning_round") {
+        if (event.reasoningDelta) {
+          operation.reasoning += `\n\n---\n\n${event.reasoningDelta}`;
+        } else if (operation.reasoning) {
+          operation.reasoning += "\n\n---\n\n";
+        }
+        scheduleFlush(operation);
+        return;
+      }
+
+      if (event?.type === "delta") {
+        operation.reply += event.delta || "";
+        operation.reasoning += event.reasoningDelta || event.reasoning_delta || "";
+        scheduleFlush(operation);
+        return;
+      }
+
+      if (event?.type === "complete") {
+        clearSessionOperation(operation);
+        onComplete?.(event.detail);
+        return;
+      }
+
+      if (event?.type === "cancelled") {
+        clearSessionOperation(operation);
+        return;
+      }
+
+      if (event?.type === "error") {
+        clearSessionOperation(operation);
+        throw new Error(event.error || "请求失败了，请稍后再试。");
+      }
+    },
+    [clearSessionOperation, isCurrentOperation, scheduleFlush],
+  );
+
+  const subscribeToStream = useCallback(
+    async (sessionHash) => {
+      const current = currentOperationRef.current;
+      if (current?.type === "send" && current.sessionHash === sessionHash) {
+        return true;
+      }
+      const serverOperationId = operationIdsBySessionRef.current.get(sessionHash);
+      const operation = startOperation(
+        "subscribe",
+        sessionHash,
+        serverOperationId,
+      );
+      let completed = false;
 
       try {
         const result = await subscribeToSessionStream(sessionHash, {
-          signal: abortController.signal,
-          onEvent: (event) => {
-            // 处理工具事件
-            if (event?.type === "tool_start") {
-              if (event.toolName === "web_search") {
-                setStreamingToolState({ type: "searching", toolName: event.toolName, query: event.arguments?.query });
-              }
-              if (event.toolName === "draw_tikz") {
-                setStreamingToolState({ type: "drawing", toolName: event.toolName });
-                setStreamingTikzSvg(null);
-              }
-              return;
-            }
-            if (event?.type === "tool_result") {
-              if (event.toolName === "web_search") {
-                setStreamingToolState({ type: "searched", toolName: event.toolName, engine: event.engine, sources: event.sources });
-              }
-              if (event.toolName === "draw_tikz") {
-                if (event.compiled && event.svg) {
-                  setStreamingTikzSvg(event.svg);
-                }
-                setStreamingToolState({
-                  type: event.compiled ? "drawn" : "failed",
-                  toolName: event.toolName,
-                  error: event.error,
-                });
-              }
-              return;
-            }
-            // 处理 reasoning round 事件
-            if (event?.type === "reasoning_round") {
-              if (event.reasoningDelta) {
-                streamReasoningBufferRef.current += `\n\n---\n\n${event.reasoningDelta}`;
-              } else if (streamReasoningBufferRef.current) {
-                streamReasoningBufferRef.current += `\n\n---\n\n`;
-              }
-              scheduleFlush();
-              return;
-            }
-            if (event?.type === "delta") {
-              streamBufferRef.current += event.delta || "";
-              if (event.reasoningDelta || event.reasoning_delta) {
-                streamReasoningBufferRef.current +=
-                  event.reasoningDelta || event.reasoning_delta || "";
-              }
-              scheduleFlush();
-              return;
-            }
-            if (event?.type === "complete") {
-              onApplyDetail(event.detail);
-              return;
-            }
-            if (event?.type === "error") {
-              throw new Error(event.error || "流式重连出错。");
-            }
-          },
+          operationId: operation.serverOperationId || undefined,
+          signal: operation.controller.signal,
+          onEvent: (event) =>
+            applyStreamEvent(operation, event, {
+              onComplete: (detail) => {
+                if (!isCurrentOperation(operation)) return;
+                completed = true;
+                onApplyDetail(detail);
+              },
+            }),
         });
 
-        if (!result.active) {
-          onSetLoading(false);
-          setPendingPrompt("");
-          setStreamingReply("");
-          setStreamingReasoning("");
-          setStreamingToolState(null);
-          setStreamingTikzSvg(null);
+        if (!result.active && !completed) {
+          clearSessionOperation(operation);
         }
+        return result.active || completed;
       } catch (err) {
-        if (err?.name !== "AbortError") {
-          onSetError(
-            err instanceof Error ? err.message : "流式重连失败。",
-          );
+        if (isCurrentOperation(operation) && err?.name !== "AbortError") {
+          onSetError(err instanceof Error ? err.message : "流式重连失败。");
         }
+        return false;
       } finally {
-        if (streamFlushRafRef.current) {
-          cancelAnimationFrame(streamFlushRafRef.current);
-          streamFlushRafRef.current = 0;
-        }
-        streamBufferRef.current = "";
-        streamReasoningBufferRef.current = "";
-        onSetLoading(false);
-        setPendingPrompt("");
-        setStreamingReply("");
-        setStreamingReasoning("");
-        setStreamingToolState(null);
-        setStreamingTikzSvg(null);
-        streamReconnectControllerRef.current = null;
+        finishOperation(operation);
       }
     },
-    [onApplyDetail, onSetLoading, onSetError],
+    [applyStreamEvent, clearSessionOperation, finishOperation, isCurrentOperation, onApplyDetail, onSetError, startOperation],
   );
 
   const handleUploadAttachment = useCallback(
@@ -155,170 +270,127 @@ export default function useStreaming({
         onApplyDetail(createdDetail);
         sessionHash = createdDetail.session.sessionHash;
         navigate(`/chat/${sessionHash}`);
-        return uploadAttachment({
-          sessionHash,
-          fileName,
-          mimeType,
-          base64Data,
-        });
       }
       return uploadAttachment({ sessionHash, fileName, mimeType, base64Data });
     },
-    [getSessionHash, systemPrompt, onApplyDetail],
+    [getSessionHash, systemPrompt, onApplyDetail, navigate],
   );
 
   const handleSend = useCallback(
     async (rawContent) => {
       const isArray = Array.isArray(rawContent);
       const textPreview = isArray
-        ? rawContent.map((b) => b.text ?? "").join(" ").trim()
+        ? rawContent.map((block) => block.text ?? "").join(" ").trim()
         : rawContent.trim();
       const model = selectedModel;
-      if ((!textPreview && !isArray) || !model) return;
+      if ((!textPreview && !isArray) || !model) return false;
 
-      onSetLoading(true);
+      const operation = startOperation("send", getSessionHash() || "");
       setPendingPrompt(rawContent);
-      setStreamingReply("");
-      setStreamingToolState(null);
-      setStreamingTikzSvg(null);
-      streamReconnectControllerRef.current?.abort();
-      streamReconnectControllerRef.current = null;
-
-      let sessionHash = getSessionHash() || "";
       const supportsStreaming = model.supportsStreaming !== false;
 
       try {
-        if (!sessionHash) {
+        if (!operation.sessionHash) {
           const createdDetail = await createSession(systemPrompt?.content || "");
+          if (!isCurrentOperation(operation)) return false;
           onApplyDetail(createdDetail);
-          sessionHash = createdDetail.session.sessionHash;
-          navigate(`/chat/${sessionHash}`);
+          operation.sessionHash = createdDetail.session.sessionHash;
+          navigate(`/chat/${operation.sessionHash}`);
         }
 
         const prompt = isArray ? rawContent : rawContent.trim();
-
         if (!supportsStreaming) {
           const detail = await sendReply({
-            sessionHash,
+            sessionHash: operation.sessionHash,
             prompt,
             modelAlias: model.alias,
             searchMode,
             searchEngine,
           });
+          if (!isCurrentOperation(operation)) return false;
           onApplyDetail(detail, {
             revealLatestInChat: true,
             reason: "send-reply",
             behavior: "auto",
           });
-          return;
+          clearSessionOperation(operation);
+          return true;
         }
 
-        const abortController = new AbortController();
-        streamAbortControllerRef.current = abortController;
-
         let streamedDetail = null;
+        const onStreamEvent = (event) =>
+          applyStreamEvent(operation, event, {
+            onComplete: (detail) => {
+              streamedDetail = detail;
+            },
+          });
 
-        await sendReplyStream({
-          sessionHash,
-          prompt,
-          modelAlias: model.alias,
-          searchMode,
-          searchEngine,
-          signal: abortController.signal,
-          onEvent: async (event) => {
-            // 处理工具事件
-            if (event?.type === "tool_start") {
-              if (event.toolName === "web_search") {
-                setStreamingToolState({ type: "searching", toolName: event.toolName, query: event.arguments?.query });
-              }
-              if (event.toolName === "draw_tikz") {
-                setStreamingToolState({ type: "drawing", toolName: event.toolName });
-                setStreamingTikzSvg(null);
-              }
-              return;
-            }
-            if (event?.type === "tool_result") {
-              if (event.toolName === "web_search") {
-                setStreamingToolState({ type: "searched", toolName: event.toolName, engine: event.engine, sources: event.sources });
-              }
-              if (event.toolName === "draw_tikz") {
-                if (event.compiled && event.svg) {
-                  setStreamingTikzSvg(event.svg);
-                }
-                setStreamingToolState({
-                  type: event.compiled ? "drawn" : "failed",
-                  toolName: event.toolName,
-                  error: event.error,
-                });
-              }
-              return;
-            }
-            // 处理 reasoning round 事件
-            if (event?.type === "reasoning_round") {
-              if (event.reasoningDelta) {
-                streamReasoningBufferRef.current += `\n\n---\n\n${event.reasoningDelta}`;
-              } else if (streamReasoningBufferRef.current) {
-                streamReasoningBufferRef.current += `\n\n---\n\n`;
-              }
-              scheduleFlush();
-              return;
-            }
-            if (event?.type === "delta") {
-              streamBufferRef.current += event.delta || "";
-              if (event.reasoningDelta || event.reasoning_delta) {
-                streamReasoningBufferRef.current +=
-                  event.reasoningDelta || event.reasoning_delta || "";
-              }
-              scheduleFlush();
-              return;
-            }
-            if (event?.type === "complete") {
-              streamedDetail = event.detail;
-              return;
-            }
-            if (event?.type === "error") {
-              throw new Error(event.error || "请求失败了，请稍后再试。");
-            }
-          },
-        });
+        try {
+          operationIdsBySessionRef.current.set(operation.sessionHash, operation.id);
+          await sendReplyStream({
+            sessionHash: operation.sessionHash,
+            prompt,
+            modelAlias: model.alias,
+            searchMode,
+            searchEngine,
+            operationId: operation.id,
+            signal: operation.controller.signal,
+            onEvent: onStreamEvent,
+          });
+        } catch (streamError) {
+          if (streamError?.name === "AbortError") throw streamError;
+
+          resetReplayState(operation);
+          try {
+            await subscribeToSessionStream(operation.sessionHash, {
+              operationId: operation.id,
+              signal: operation.controller.signal,
+              onEvent: onStreamEvent,
+            });
+          } catch {
+            throw streamError;
+          }
+        }
 
         if (!streamedDetail) {
           throw new Error("流式请求未返回完成事件。");
         }
+        if (!isCurrentOperation(operation)) return false;
 
         onApplyDetail(streamedDetail, { revealLatestInChat: false });
+        return true;
       } catch (err) {
-        if (err?.name === "AbortError") {
-          onSetError("已停止生成。");
-        } else {
+        if (isCurrentOperation(operation)) {
           onSetError(
-            err instanceof Error ? err.message : "请求失败了，请稍后再试。",
+            err?.name === "AbortError"
+              ? "已停止生成。"
+              : err instanceof Error
+                ? err.message
+                : "请求失败了，请稍后再试。",
           );
         }
+        return false;
       } finally {
-        if (streamFlushRafRef.current) {
-          cancelAnimationFrame(streamFlushRafRef.current);
-          streamFlushRafRef.current = 0;
-        }
-        streamBufferRef.current = "";
-        streamReasoningBufferRef.current = "";
-        onSetLoading(false);
-        setPendingPrompt("");
-        setStreamingReply("");
-        setStreamingReasoning("");
-        setStreamingToolState(null);
-        setStreamingTikzSvg(null);
-        streamAbortControllerRef.current = null;
+        finishOperation(operation);
       }
     },
-    [selectedModel, searchMode, systemPrompt, getSessionHash, onApplyDetail, onSetLoading, onSetError],
+    [applyStreamEvent, clearSessionOperation, finishOperation, getSessionHash, isCurrentOperation, navigate, onApplyDetail, onSetError, resetReplayState, searchEngine, searchMode, selectedModel, startOperation, systemPrompt],
   );
 
   const handleStopStreaming = useCallback(() => {
-    streamAbortControllerRef.current?.abort();
-  }, []);
+    const operation = currentOperationRef.current;
+    if (!operation || operation.type !== "send") return;
 
-  const abortControllerValue = streamAbortControllerRef;
+    operation.controller.abort();
+    if (operation.sessionHash) {
+      cancelReplyStream({
+        sessionHash: operation.sessionHash,
+        operationId: operation.id,
+      }).then(() => {
+        clearSessionOperation(operation);
+      }).catch(() => {});
+    }
+  }, [clearSessionOperation]);
 
   return {
     streamingReply,
@@ -326,7 +398,7 @@ export default function useStreaming({
     pendingPrompt,
     streamingToolState,
     streamingTikzSvg,
-    abortControllerRef: abortControllerValue,
+    abortControllerRef: streamAbortControllerRef,
     subscribeToStream,
     handleSend,
     handleStopStreaming,

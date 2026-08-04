@@ -1,26 +1,27 @@
-const STREAM_SESSION_TTL = 300000; // 5 minutes after completion
+const STREAM_SESSION_TTL = 300000;
 
-class StreamSession {
-  constructor(sessionHash) {
+export class StreamSession {
+  constructor(sessionHash, operationId) {
     this.sessionHash = sessionHash;
+    this.operationId = operationId;
     this.events = [];
     this.subscribers = new Set();
     this.completed = false;
     this.completedAt = 0;
     this.finalDetail = null;
     this.finalError = null;
+    this.abortController = new AbortController();
   }
 
   pushEvent(event) {
-    this.events.push(event);
-    this._broadcast(event);
+    const withOperationId = { ...event, operationId: this.operationId };
+    this.events.push(withOperationId);
+    this._broadcast(withOperationId);
   }
 
   subscribe(callback) {
     this.subscribers.add(callback);
-    return () => {
-      this.subscribers.delete(callback);
-    };
+    return () => this.subscribers.delete(callback);
   }
 
   complete(detail) {
@@ -33,9 +34,13 @@ class StreamSession {
     this.completed = true;
     this.completedAt = Date.now();
     this.finalError = error;
-    const errorEvent = { type: "error", error: error instanceof Error ? error.message : String(error) };
-    this.events.push(errorEvent);
-    this._broadcast(errorEvent);
+    this.pushEvent({ type: "error", error: error instanceof Error ? error.message : String(error) });
+  }
+
+  cancel() {
+    if (!this.abortController.signal.aborted) {
+      this.abortController.abort();
+    }
   }
 
   _broadcast(event) {
@@ -43,62 +48,86 @@ class StreamSession {
       try {
         sub(event);
       } catch {
-        // subscriber error should not break other subscribers
+        // A disconnected subscriber must not affect the generation.
       }
     }
   }
 }
 
-class StreamSessionManager {
+export class StreamSessionManager {
   constructor() {
-    this.sessions = new Map();
+    this.sessionsByOperationId = new Map();
+    this.activeOperationIdsBySession = new Map();
     this.cleanupTimer = null;
   }
 
-  create(sessionHash) {
-    const existing = this.sessions.get(sessionHash);
+  create(sessionHash, operationId) {
+    const existing = this.sessionsByOperationId.get(operationId);
     if (existing) {
-      existing.subscribers.clear();
-      existing.complete(null);
+      if (existing.sessionHash !== sessionHash) {
+        const error = new Error("operationId 已用于其他会话。");
+        error.status = 409;
+        throw error;
+      }
+      return { session: existing, created: false };
     }
-    this.sessions.delete(sessionHash);
 
-    const session = new StreamSession(sessionHash);
-    this.sessions.set(sessionHash, session);
-    return session;
+    const activeOperationId = this.activeOperationIdsBySession.get(sessionHash);
+    if (activeOperationId) {
+      const error = new Error("该会话已有正在进行的回复。");
+      error.status = 409;
+      throw error;
+    }
+
+    const session = new StreamSession(sessionHash, operationId);
+    this.sessionsByOperationId.set(operationId, session);
+    this.activeOperationIdsBySession.set(sessionHash, operationId);
+    return { session, created: true };
   }
 
-  get(sessionHash) {
-    const session = this.sessions.get(sessionHash);
-    if (!session) {
-      return null;
-    }
-
-    if (session.completed) {
-      const elapsed = Date.now() - session.completedAt;
-      if (elapsed > STREAM_SESSION_TTL) {
-        this.sessions.delete(sessionHash);
+  getForReconnect(sessionHash, operationId) {
+    if (operationId) {
+      const session = this.sessionsByOperationId.get(operationId);
+      if (!session || session.sessionHash !== sessionHash) {
         return null;
       }
+      if (session.completed && Date.now() - session.completedAt > STREAM_SESSION_TTL) {
+        this.sessionsByOperationId.delete(operationId);
+        return null;
+      }
+      return session;
     }
 
-    return session;
+    const activeOperationId = this.activeOperationIdsBySession.get(sessionHash);
+    const session = this.sessionsByOperationId.get(activeOperationId);
+    return session && !session.completed ? session : null;
   }
 
-  remove(sessionHash) {
-    this.sessions.delete(sessionHash);
+  getActive(sessionHash, operationId) {
+    const session = this.getForReconnect(sessionHash, operationId);
+    return session && !session.completed ? session : null;
+  }
+
+  cancel(sessionHash, operationId) {
+    const session = this.getActive(sessionHash, operationId);
+    if (!session) return false;
+    session.cancel();
+    return true;
+  }
+
+  finish(session) {
+    if (this.activeOperationIdsBySession.get(session.sessionHash) === session.operationId) {
+      this.activeOperationIdsBySession.delete(session.sessionHash);
+    }
   }
 
   startCleanupTimer() {
-    if (this.cleanupTimer) {
-      return;
-    }
-
+    if (this.cleanupTimer) return;
     this.cleanupTimer = setInterval(() => {
       const now = Date.now();
-      for (const [key, session] of this.sessions) {
-        if (session.completed && (now - session.completedAt) > STREAM_SESSION_TTL) {
-          this.sessions.delete(key);
+      for (const [operationId, session] of this.sessionsByOperationId) {
+        if (session.completed && now - session.completedAt > STREAM_SESSION_TTL) {
+          this.sessionsByOperationId.delete(operationId);
         }
       }
     }, 60000).unref();

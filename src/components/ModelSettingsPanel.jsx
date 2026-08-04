@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { getModelCapabilities } from "../lib/chatApi.js";
+import { getModelCapabilities, testModelConnectivity } from "../lib/chatApi.js";
 import { useLocale } from "../contexts/LocaleContext.jsx";
 
 // ── Helpers ──
@@ -156,6 +156,7 @@ export default function ModelSettingsPanel({
   const [modelDraft, setModelDraft] = useState(() => buildModelDraft(null, providerDefinitions, thinkingDisableOptions));
   const [clearStoredApiKey, setClearStoredApiKey] = useState(false);
   const [expandedProviders, setExpandedProviders] = useState(new Set());
+  const [connectivityTest, setConnectivityTest] = useState({ status: "idle", message: "" });
   const capabilitiesManuallyChanged = useRef(false);
   const lastInferredModelName = useRef("");
 
@@ -186,6 +187,7 @@ export default function ModelSettingsPanel({
       setSelection(null);
       setFormMode("view");
       setCreateType(null);
+      setConnectivityTest({ status: "idle", message: "" });
       return;
     }
     // Default: select first provider
@@ -200,12 +202,14 @@ export default function ModelSettingsPanel({
     if (!selection || formMode === "create") return;
 
     if (selection.type === "provider") {
+      setConnectivityTest({ status: "idle", message: "" });
       const provider = providers.find((p) => p.providerId === selection.providerId);
       if (provider) {
         setProviderDraft(buildProviderDraft(provider, providerDefinitions));
         setClearStoredApiKey(false);
       }
     } else if (selection.type === "model") {
+      setConnectivityTest({ status: "idle", message: "" });
       const model = models.find((m) => m.alias === selection.alias);
       if (model) {
         setModelDraft(buildModelDraft(model, providerDefinitions, thinkingDisableOptions));
@@ -284,6 +288,7 @@ export default function ModelSettingsPanel({
     setSelection({ type: "model", alias });
     setFormMode("view");
     setCreateType(null);
+    setConnectivityTest({ status: "idle", message: "" });
   };
 
   const handleStartCreateProvider = () => {
@@ -302,6 +307,7 @@ export default function ModelSettingsPanel({
     setCreateModelProviderId(providerId);
     setModelDraft(buildEmptyModelDraft(providerId, provider, providerDefinitions, thinkingDisableOptions));
     setClearStoredApiKey(false);
+    setConnectivityTest({ status: "idle", message: "" });
     capabilitiesManuallyChanged.current = false;
     lastInferredModelName.current = "";
     // Auto-expand the provider
@@ -314,11 +320,46 @@ export default function ModelSettingsPanel({
 
   const handleModelDraftChange = (patch) => {
     setModelDraft((prev) => ({ ...prev, ...patch }));
+    setConnectivityTest({ status: "idle", message: "" });
   };
 
   const handleCapabilityChange = (patch) => {
     capabilitiesManuallyChanged.current = true;
     handleModelDraftChange(patch);
+  };
+
+  const handleTestModelConnectivity = async () => {
+    const modelName = modelDraft.modelName.trim();
+    if (!modelName || (!modelDraft.providerId && !selectedModel)) {
+      setConnectivityTest({ status: "error", message: t("model.connectivityNeedsModel") });
+      return;
+    }
+
+    setConnectivityTest({ status: "testing", message: "" });
+
+    try {
+      const result = await testModelConnectivity({
+        alias: selectedModel?.alias,
+        providerId: modelDraft.providerId,
+        modelName,
+        supportsSystemRole: modelDraft.supportsSystemRole,
+        supportsThinking: modelDraft.supportsThinking,
+        thinkingDisable: modelDraft.thinkingDisableKey
+          ? thinkingDisableOptions.find((option) => option.key === modelDraft.thinkingDisableKey)?.config ?? null
+          : null,
+        systemPromptRole: modelDraft.systemPromptRole,
+        requestOptions: modelDraft.requestOptions,
+      });
+      setConnectivityTest({
+        status: "success",
+        message: t("model.connectivitySuccess", { latency: result.latencyMs }),
+      });
+    } catch (error) {
+      setConnectivityTest({
+        status: "error",
+        message: error instanceof Error ? error.message : t("model.connectivityFailed"),
+      });
+    }
   };
 
   const handleProviderTypeChange = (providerType) => {
@@ -845,10 +886,25 @@ export default function ModelSettingsPanel({
               {t("model.delete")}
             </button>
           ) : <span />}
-          <button type="submit" className="settings-primary-btn" disabled={isSaving}>
-            {isSaving ? t("model.saving") : formMode === "create" ? t("model.createSubmit") : t("model.updateSubmit")}
-          </button>
+          <div className="settings-action-group">
+            <button
+              type="button"
+              className="settings-secondary-btn"
+              onClick={handleTestModelConnectivity}
+              disabled={isSaving || connectivityTest.status === "testing" || !modelDraft.modelName.trim() || (!modelDraft.providerId && !selectedModel)}
+            >
+              {connectivityTest.status === "testing" ? t("model.testingConnectivity") : t("model.testConnectivity")}
+            </button>
+            <button type="submit" className="settings-primary-btn" disabled={isSaving || connectivityTest.status === "testing"}>
+              {isSaving ? t("model.saving") : formMode === "create" ? t("model.createSubmit") : t("model.updateSubmit")}
+            </button>
+          </div>
         </div>
+        {connectivityTest.status !== "idle" && connectivityTest.status !== "testing" ? (
+          <div className={`model-connectivity-result ${connectivityTest.status}`} role="status">
+            {connectivityTest.message}
+          </div>
+        ) : null}
       </form>
     );
   };

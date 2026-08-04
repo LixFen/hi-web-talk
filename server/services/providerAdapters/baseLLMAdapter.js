@@ -32,15 +32,15 @@ export class BaseLLMAdapter {
   /**
    * 统一调用入口（含 5xx 指数退避重试）
    */
-  async call({ messages }) {
-    return this.withRetry(() => this.doCall(messages));
+  async call({ messages, signal, toolContext }) {
+    return this.withRetry(() => this.doCall(messages, signal, toolContext));
   }
 
   /**
    * 统一流式入口
    */
-  async stream({ messages, onChunk }) {
-    return this.doStream(messages, onChunk);
+  async stream({ messages, onChunk, signal, toolContext }) {
+    return this.doStream(messages, onChunk, signal, toolContext);
   }
 
   // ── 公开入口（含 tool calling 循环） ──
@@ -53,12 +53,12 @@ export class BaseLLMAdapter {
    * @param {Function} params.onToolEvent - 工具事件回调 ({ type, toolCall, result, toolName, sources })
    * @returns {Promise<Object>} 标准化结果，包含 reasoning 数组和 searchInfo
    */
-  async callWithTools({ messages, tools, onToolEvent }) {
+  async callWithTools({ messages, tools, onToolEvent, signal, toolContext }) {
     if (!tools || tools.length === 0) {
-      const result = await this.call({ messages });
+      const result = await this.call({ messages, signal, toolContext });
       return { ...result, reasoning: wrapReasoning(result.reasoning), searchInfo: null };
     }
-    return this.withRetry(() => this._callWithToolsLoop(messages, tools, onToolEvent));
+    return this.withRetry(() => this._callWithToolsLoop(messages, tools, onToolEvent, signal, toolContext));
   }
 
   /**
@@ -70,12 +70,12 @@ export class BaseLLMAdapter {
    * @param {Function} params.onToolEvent
    * @returns {Promise<Object>}
    */
-  async streamWithTools({ messages, tools, onChunk, onToolEvent }) {
+  async streamWithTools({ messages, tools, onChunk, onToolEvent, signal, toolContext }) {
     if (!tools || tools.length === 0) {
-      const result = await this.doStream(messages, onChunk);
+      const result = await this.doStream(messages, onChunk, signal, toolContext);
       return { ...result, reasoning: wrapReasoning(result.reasoning), searchInfo: null };
     }
-    return this._streamWithToolsLoop(messages, tools, onChunk, onToolEvent);
+    return this._streamWithToolsLoop(messages, tools, onChunk, onToolEvent, signal, toolContext);
   }
 
   // ── 子类实现 ──
@@ -83,14 +83,14 @@ export class BaseLLMAdapter {
   /**
    * 子类实现：非流式调用
    */
-  async doCall(_messages) {
+  async doCall(_messages, _signal, _toolContext) {
     throw new Error("doCall() not implemented");
   }
 
   /**
    * 子类实现：流式调用
    */
-  async doStream(_messages, _onChunk) {
+  async doStream(_messages, _onChunk, _signal, _toolContext) {
     throw new Error("doStream() not implemented");
   }
 
@@ -98,16 +98,16 @@ export class BaseLLMAdapter {
    * 子类实现：带 tools 的非流式调用
    * 默认回退到 doCall（不传 tools）
    */
-  async doCallWithTools(messages, _tools) {
-    return this.doCall(messages);
+  async doCallWithTools(messages, _tools, signal, toolContext) {
+    return this.doCall(messages, signal, toolContext);
   }
 
   /**
    * 子类实现：带 tools 的流式调用
    * 默认回退到 doStream（不传 tools）
    */
-  async doStreamWithTools(messages, _tools, onChunk) {
-    return this.doStream(messages, onChunk);
+  async doStreamWithTools(messages, _tools, onChunk, signal, toolContext) {
+    return this.doStream(messages, onChunk, signal, toolContext);
   }
 
   /**
@@ -120,7 +120,7 @@ export class BaseLLMAdapter {
 
   // ── Tool Calling 循环（核心逻辑） ──
 
-  async _callWithToolsLoop(messages, tools, onToolEvent) {
+  async _callWithToolsLoop(messages, tools, onToolEvent, signal, toolContext) {
     let msgs = [...messages];
     let totalUsage = { input: 0, output: 0, total: 0 };
     const reasoningParts = [];
@@ -134,6 +134,7 @@ export class BaseLLMAdapter {
     let llmCalls = 0;
 
     while (true) {
+      throwIfAborted(signal);
       llmCalls++;
 
       if (llmCalls > MAX_TOOL_ROUNDS) {
@@ -143,7 +144,7 @@ export class BaseLLMAdapter {
       // Strip internal fields before sending to provider
       const cleanMsgs = stripInternalFields(msgs);
       const result = await this.withRetry(() =>
-        this.doCallWithTools(cleanMsgs, tools)
+        this.doCallWithTools(cleanMsgs, tools, signal, toolContext)
       );
 
       totalUsage = addUsage(totalUsage, result.usage);
@@ -189,8 +190,9 @@ export class BaseLLMAdapter {
         let rawResult;
         if (executor) {
           try {
-            rawResult = await executor(toolArgs);
+            rawResult = await executor(toolArgs, { signal, toolContext });
           } catch (err) {
+            if (err?.name === "AbortError") throw err;
             rawResult = { toolResult: { error: err.message }, artifacts: [] };
           }
         } else {
@@ -298,7 +300,7 @@ export class BaseLLMAdapter {
     }
   }
 
-  async _streamWithToolsLoop(messages, tools, onChunk, onToolEvent) {
+  async _streamWithToolsLoop(messages, tools, onChunk, onToolEvent, signal, toolContext) {
     let msgs = [...messages];
     let totalUsage = { input: 0, output: 0, total: 0 };
     const reasoningParts = [];
@@ -312,6 +314,7 @@ export class BaseLLMAdapter {
     let llmCalls = 0;
 
     while (true) {
+      throwIfAborted(signal);
       llmCalls++;
 
       if (llmCalls > MAX_TOOL_ROUNDS) {
@@ -323,7 +326,7 @@ export class BaseLLMAdapter {
       // Strip internal fields before sending to provider
       const cleanMsgs = stripInternalFields(msgs);
       const result = await this.collectStreamResult(
-        await this.createStreamWithTools(cleanMsgs, tools),
+        await this.createStreamWithTools(cleanMsgs, tools, signal, toolContext),
         onChunk,
         onChunk,
       );
@@ -372,8 +375,9 @@ export class BaseLLMAdapter {
         let rawResult;
         if (executor) {
           try {
-            rawResult = await executor(toolArgs);
+            rawResult = await executor(toolArgs, { signal, toolContext });
           } catch (err) {
+            if (err?.name === "AbortError") throw err;
             rawResult = { toolResult: { error: err.message }, artifacts: [] };
           }
         } else {
@@ -572,4 +576,12 @@ function wrapReasoning(reasoning) {
     return [{ round: 1, content: reasoning.trim(), type: "thinking" }];
   }
   return [];
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    const error = new Error("回复已取消。");
+    error.name = "AbortError";
+    throw error;
+  }
 }

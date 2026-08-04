@@ -5,7 +5,7 @@ import {
 } from "./modelConfigService.js";
 import { getAdapter, clearAdapterCache } from "./providerAdapters/adapterFactory.js";
 
-export async function callProviderModel({ modelConfig, provider, model, messages, tools, onToolEvent }) {
+export async function callProviderModel({ modelConfig, provider, model, messages, tools, onToolEvent, signal, toolContext }) {
   const resolvedModelConfig = modelConfig ?? createLegacyModelConfig(provider, model);
   const providerDefinition = getProviderDefinitionByType(resolvedModelConfig.providerType);
 
@@ -31,13 +31,13 @@ export async function callProviderModel({ modelConfig, provider, model, messages
 
   // 如果有 tools，使用 tool calling 版本
   if (tools && tools.length > 0 && adapter.callWithTools) {
-    return adapter.callWithTools({ messages, tools, onToolEvent });
+    return adapter.callWithTools({ messages, tools, onToolEvent, signal, toolContext });
   }
 
-  return adapter.call({ messages });
+  return adapter.call({ messages, signal, toolContext });
 }
 
-export async function streamProviderModel({ modelConfig, provider, model, messages, tools, onChunk, onToolEvent }) {
+export async function streamProviderModel({ modelConfig, provider, model, messages, tools, onChunk, onToolEvent, signal, toolContext }) {
   const resolvedModelConfig = modelConfig ?? createLegacyModelConfig(provider, model);
   const providerDefinition = getProviderDefinitionByType(resolvedModelConfig.providerType);
 
@@ -69,10 +69,10 @@ export async function streamProviderModel({ modelConfig, provider, model, messag
 
   // 如果有 tools，使用 tool calling 版本
   if (tools && tools.length > 0 && adapter.streamWithTools) {
-    return adapter.streamWithTools({ messages, tools, onChunk, onToolEvent });
+    return adapter.streamWithTools({ messages, tools, onChunk, onToolEvent, signal, toolContext });
   }
 
-  return adapter.stream({ messages, onChunk });
+  return adapter.stream({ messages, onChunk, signal, toolContext });
 }
 
 export function invalidateModelAdapterCache() {

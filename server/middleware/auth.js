@@ -29,7 +29,7 @@ export function authenticateToken(request, response, next) {
 
 export function requireSessionOwnership(sessionHashParam = "sessionHash") {
   return async (request, response, next) => {
-    const sessionHash = request.params[sessionHashParam] || request.body?.sessionHash;
+    const sessionHash = request.params[sessionHashParam] || request.body?.sessionHash || request.query?.sessionHash;
 
     if (!sessionHash) {
       response.status(400).json({ error: "sessionHash 不能为空。" });

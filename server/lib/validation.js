@@ -99,6 +99,19 @@ export const modelUpdateSchema = modelPayloadSchema.partial({
   modelName: true,
 });
 
+export const modelConnectivityTestSchema = z.object({
+  alias: z.string().trim().optional(),
+  providerId: z.string().uuid().optional(),
+  modelName: z.string().trim().min(1).max(256),
+  supportsSystemRole: z.boolean().optional(),
+  supportsThinking: z.boolean().optional(),
+  thinkingDisable: z.any().optional(),
+  systemPromptRole: z.string().optional(),
+  requestOptions: z.record(z.unknown()).optional(),
+}).refine((payload) => payload.alias || payload.providerId, {
+  message: "alias or providerId is required",
+});
+
 export const attachmentUploadSchema = z.object({
   sessionHash: z.string().min(1, "sessionHash 不能为空。"),
   fileName: z.string().optional(),
@@ -127,6 +140,9 @@ export const blockReplySchema = z.object({
 });
 
 export const blockReplyStreamSchema = blockReplySchema;
+export const blockReplyStreamWithOperationSchema = blockReplySchema.extend({
+  operationId: z.string().uuid("operationId 必须是 UUID。"),
+});
 
 export const blockBranchSchema = z.object({
   sessionHash: z.string().min(1, "sessionHash 不能为空。"),
@@ -191,6 +207,18 @@ const sessionHashHex = z.string().regex(/^[a-f0-9]{24}$/);
 
 export const pathSessionHashSchema = z.object({
   sessionHash: sessionHashHex,
+});
+
+export const streamOperationQuerySchema = z.object({
+  operationId: z.string().uuid("operationId 必须是 UUID。").optional(),
+});
+
+export const streamCancellationQuerySchema = z.object({
+  sessionHash: sessionHashHex,
+});
+
+export const pathOperationIdSchema = z.object({
+  operationId: z.string().uuid(),
 });
 
 export const pathBlockSHA1Schema = z.object({

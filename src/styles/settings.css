@@ -178,6 +178,12 @@
   flex-shrink: 0;
 }
 
+.settings-action-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .settings-eyebrow {
   font-size: 0.68rem;
   text-transform: uppercase;
@@ -664,7 +670,8 @@
    Action Buttons
    ----------------------------------------------------------------- */
 .settings-primary-btn,
-.settings-danger-btn {
+.settings-danger-btn,
+.settings-secondary-btn {
   border-radius: var(--radius-full);
   padding: 0.65rem 1.1rem;
   border: 1px solid transparent;
@@ -699,9 +706,40 @@
 }
 
 .settings-primary-btn:disabled,
-.settings-danger-btn:disabled {
+.settings-danger-btn:disabled,
+.settings-secondary-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.settings-secondary-btn {
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+  background: var(--bg-main);
+}
+
+.settings-secondary-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.model-connectivity-result {
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.model-connectivity-result.success {
+  color: #1b7844;
+  background: rgba(27, 120, 68, 0.1);
+}
+
+.model-connectivity-result.error {
+  color: #b42318;
+  background: rgba(180, 35, 24, 0.08);
 }
 
 /* =================================================================

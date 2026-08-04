@@ -7,18 +7,6 @@
 import { registerTool } from "./toolRegistry.js";
 import { webSearch } from "../webSearchService.js";
 
-// ponytail: module-level config, set per-request. Node single-threaded, no race.
-let preferredEngine = null;
-let preferredProviderConfigs = {};
-
-export function setPreferredEngine(engine) {
-  preferredEngine = engine;
-}
-
-export function setPreferredProviderConfigs(configs) {
-  preferredProviderConfigs = configs || {};
-}
-
 const webSearchDefinition = {
   type: "function",
   function: {
@@ -44,7 +32,7 @@ const webSearchDefinition = {
  * @param {string} args.query - 搜索关键词
  * @returns {Promise<Object>} 搜索结果
  */
-async function execute({ query }) {
+async function execute({ query }, { toolContext = {}, signal } = {}) {
   if (!query || typeof query !== "string") {
     return { toolResult: { error: "query 参数无效", sources: [] }, artifacts: [] };
   }
@@ -53,8 +41,9 @@ async function execute({ query }) {
     const result = await webSearch(query.trim(), {
       maxResults: 5,
       fetchContent: true,
-      engine: preferredEngine || undefined,
-      providerConfigs: preferredProviderConfigs,
+      engine: toolContext.searchEngine || undefined,
+      providerConfigs: toolContext.searchProviderConfigs || {},
+      signal,
     });
 
     return {
@@ -71,10 +60,13 @@ async function execute({ query }) {
       artifacts: [],
     };
   } catch (err) {
+    if (err?.name === "AbortError") {
+      throw err;
+    }
     return {
       toolResult: {
         query: query,
-        engine: preferredEngine,
+        engine: toolContext.searchEngine || null,
         error: err.message,
         sources: [],
       },

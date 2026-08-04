@@ -107,6 +107,13 @@ export function getModelCapabilities(modelName) {
   return requestJson(`/api/model-capabilities?modelName=${encodeURIComponent(modelName)}`);
 }
 
+export function testModelConnectivity(payload) {
+  return requestJson("/api/model-connectivity-test", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function listProviders() {
   return requestJson("/api/providers");
 }
@@ -233,7 +240,7 @@ export function sendReply({ sessionHash, prompt, modelAlias, searchMode, searchE
   });
 }
 
-export async function sendReplyStream({ sessionHash, prompt, modelAlias, searchMode, searchEngine, signal, onEvent }) {
+export async function sendReplyStream({ sessionHash, prompt, modelAlias, searchMode, searchEngine, operationId, signal, onEvent }) {
   const token = getToken();
   const response = await fetch("/api/blocks/reply/stream", {
     method: "POST",
@@ -248,6 +255,7 @@ export async function sendReplyStream({ sessionHash, prompt, modelAlias, searchM
       modelAlias,
       searchMode,
       searchEngine,
+      operationId,
     }),
     signal,
   });
@@ -333,6 +341,13 @@ export async function sendReplyStream({ sessionHash, prompt, modelAlias, searchM
   if (!isDone) {
     throw new Error("流已结束，但服务端没有发送 [DONE] 结束标记。");
   }
+}
+
+export function cancelReplyStream({ sessionHash, operationId }) {
+  const searchParams = new URLSearchParams({ sessionHash });
+  return requestJson(`/api/blocks/reply/stream/${encodeURIComponent(operationId)}?${searchParams}`, {
+    method: "DELETE",
+  });
 }
 
 export function regenerateBlock({ sessionHash, blockSHA1, modelAlias, searchMode, searchEngine }) {
@@ -444,9 +459,10 @@ export function changePassword(oldPassword, newPassword) {
   });
 }
 
-export async function subscribeToSessionStream(sessionHash, { signal, onEvent } = {}) {
+export async function subscribeToSessionStream(sessionHash, { operationId, signal, onEvent } = {}) {
   const token = getToken();
-  const response = await fetch(`/api/sessions/${sessionHash}/stream`, {
+  const query = operationId ? `?operationId=${encodeURIComponent(operationId)}` : "";
+  const response = await fetch(`/api/sessions/${sessionHash}/stream${query}`, {
     credentials: "same-origin",
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
