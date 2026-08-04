@@ -11,6 +11,7 @@ import {
   writeJson,
 } from "../lib/fileStore.js";
 import { encryptApiKey, decryptApiKey } from "./modelConfigService.js";
+import { normalizeResponsesBaseURL } from "./providerAdapters/responsesBaseURL.js";
 
 const providersFilePath = path.join(CONFIG_DIR, "providers.json");
 
@@ -74,7 +75,9 @@ async function normalizeProviderRecord(record = {}) {
     slug,
     name: sanitizeText(record.name) || slug,
     providerType,
-    baseURL: sanitizeText(record.baseURL) || definition.defaultBaseURL || "",
+    baseURL: providerType === "openai-responses"
+      ? normalizeResponsesBaseURL(sanitizeText(record.baseURL) || definition.defaultBaseURL || "")
+      : sanitizeText(record.baseURL) || definition.defaultBaseURL || "",
     apiKeySource: record.apiKeySource === "stored" ? "stored" : "env",
     apiKeyEnvName: sanitizeText(record.apiKeyEnvName) || definition.defaultEnvKeyName || "OPENAI_API_KEY",
     apiKeyEncrypted,

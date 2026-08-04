@@ -59,4 +59,59 @@ describe("modelConfigService provider inheritance", () => {
       apiKeyEncrypted: "encrypted-key",
     });
   });
+
+  it("ignores stale model-level connection settings for linked providers", async () => {
+    readJson.mockResolvedValue([
+      {
+        providerId,
+        modelName: "third-party-model",
+        baseURL: "https://stale.example.com/v1",
+        apiKeySource: "env",
+        apiKeyEnvName: "STALE_API_KEY",
+        apiKeyEncrypted: "stale-key",
+        systemPromptRole: "developer",
+        requestOptions: { reasoningEffort: "high" },
+      },
+    ]);
+
+    const [model] = await readStoredModels(42);
+
+    expect(model).toMatchObject({
+      baseURL: "https://example.com/anthropic",
+      apiKeySource: "stored",
+      apiKeyEnvName: "THIRD_PARTY_API_KEY",
+      apiKeyEncrypted: "encrypted-key",
+      systemPromptRole: "system",
+      requestOptions: { thinkingEnabled: false },
+    });
+    expect(model.requestOptions).toEqual({
+      thinkingEnabled: false,
+      reasoningEffort: "high",
+    });
+  });
+
+  it("preserves an explicit null thinkingDisable override", async () => {
+    readJson.mockResolvedValue([
+      {
+        providerId,
+        modelName: "reasoning-model",
+        thinkingDisable: null,
+      },
+    ]);
+    getProviderById.mockImplementation(async () => ({
+      providerId,
+      slug: "chat-provider",
+      providerType: "openai-chat-completions",
+      baseURL: "https://example.com/v1",
+      apiKeySource: "env",
+      apiKeyEnvName: "OPENAI_API_KEY",
+      apiKeyEncrypted: "",
+      systemPromptRole: "system",
+      requestOptions: {},
+    }));
+
+    const [model] = await readStoredModels(42);
+
+    expect(model.thinkingDisable).toBeNull();
+  });
 });

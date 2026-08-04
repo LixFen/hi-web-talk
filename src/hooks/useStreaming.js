@@ -212,6 +212,10 @@ export default function useStreaming({
 
       if (event?.type === "error") {
         clearSessionOperation(operation);
+        console.error("[useStreaming] stream error event", {
+          event,
+          operationId: operation.serverOperationId || operation.id,
+        });
         throw new Error(event.error || "请求失败了，请稍后再试。");
       }
     },
@@ -252,6 +256,7 @@ export default function useStreaming({
         return result.active || completed;
       } catch (err) {
         if (isCurrentOperation(operation) && err?.name !== "AbortError") {
+          console.error("[useStreaming] stream reconnect failed", err);
           onSetError(err instanceof Error ? err.message : "流式重连失败。");
         }
         return false;
@@ -360,6 +365,9 @@ export default function useStreaming({
         onApplyDetail(streamedDetail, { revealLatestInChat: false });
         return true;
       } catch (err) {
+        if (err?.name !== "AbortError") {
+          console.error("[useStreaming] send failed", err);
+        }
         if (isCurrentOperation(operation)) {
           onSetError(
             err?.name === "AbortError"

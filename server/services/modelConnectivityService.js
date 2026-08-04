@@ -14,6 +14,10 @@ function createConnectivityError(message, status = 400) {
   return error;
 }
 
+function getExplicitOrDefault(payload, key, fallback) {
+  return Object.prototype.hasOwnProperty.call(payload, key) ? payload[key] : fallback;
+}
+
 function isConnectivityAbort(error, signal) {
   return signal.aborted
     || error?.name === "AbortError"
@@ -39,7 +43,11 @@ function buildModelConfigFromProvider(provider, payload) {
       payload.supportsSystemRole ?? definition?.supportsSystemRole ?? true,
     supportsThinking:
       payload.supportsThinking ?? definition?.supportsThinking ?? false,
-    thinkingDisable: payload.thinkingDisable ?? definition?.thinkingDisableConfig ?? null,
+    thinkingDisable: getExplicitOrDefault(
+      payload,
+      "thinkingDisable",
+      definition?.thinkingDisableConfig ?? null,
+    ),
     systemPromptRole:
       payload.systemPromptRole || provider.systemPromptRole || definition?.defaultSystemPromptRole || "system",
     requestOptions: {
@@ -61,7 +69,7 @@ async function resolveConnectivityTarget(payload, userId, role) {
       modelName: payload.modelName,
       supportsSystemRole: payload.supportsSystemRole ?? model.supportsSystemRole,
       supportsThinking: payload.supportsThinking ?? model.supportsThinking,
-      thinkingDisable: payload.thinkingDisable ?? model.thinkingDisable,
+      thinkingDisable: getExplicitOrDefault(payload, "thinkingDisable", model.thinkingDisable),
       systemPromptRole: payload.systemPromptRole || model.systemPromptRole,
       requestOptions: {
         ...(model.requestOptions ?? {}),

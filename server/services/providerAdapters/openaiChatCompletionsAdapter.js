@@ -21,16 +21,14 @@ function buildExtraBody(modelConfig) {
   const providerType = modelConfig.providerType;
   const extraBody = {};
 
-  if (providerType === "doubao") {
+  if (providerType === "openai-chat-completions" || providerType === "doubao" || providerType === "glm") {
     const effort = opts.reasoningEffort;
     if (effort && effort !== "") {
       extraBody.reasoning_effort = effort;
     }
-  } else if (providerType === "glm") {
-    const effort = opts.reasoningEffort;
-    if (effort && effort !== "") {
-      extraBody.reasoning_effort = effort;
-    }
+  }
+
+  if (providerType === "glm") {
     if (opts.clearThinking === true) {
       extraBody.clear_thinking = true;
     }

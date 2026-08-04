@@ -57,6 +57,7 @@ describe("model connectivity service", () => {
       apiKeySource: "env",
       apiKeyEnvName: "OPENAI_API_KEY",
       modelName: "old-model",
+      thinkingDisable: { param: "enable_thinking", value: false },
       requestOptions: { reasoningEffort: "low" },
     });
 
@@ -64,6 +65,7 @@ describe("model connectivity service", () => {
       alias: "openai:gpt-test",
       providerId: "fd5f9567-f7d5-498f-ab56-a6a344e9cc2c",
       modelName: "new-model",
+      thinkingDisable: null,
       requestOptions: { reasoningEffort: "high" },
     }, 42, "user");
 
@@ -73,6 +75,7 @@ describe("model connectivity service", () => {
       expect.objectContaining({
         alias: "openai:gpt-test",
         modelName: "new-model",
+        thinkingDisable: null,
         requestOptions: { reasoningEffort: "high" },
       }),
       { apiKey: "key", configured: true },

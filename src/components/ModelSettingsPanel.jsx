@@ -21,9 +21,9 @@ function getThinkingDisableKey(cfg) {
   return "";
 }
 
-function resolveSupportsThinking(key, providerDefault, options) {
+function resolveSupportsThinking(key, providerDefault, options, modelDefault = providerDefault) {
   const opt = options.find((o) => o.key === key);
-  if (!opt || opt.enablesThinking === null) return providerDefault;
+  if (!opt || opt.enablesThinking === null) return modelDefault;
   return opt.enablesThinking;
 }
 
@@ -55,6 +55,8 @@ function buildProviderDraft(provider, providerDefinitions) {
 function buildModelDraft(model, providerDefinitions, thinkingDisableOptions) {
   const pd = providerDefinitions.find((d) => d.key === model?.providerType);
   const tdKey = getThinkingDisableKey(model?.thinkingDisable ?? null);
+  const providerSupportsThinking = pd?.supportsThinking !== false;
+  const modelSupportsThinking = model?.supportsThinking ?? providerSupportsThinking;
   return {
     label: model?.label || "",
     modelName: model?.modelName || "",
@@ -65,7 +67,8 @@ function buildModelDraft(model, providerDefinitions, thinkingDisableOptions) {
     supportsMultimodal: model?.supportsMultimodal !== false,
     supportsToolUse: model?.supportsToolUse ?? false,
     thinkingDisableKey: tdKey,
-    supportsThinking: resolveSupportsThinking(tdKey, pd?.supportsThinking !== false, thinkingDisableOptions),
+    supportsThinkingBase: modelSupportsThinking,
+    supportsThinking: resolveSupportsThinking(tdKey, providerSupportsThinking, thinkingDisableOptions, modelSupportsThinking),
     systemPromptRole: model?.systemPromptRole || "system",
     requestOptions: {
       reasoningEffort: model?.requestOptions?.reasoningEffort || "",
@@ -105,6 +108,7 @@ function buildEmptyModelDraft(providerId, provider, providerDefinitions, thinkin
     supportsSystemRole: pd?.supportsSystemRole !== false,
     supportsMultimodal: pd?.supportsMultimodal !== false,
     thinkingDisableKey: getThinkingDisableKey(pd?.thinkingDisableConfig ?? null),
+    supportsThinkingBase: pd?.supportsThinking !== false,
     supportsThinking: resolveSupportsThinking(
       getThinkingDisableKey(pd?.thinkingDisableConfig ?? null),
       pd?.supportsThinking !== false,
@@ -237,6 +241,7 @@ export default function ModelSettingsPanel({
           ...prev,
           supportsMultimodal: caps.supportsMultimodal ?? prev.supportsMultimodal,
           supportsThinking: caps.supportsThinking ?? prev.supportsThinking,
+          supportsThinkingBase: caps.supportsThinking ?? prev.supportsThinkingBase,
           supportsToolUse: caps.toolUse ?? prev.supportsToolUse,
         }));
       }
@@ -843,7 +848,12 @@ export default function ModelSettingsPanel({
               const key = e.target.value;
               handleModelDraftChange({
                 thinkingDisableKey: key,
-                supportsThinking: resolveSupportsThinking(key, pd?.supportsThinking !== false, thinkingDisableOptions),
+                supportsThinking: resolveSupportsThinking(
+                  key,
+                  pd?.supportsThinking !== false,
+                  thinkingDisableOptions,
+                  modelDraft.supportsThinkingBase ?? modelDraft.supportsThinking,
+                ),
               });
             }}>
               {thinkingDisableOptions.map((opt) => <option key={opt.key} value={opt.key}>{opt.label}</option>)}

@@ -106,6 +106,7 @@ const ChatComposer = ({
 
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState([]);
+  const [isPendingSend, setIsPendingSend] = useState(false);
   const textareaRef = useRef(null);
   const prevSessionHashRef = useRef(sessionHash);
   const onUploadAttachmentRef = useRef(onUploadAttachment);
@@ -120,7 +121,7 @@ const ChatComposer = ({
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
-  }, [text]);
+  }, [text, isPendingSend]);
 
   useEffect(() => {
     const prev = prevSessionHashRef.current;
@@ -432,6 +433,7 @@ const ChatComposer = ({
 
     let sent = false;
     sendingRef.current = true;
+    setIsPendingSend(true);
     try {
       if (readyAttachments.length === 0) {
         sent = await onSend(trimmedText);
@@ -452,6 +454,7 @@ const ChatComposer = ({
       }
     } finally {
       sendingRef.current = false;
+      setIsPendingSend(false);
     }
 
     if (!sent) return;
@@ -513,7 +516,7 @@ const ChatComposer = ({
         ) : null}
         {!isCollapsed ? (
           <>
-        {attachments.length > 0 && (
+        {attachments.length > 0 && !isPendingSend && (
           <div className="composer-attachments">
             {attachments.map((attachment) => (
               <div key={attachment.attachmentId} className="composer-attachment-item">
@@ -547,7 +550,7 @@ const ChatComposer = ({
             className="chat-textarea"
             rows={1}
             placeholder={t('app.messagePlaceholder')}
-            value={text}
+            value={isPendingSend ? '' : text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}

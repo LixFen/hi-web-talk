@@ -236,10 +236,13 @@ async function normalizeModelRecord(record = {}, index = 0, userId = null) {
   const apiKeyEncrypted = apiKeyRaw
     ? await encryptApiKey(apiKeyRaw)
     : sanitizeOptionalText(record.apiKeyEncrypted);
+  const thinkingDisable = Object.prototype.hasOwnProperty.call(record, "thinkingDisable")
+    ? record.thinkingDisable
+    : providerDefinition.thinkingDisableConfig ?? null;
 
   // ── Build record ──
-  // For provider-linked models: model fields override provider defaults (when non-null).
-  // For legacy models: use inline fields as before.
+  // Provider-linked models always use the Provider's connection settings.
+  // Behavioral request options may still be overridden per model.
   const base = provider ? {
     providerType: provider.providerType,
     baseURL: provider.baseURL,
@@ -258,22 +261,25 @@ async function normalizeModelRecord(record = {}, index = 0, userId = null) {
       record.systemPromptRole || providerDefinition.defaultSystemPromptRole || "system",
     requestOptions: buildDefaultRequestOptions(providerType, record),
   };
+  const usesProviderConnection = Boolean(provider);
 
   return {
     modelId: record.modelId ?? crypto.randomUUID(),
     alias,
     label: sanitizeOptionalText(record.label) || alias,
     providerId: effectiveProviderId,
-    // Provider-inherited or inline fields (model overrides take precedence)
+    // Provider-linked models inherit these fields; legacy models keep inline values.
     providerType: base.providerType,
-    baseURL: record.baseURL ?? base.baseURL,
-    apiKeySource: record.apiKeySource ?? base.apiKeySource,
-    apiKeyEnvName: record.apiKeyEnvName ?? base.apiKeyEnvName,
-    apiKeyEncrypted: apiKeyEncrypted || base.apiKeyEncrypted || "",
+    baseURL: base.baseURL,
+    apiKeySource: base.apiKeySource,
+    apiKeyEnvName: base.apiKeyEnvName,
+    apiKeyEncrypted: usesProviderConnection
+      ? base.apiKeyEncrypted
+      : apiKeyEncrypted || base.apiKeyEncrypted || "",
     modelName,
     enabled: record.enabled !== false,
     supportsStreaming: record.supportsStreaming !== false,
-    systemPromptRole: record.systemPromptRole ?? base.systemPromptRole,
+    systemPromptRole: base.systemPromptRole,
     supportsSystemRole:
       record.supportsSystemRole ?? providerDefinition.supportsSystemRole ?? true,
     supportsMultimodal:
@@ -281,8 +287,7 @@ async function normalizeModelRecord(record = {}, index = 0, userId = null) {
     supportsToolUse: Boolean(record.supportsToolUse ?? false),
     supportsThinking:
       record.supportsThinking ?? providerDefinition.supportsThinking ?? false,
-    thinkingDisable:
-      record.thinkingDisable ?? providerDefinition.thinkingDisableConfig ?? null,
+    thinkingDisable,
     requestOptions: { ...(base.requestOptions ?? {}), ...(record.requestOptions ?? {}) },
     isPreset: Boolean(record.isPreset ?? false),
     shared: Boolean(record.shared ?? false),

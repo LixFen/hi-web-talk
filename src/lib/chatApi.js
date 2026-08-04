@@ -11,11 +11,22 @@ async function requestJson(path, options = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(path, {
-    credentials: "same-origin",
-    headers,
-    ...options,
-  });
+  let response;
+  try {
+    response = await fetch(path, {
+      credentials: "same-origin",
+      headers,
+      ...options,
+    });
+  } catch (error) {
+    console.error("[chatApi] request failed before receiving a response", {
+      method: options.method || "GET",
+      path,
+      error,
+      stack: error?.stack,
+    });
+    throw error;
+  }
 
   const responseText = await response.text();
   let data = null;
@@ -30,6 +41,15 @@ async function requestJson(path, options = {}) {
   }
 
   if (!response.ok) {
+    console.error("[chatApi] HTTP request failed", {
+      method: options.method || "GET",
+      path,
+      status: response.status,
+      statusText: response.statusText,
+      url: response.url,
+      responseBody: data ?? responseText,
+    });
+
     if (data?.error) {
       throw new Error(data.error);
     }
@@ -42,6 +62,16 @@ async function requestJson(path, options = {}) {
   }
 
   if (responseText && parseError) {
+    console.error("[chatApi] response JSON parsing failed", {
+      method: options.method || "GET",
+      path,
+      status: response.status,
+      statusText: response.statusText,
+      url: response.url,
+      responseBody: responseText,
+      error: parseError,
+      stack: parseError?.stack,
+    });
     throw new Error("接口返回了无效 JSON，可能包含未正确转义的特殊字符。");
   }
 
@@ -86,6 +116,13 @@ function parseSsePayload(payload) {
 
 async function readResponseError(response) {
   const responseText = await response.text();
+
+  console.error("[chatApi] stream HTTP request failed", {
+    status: response.status,
+    statusText: response.statusText,
+    url: response.url,
+    responseBody: responseText,
+  });
 
   if (!responseText) {
     return "请求失败，请稍后再试。";

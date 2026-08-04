@@ -118,6 +118,31 @@ export class BaseLLMAdapter {
     throw new Error("collectStreamResult() not implemented");
   }
 
+  // Provider-specific tool-loop context hooks. Chat-style providers use the
+  // default messages below; Responses overrides these with native items.
+  appendAssistantToolContext(messages, result) {
+    if (result.message) messages.push(result.message);
+  }
+
+  appendToolResultContext(messages, toolCall, toolResult) {
+    messages.push({
+      role: "tool",
+      tool_call_id: toolCall.id || `call_${Date.now()}`,
+      content: JSON.stringify(toolResult),
+    });
+  }
+
+  appendArtifactContext(messages, artifact) {
+    messages.push({
+      role: "user",
+      source: "harness",
+      content: [
+        { type: "text", text: artifact.label || "[图]" },
+        { type: "image_url", image_url: { url: `data:${artifact.mime};base64,${artifact.data}` } },
+      ],
+    });
+  }
+
   // ── Tool Calling 循环（核心逻辑） ──
 
   async _callWithToolsLoop(messages, tools, onToolEvent, signal, toolContext) {
@@ -169,7 +194,8 @@ export class BaseLLMAdapter {
         };
       }
 
-      msgs.push(result.message);
+      this.appendAssistantToolContext(msgs, result);
+      const contextArtifacts = [];
 
       for (const toolCall of result.toolCalls) {
         const toolName = toolCall.function?.name || toolCall.name;
@@ -207,14 +233,7 @@ export class BaseLLMAdapter {
           switch (artifact.type) {
             case "image":
               if (this.modelConfig.supportsMultimodal !== false) {
-                msgs.push({
-                  role: "user",
-                  source: "harness",
-                  content: [
-                    { type: "text", text: artifact.label || "[图]" },
-                    { type: "image_url", image_url: { url: `data:${artifact.mime};base64,${artifact.data}` } },
-                  ],
-                });
+                contextArtifacts.push(artifact);
               }
               if (artifact.contextPolicy === "preserve") {
                 preservedArtifacts.push(artifact);
@@ -291,11 +310,10 @@ export class BaseLLMAdapter {
           sources: toolResult.sources,
         });
 
-        msgs.push({
-          role: "tool",
-          tool_call_id: toolCall.id || `call_${Date.now()}`,
-          content: JSON.stringify(toolResult),
-        });
+        this.appendToolResultContext(msgs, toolCall, toolResult);
+      }
+      for (const artifact of contextArtifacts) {
+        this.appendArtifactContext(msgs, artifact);
       }
     }
   }
@@ -354,7 +372,8 @@ export class BaseLLMAdapter {
         };
       }
 
-      msgs.push(result.message);
+      this.appendAssistantToolContext(msgs, result);
+      const contextArtifacts = [];
 
       for (const toolCall of result.toolCalls) {
         const toolName = toolCall.function?.name || toolCall.name;
@@ -392,14 +411,7 @@ export class BaseLLMAdapter {
           switch (artifact.type) {
             case "image":
               if (this.modelConfig.supportsMultimodal !== false) {
-                msgs.push({
-                  role: "user",
-                  source: "harness",
-                  content: [
-                    { type: "text", text: artifact.label || "[图]" },
-                    { type: "image_url", image_url: { url: `data:${artifact.mime};base64,${artifact.data}` } },
-                  ],
-                });
+                contextArtifacts.push(artifact);
               }
               if (artifact.contextPolicy === "preserve") {
                 preservedArtifacts.push(artifact);
@@ -500,11 +512,10 @@ export class BaseLLMAdapter {
           error: toolName === "draw_tikz" ? toolResult.error ?? null : undefined,
         });
 
-        msgs.push({
-          role: "tool",
-          tool_call_id: toolCall.id || `call_${Date.now()}`,
-          content: JSON.stringify(toolResult),
-        });
+        this.appendToolResultContext(msgs, toolCall, toolResult);
+      }
+      for (const artifact of contextArtifacts) {
+        this.appendArtifactContext(msgs, artifact);
       }
     }
   }
