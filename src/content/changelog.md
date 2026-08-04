@@ -1,3 +1,8 @@
+# 2.1.0
+
+- Fix: improved API support stabilitty.
+- Feat: Added WorkStation mode blueprint(not fully implement yet).
+
 # 2.0.1
 
 - Fix: GraphView crash caused by referencing offsetX/offsetY before initialization.
