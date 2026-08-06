@@ -12,6 +12,9 @@ function stripInternalFields(msgs) {
 }
 
 const MAX_TOOL_ROUNDS = 10;
+const MAX_TIKZ_ATTEMPTS = 4;
+const MAX_PRESERVED_ARTIFACTS = 1;
+const MAX_ARTIFACT_BASE64_LENGTH = 6 * 1024 * 1024;
 
 /**
  * 抽象基类：统一 LLM Adapter 的公共逻辑
@@ -58,7 +61,9 @@ export class BaseLLMAdapter {
       const result = await this.call({ messages, signal, toolContext });
       return { ...result, reasoning: wrapReasoning(result.reasoning), searchInfo: null };
     }
-    return this.withRetry(() => this._callWithToolsLoop(messages, tools, onToolEvent, signal, toolContext));
+    // Each provider request is retried inside the loop. Retrying the whole
+    // loop would execute already-completed tools a second time.
+    return this._callWithToolsLoop(messages, tools, onToolEvent, signal, toolContext);
   }
 
   /**
@@ -125,9 +130,13 @@ export class BaseLLMAdapter {
   }
 
   appendToolResultContext(messages, toolCall, toolResult) {
+    const toolName = toolCall.function?.name || toolCall.name || "unknown";
     messages.push({
       role: "tool",
-      tool_call_id: toolCall.id || `call_${Date.now()}`,
+      tool_call_id: toolCall.id || toolCall.call_id || `call_${Date.now()}`,
+      // Gemini needs the function name to build functionResponse. Chat-style
+      // adapters ignore this internal compatibility field.
+      tool_name: toolName,
       content: JSON.stringify(toolResult),
     });
   }
@@ -151,9 +160,7 @@ export class BaseLLMAdapter {
     const reasoningParts = [];
     const searchInfo = { used: false, queries: [], sources: [] };
     let tikzInfo = null;
-    let currentTikzCode = null;
-    let currentTikzSvg = null;
-    let currentTikzPngBase64 = null;
+    let currentDrawing = null;
     let tikzAttempts = 0;
     const preservedArtifacts = [];
     let llmCalls = 0;
@@ -202,7 +209,12 @@ export class BaseLLMAdapter {
         const toolArgs = parseToolArgs(toolCall);
         const executor = getToolExecutor(toolName);
 
-        onToolEvent?.({ type: "tool_start", toolName, arguments: toolArgs });
+        onToolEvent?.({
+          type: "tool_start",
+          toolCallId: getToolCallId(toolCall),
+          toolName,
+          arguments: toolArgs,
+        });
 
         if (toolName === "web_search") {
           const query = toolArgs?.query || "";
@@ -214,7 +226,19 @@ export class BaseLLMAdapter {
         }
 
         let rawResult;
-        if (executor) {
+        if (toolName === "draw_tikz") {
+          currentDrawing = null;
+        }
+
+        if (toolName === "draw_tikz" && tikzAttempts >= MAX_TIKZ_ATTEMPTS) {
+          rawResult = {
+            toolResult: {
+              compiled: false,
+              error: `单次回复最多绘制 ${MAX_TIKZ_ATTEMPTS} 次 TikZ 图形`,
+            },
+            artifacts: [],
+          };
+        } else if (executor) {
           try {
             rawResult = await executor(toolArgs, { signal, toolContext });
           } catch (err) {
@@ -226,24 +250,105 @@ export class BaseLLMAdapter {
         }
 
         // Destructure: tools now return { toolResult, artifacts[] }
-        const { toolResult = rawResult, artifacts = [] } = rawResult || {};
+        let { toolResult = {}, artifacts = [] } = rawResult || {};
 
         // ── Artifact-driven processing ──
         for (const artifact of artifacts) {
-          switch (artifact.type) {
-            case "image":
-              if (this.modelConfig.supportsMultimodal !== false) {
-                contextArtifacts.push(artifact);
-              }
-              if (artifact.contextPolicy === "preserve") {
-                preservedArtifacts.push(artifact);
-              }
-              break;
+          if (artifact.type !== "image" || !isUsableImageArtifact(artifact)) {
+            continue;
+          }
+          if (this.modelConfig.supportsMultimodal !== false) {
+            contextArtifacts.splice(0, contextArtifacts.length, artifact);
+          }
+          if (artifact.contextPolicy === "preserve") {
+            preservedArtifacts.splice(0, MAX_PRESERVED_ARTIFACTS, toPreservedArtifact(artifact));
+          }
+        }
+
+        if (toolName === "draw_tikz") {
+          tikzAttempts++;
+          const imageArtifact = artifacts.find(
+            (artifact) => artifact.type === "image" && isUsableImageArtifact(artifact),
+          );
+          if (toolResult.compiled && imageArtifact && toolResult.artifactId) {
+            currentDrawing = {
+              artifactId: toolResult.artifactId,
+              code: toolResult.tikzCode || "",
+              svg: imageArtifact.meta?.svg || null,
+            };
+            tikzInfo = {
+              artifactId: currentDrawing.artifactId,
+              code: currentDrawing.code,
+              svg: currentDrawing.svg,
+              compiled: true,
+              checked: false,
+              verified: false,
+              verifyAttempts: tikzAttempts,
+            };
+          } else if (!toolResult.compiled) {
+            tikzInfo = {
+              code: toolResult.tikzCode || null,
+              svg: null,
+              compiled: false,
+              checked: false,
+              verified: false,
+              error: toolResult.error || "TikZ 编译失败",
+              verifyAttempts: tikzAttempts,
+            };
+          }
+        }
+
+        if (toolName === "check_drawing") {
+          const requestedArtifactId = toolArgs?.artifactId;
+          const requestedCode = normalizeCode(toolArgs?.tikzCode);
+          const currentCode = normalizeCode(currentDrawing?.code);
+          const hasDrawing = Boolean(currentDrawing?.artifactId && currentDrawing?.svg);
+          const artifactMatches = hasDrawing && requestedArtifactId === currentDrawing.artifactId;
+          const codeMatches = !requestedCode || requestedCode === currentCode;
+          const visualInspectionAvailable = this.modelConfig.supportsMultimodal !== false;
+
+          if (!hasDrawing) {
+            toolResult = {
+              ...toolResult,
+              checked: false,
+              verified: false,
+              error: "暂无可检查的渲染结果，请先调用 draw_tikz",
+            };
+          } else if (!artifactMatches || !codeMatches) {
+            toolResult = {
+              ...toolResult,
+              checked: false,
+              verified: false,
+              artifactId: currentDrawing.artifactId,
+              codeMatches,
+              error: "check_drawing 的 artifactId 或 TikZ 代码与最近一次绘图不匹配",
+            };
+          } else {
+            toolResult = {
+              ...toolResult,
+              artifactId: currentDrawing.artifactId,
+              tikzCode: currentDrawing.code,
+              rendered: true,
+              checked: true,
+              verified: false,
+              codeMatches: true,
+              visualInspectionAvailable,
+              verificationStatus: visualInspectionAvailable
+                ? "image_available_for_model_review"
+                : "visual_review_unavailable",
+            };
+            tikzInfo = {
+              ...tikzInfo,
+              checked: true,
+              verified: false,
+              verificationStatus: toolResult.verificationStatus,
+            };
           }
         }
 
         // ── Response metadata collection (tool-name based, for frontend) ──
         if (toolName === "web_search" && toolResult.sources) {
+          searchInfo.used = true;
           if (toolResult.query) searchInfo.queries.push(toolResult.query);
           const startIdx = searchInfo.sources.length;
           searchInfo.sources.push(
@@ -256,32 +361,9 @@ export class BaseLLMAdapter {
           );
         }
 
-        if (toolName === "draw_tikz" && toolResult.compiled) {
-          currentTikzCode = toolResult.tikzCode;
-          const imageArtifact = artifacts.find((a) => a.type === "image");
-          currentTikzSvg = imageArtifact?.meta?.svg || null;
-          currentTikzPngBase64 = imageArtifact?.data || null;
-          tikzAttempts++;
-          tikzInfo = {
-            code: toolResult.tikzCode,
-            svg: currentTikzSvg,
-            compiled: true,
-          };
-        }
 
-        if (toolName === "check_drawing") {
-          if (!currentTikzSvg) {
-            toolResult.error = "暂无绘制结果，请先调用 draw_tikz";
-          } else {
-            tikzInfo = {
-              code: currentTikzCode,
-              svg: currentTikzSvg,
-              compiled: true,
-              verified: true,
-              verifyAttempts: tikzAttempts,
-            };
-          }
-        }
+
+
 
         if (toolName === "draw_tikz") {
           reasoningParts.push({
@@ -296,7 +378,7 @@ export class BaseLLMAdapter {
         if (toolName === "check_drawing") {
           reasoningParts.push({
             round: reasoningParts.length + 1,
-            content: currentTikzSvg
+            content: toolResult.checked
               ? "> ✅ **TikZ 图形已检查**"
               : "> ❌ **暂无可检查的绘制结果**",
             type: "tool",
@@ -305,6 +387,7 @@ export class BaseLLMAdapter {
 
         onToolEvent?.({
           type: "tool_result",
+          toolCallId: getToolCallId(toolCall),
           toolName,
           result: toolResult,
           sources: toolResult.sources,
@@ -324,9 +407,7 @@ export class BaseLLMAdapter {
     const reasoningParts = [];
     const searchInfo = { used: false, queries: [], sources: [] };
     let tikzInfo = null;
-    let currentTikzCode = null;
-    let currentTikzSvg = null;
-    let currentTikzPngBase64 = null;
+    let currentDrawing = null;
     let tikzAttempts = 0;
     const preservedArtifacts = [];
     let llmCalls = 0;
@@ -380,8 +461,18 @@ export class BaseLLMAdapter {
         const toolArgs = parseToolArgs(toolCall);
         const executor = getToolExecutor(toolName);
 
-        onToolEvent?.({ type: "tool_start", toolName, arguments: toolArgs });
-        onChunk?.({ type: "tool_start", toolName, arguments: toolArgs });
+        onToolEvent?.({
+          type: "tool_start",
+          toolCallId: getToolCallId(toolCall),
+          toolName,
+          arguments: toolArgs,
+        });
+        onChunk?.({
+          type: "tool_start",
+          toolCallId: getToolCallId(toolCall),
+          toolName,
+          arguments: toolArgs,
+        });
 
         if (toolName === "web_search") {
           const query = toolArgs?.query || "";
@@ -392,7 +483,19 @@ export class BaseLLMAdapter {
         }
 
         let rawResult;
-        if (executor) {
+        if (toolName === "draw_tikz") {
+          currentDrawing = null;
+        }
+
+        if (toolName === "draw_tikz" && tikzAttempts >= MAX_TIKZ_ATTEMPTS) {
+          rawResult = {
+            toolResult: {
+              compiled: false,
+              error: `单次回复最多绘制 ${MAX_TIKZ_ATTEMPTS} 次 TikZ 图形`,
+            },
+            artifacts: [],
+          };
+        } else if (executor) {
           try {
             rawResult = await executor(toolArgs, { signal, toolContext });
           } catch (err) {
@@ -404,19 +507,99 @@ export class BaseLLMAdapter {
         }
 
         // Destructure: tools now return { toolResult, artifacts[] }
-        const { toolResult = rawResult, artifacts = [] } = rawResult || {};
+        let { toolResult = {}, artifacts = [] } = rawResult || {};
 
         // ── Artifact-driven processing ──
         for (const artifact of artifacts) {
-          switch (artifact.type) {
-            case "image":
-              if (this.modelConfig.supportsMultimodal !== false) {
-                contextArtifacts.push(artifact);
-              }
-              if (artifact.contextPolicy === "preserve") {
-                preservedArtifacts.push(artifact);
-              }
-              break;
+          if (artifact.type !== "image" || !isUsableImageArtifact(artifact)) {
+            continue;
+          }
+          if (this.modelConfig.supportsMultimodal !== false) {
+            contextArtifacts.splice(0, contextArtifacts.length, artifact);
+          }
+          if (artifact.contextPolicy === "preserve") {
+            preservedArtifacts.splice(0, MAX_PRESERVED_ARTIFACTS, toPreservedArtifact(artifact));
+          }
+        }
+
+        if (toolName === "draw_tikz") {
+          tikzAttempts++;
+          const imageArtifact = artifacts.find(
+            (artifact) => artifact.type === "image" && isUsableImageArtifact(artifact),
+          );
+          if (toolResult.compiled && imageArtifact && toolResult.artifactId) {
+            currentDrawing = {
+              artifactId: toolResult.artifactId,
+              code: toolResult.tikzCode || "",
+              svg: imageArtifact.meta?.svg || null,
+            };
+            tikzInfo = {
+              artifactId: currentDrawing.artifactId,
+              code: currentDrawing.code,
+              svg: currentDrawing.svg,
+              compiled: true,
+              checked: false,
+              verified: false,
+              verifyAttempts: tikzAttempts,
+            };
+          } else if (!toolResult.compiled) {
+            tikzInfo = {
+              code: toolResult.tikzCode || null,
+              svg: null,
+              compiled: false,
+              checked: false,
+              verified: false,
+              error: toolResult.error || "TikZ 编译失败",
+              verifyAttempts: tikzAttempts,
+            };
+          }
+        }
+
+        if (toolName === "check_drawing") {
+          const requestedArtifactId = toolArgs?.artifactId;
+          const requestedCode = normalizeCode(toolArgs?.tikzCode);
+          const currentCode = normalizeCode(currentDrawing?.code);
+          const hasDrawing = Boolean(currentDrawing?.artifactId && currentDrawing?.svg);
+          const artifactMatches = hasDrawing && requestedArtifactId === currentDrawing.artifactId;
+          const codeMatches = !requestedCode || requestedCode === currentCode;
+          const visualInspectionAvailable = this.modelConfig.supportsMultimodal !== false;
+
+          if (!hasDrawing) {
+            toolResult = {
+              ...toolResult,
+              checked: false,
+              verified: false,
+              error: "暂无可检查的渲染结果，请先调用 draw_tikz",
+            };
+          } else if (!artifactMatches || !codeMatches) {
+            toolResult = {
+              ...toolResult,
+              checked: false,
+              verified: false,
+              artifactId: currentDrawing.artifactId,
+              codeMatches,
+              error: "check_drawing 的 artifactId 或 TikZ 代码与最近一次绘图不匹配",
+            };
+          } else {
+            toolResult = {
+              ...toolResult,
+              artifactId: currentDrawing.artifactId,
+              tikzCode: currentDrawing.code,
+              rendered: true,
+              checked: true,
+              verified: false,
+              codeMatches: true,
+              visualInspectionAvailable,
+              verificationStatus: visualInspectionAvailable
+                ? "image_available_for_model_review"
+                : "visual_review_unavailable",
+            };
+            tikzInfo = {
+              ...tikzInfo,
+              checked: true,
+              verified: false,
+              verificationStatus: toolResult.verificationStatus,
+            };
           }
         }
 
@@ -435,32 +618,9 @@ export class BaseLLMAdapter {
           );
         }
 
-        if (toolName === "draw_tikz" && toolResult.compiled) {
-          currentTikzCode = toolResult.tikzCode;
-          const imageArtifact = artifacts.find((a) => a.type === "image");
-          currentTikzSvg = imageArtifact?.meta?.svg || null;
-          currentTikzPngBase64 = imageArtifact?.data || null;
-          tikzAttempts++;
-          tikzInfo = {
-            code: toolResult.tikzCode,
-            svg: currentTikzSvg,
-            compiled: true,
-          };
-        }
 
-        if (toolName === "check_drawing") {
-          if (!currentTikzSvg) {
-            toolResult.error = "暂无绘制结果，请先调用 draw_tikz";
-          } else {
-            tikzInfo = {
-              code: currentTikzCode,
-              svg: currentTikzSvg,
-              compiled: true,
-              verified: true,
-              verifyAttempts: tikzAttempts,
-            };
-          }
-        }
+
+
 
         if (toolName === "draw_tikz") {
           reasoningParts.push({
@@ -480,7 +640,7 @@ export class BaseLLMAdapter {
         if (toolName === "check_drawing") {
           reasoningParts.push({
             round: reasoningParts.length + 1,
-            content: currentTikzSvg
+            content: toolResult.checked
               ? "> ✅ **TikZ 图形已检查**"
               : "> ❌ **暂无可检查的绘制结果**",
             type: "tool",
@@ -494,12 +654,14 @@ export class BaseLLMAdapter {
 
         onToolEvent?.({
           type: "tool_result",
+          toolCallId: getToolCallId(toolCall),
           toolName,
           result: toolResult,
           sources: toolResult.sources,
         });
         onChunk?.({
           type: "tool_result",
+          toolCallId: getToolCallId(toolCall),
           toolName,
           engine: toolResult.engine,
           sources: toolResult.sources?.map((s) => ({
@@ -507,7 +669,7 @@ export class BaseLLMAdapter {
             url: s.url,
             snippet: s.snippet,
           })),
-          svg: toolName === "draw_tikz" ? currentTikzSvg ?? null : undefined,
+          svg: toolName === "draw_tikz" ? currentDrawing?.svg ?? null : undefined,
           compiled: toolName === "draw_tikz" ? toolResult.compiled ?? false : undefined,
           error: toolName === "draw_tikz" ? toolResult.error ?? null : undefined,
         });
@@ -578,6 +740,37 @@ function parseToolArgs(toolCall) {
     }
   }
   return raw || {};
+}
+
+function getToolCallId(toolCall) {
+  return toolCall.id || toolCall.call_id || null;
+}
+
+function normalizeCode(value) {
+  return typeof value === "string" ? value.replace(/\r\n/g, "\n").trim() : "";
+}
+
+function isUsableImageArtifact(artifact) {
+  return Boolean(
+    artifact &&
+    artifact.type === "image" &&
+    typeof artifact.data === "string" &&
+    artifact.data.length > 0 &&
+    artifact.data.length <= MAX_ARTIFACT_BASE64_LENGTH &&
+    typeof artifact.mime === "string" &&
+    artifact.mime.startsWith("image/"),
+  );
+}
+
+function toPreservedArtifact(artifact) {
+  return {
+    id: artifact.id,
+    type: "image",
+    mime: artifact.mime,
+    contextPolicy: "preserve",
+    label: artifact.label || "[绘制的图形]",
+    data: artifact.data,
+  };
 }
 
 function wrapReasoning(reasoning) {

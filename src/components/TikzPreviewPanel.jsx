@@ -2,6 +2,37 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { useLocale } from "../contexts/LocaleContext";
 import SafeMarkdown from "./SafeMarkdown";
 
+function sanitizeSvg(svg) {
+  if (typeof svg !== "string" || !svg.trim()) return "";
+
+  const document = new DOMParser().parseFromString(svg, "image/svg+xml");
+  if (document.querySelector("parsererror") || !document.documentElement) {
+    return "";
+  }
+
+  for (const node of document.querySelectorAll("script, foreignObject, iframe, object, embed")) {
+    node.remove();
+  }
+
+  for (const element of document.querySelectorAll("*")) {
+    for (const attribute of [...element.attributes]) {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim().toLowerCase();
+      if (name.startsWith("on")) {
+        element.removeAttribute(attribute.name);
+      } else if (
+        (name === "href" || name === "xlink:href") &&
+        !value.startsWith("#") &&
+        !value.startsWith("data:image/")
+      ) {
+        element.removeAttribute(attribute.name);
+      }
+    }
+  }
+
+  return document.documentElement.outerHTML;
+}
+
 export default function TikzPreviewPanel({ open, tikzData, contextText, onClose }) {
   const { t } = useLocale();
   const svgContainerRef = useRef(null);
@@ -18,7 +49,7 @@ export default function TikzPreviewPanel({ open, tikzData, contextText, onClose 
 
   useEffect(() => {
     if (open && tikzData?.svg && svgContainerRef.current) {
-      svgContainerRef.current.innerHTML = tikzData.svg;
+      svgContainerRef.current.innerHTML = sanitizeSvg(tikzData.svg);
     }
   }, [open, tikzData?.svg]);
 

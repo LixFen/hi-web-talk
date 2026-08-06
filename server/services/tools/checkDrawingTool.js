@@ -5,27 +5,31 @@ const checkDrawingDefinition = {
   function: {
     name: "check_drawing",
     description:
-      "使用此工具来检查绘制的图片。如果没有先调用 draw_tikz 会返回错误提示，请先绘制。",
+      "确认最近一次 draw_tikz 的渲染结果。必须传入 draw_tikz 返回的 artifactId；此工具会检查渲染结果是否存在以及代码是否匹配，并把图片留给支持视觉的模型检查。它不会替模型判断图形语义是否正确。",
     parameters: {
       type: "object",
       properties: {
+        artifactId: {
+          type: "string",
+          description: "最近一次 draw_tikz 返回的 artifactId",
+        },
         tikzCode: {
           type: "string",
-          description: "最终确认的 TikZ 代码",
+          description: "可选；用于确认当前图形对应的 TikZ 代码",
         },
         notes: {
           type: "string",
           description: "对结果的补充说明",
         },
       },
-      required: ["tikzCode"],
+      required: ["artifactId"],
     },
   },
 };
 
-async function execute({ tikzCode, notes }) {
+async function execute({ artifactId, tikzCode, notes }) {
   return {
-    toolResult: { tikzCode, notes: notes || "" },
+    toolResult: { artifactId, tikzCode: tikzCode || "", notes: notes || "" },
     artifacts: [],
   };
 }

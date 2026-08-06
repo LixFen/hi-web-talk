@@ -23,10 +23,17 @@ export function registerTool(tool) {
 
 /**
  * 获取所有工具的定义（用于传给 LLM）
+ * @param {string[]|null} names - 可选的工具名称白名单
  * @returns {Array} OpenAI function calling 格式的工具定义列表
  */
-export function getToolDefinitions() {
-  return [...tools.values()].map((t) => t.definition);
+export function getToolDefinitions(names = null) {
+  const registeredTools = names == null
+    ? [...tools.values()]
+    : names
+        .map((name) => tools.get(name))
+        .filter(Boolean);
+
+  return registeredTools.map((t) => t.definition);
 }
 
 /**

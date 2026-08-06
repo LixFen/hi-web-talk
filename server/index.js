@@ -402,6 +402,24 @@ function injectArtifactMessages(messages, chainBlocks, adaptationMap, supportsMu
     dialogueBlocks.push(block);
   }
 
+  let latestArtifact = null;
+  let latestArtifactBlockIndex = -1;
+  dialogueBlocks.forEach((block, blockIdx) => {
+    const artifact = [...(block.meta?.artifacts ?? [])]
+      .reverse()
+      .find((candidate) => (
+        candidate?.type === "image" &&
+        candidate?.contextPolicy === "preserve" &&
+        typeof candidate.data === "string" &&
+        candidate.data.length > 0 &&
+        candidate.data.length <= 6 * 1024 * 1024
+      ));
+    if (artifact) {
+      latestArtifact = artifact;
+      latestArtifactBlockIndex = blockIdx;
+    }
+  });
+
   const result = [];
   let blockIdx = 0;
 
@@ -410,19 +428,18 @@ function injectArtifactMessages(messages, chainBlocks, adaptationMap, supportsMu
     if (msg.role !== "assistant") continue;
 
     const block = dialogueBlocks[blockIdx];
-    if (block?.meta?.artifacts) {
-      for (const a of block.meta.artifacts) {
-        if (a.type === "image" && a.contextPolicy === "preserve") {
-          result.push({
-            role: "user",
-            source: "harness",
-            content: [
-              { type: "text", text: a.label || "[这是上一轮绘制的图形]" },
-              { type: "image_url", image_url: { url: `data:${a.mime};base64,${a.data}` } },
-            ],
-          });
-        }
-      }
+    if (blockIdx === latestArtifactBlockIndex && latestArtifact) {
+      result.push({
+        role: "user",
+        source: "harness",
+        content: [
+          { type: "text", text: latestArtifact.label || "[这是上一轮绘制的图形]" },
+          {
+            type: "image_url",
+            image_url: { url: `data:${latestArtifact.mime};base64,${latestArtifact.data}` },
+          },
+        ],
+      });
     }
     blockIdx++;
   }
@@ -486,7 +503,7 @@ function logStream(stage, payload = null) {
 }
 
 /**
- * 判断是否应该启用搜索（tool calling）
+ * 判断是否应该启用联网搜索工具。TikZ 工具由 resolveToolNames 独立选择。
  * @param {string|undefined} searchMode - 'auto' | 'on' | 'off' | undefined
  * @param {Object} model - 模型配置
  * @returns {boolean}
@@ -503,6 +520,18 @@ function resolveSearchMode(searchMode, model) {
 
   // auto 模式：默认启用（由 AI 自行判断是否调用搜索工具）
   return true;
+}
+
+function resolveToolNames(searchMode, model) {
+  if (!model.supportsToolUse) {
+    return [];
+  }
+
+  const toolNames = ["draw_tikz", "check_drawing"];
+  if (resolveSearchMode(searchMode, model)) {
+    toolNames.unshift("web_search");
+  }
+  return toolNames;
 }
 
 app.get("/api/health", async (_request, response) => {
@@ -1235,8 +1264,9 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
       return;
     }
 
-    // 判断是否需要 tool calling（搜索）
-    const shouldUseTools = resolveSearchMode(searchMode, selectedModel);
+    // 按搜索模式和模型能力选择工具集
+    const toolNames = resolveToolNames(searchMode, selectedModel);
+    const shouldUseTools = toolNames.length > 0;
     if (searchMode === "on" && !selectedModel.supportsToolUse) {
       response.status(400).json({ error: "当前模型不支持联网搜索，请切换到支持的模型。" });
       return;
@@ -1285,9 +1315,9 @@ app.post("/api/blocks/reply", authenticateToken, validateBody(blockReplySchema),
     );
 
     const tools = shouldUseTools
-      ? getToolDefinitions()
+      ? getToolDefinitions(toolNames)
       : undefined;
-    const toolContext = shouldUseTools
+    const toolContext = toolNames.includes("web_search")
       ? await getSearchToolContext(request.user.id, searchEngine)
       : undefined;
 
@@ -1395,8 +1425,9 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
     return;
   }
 
-  // 判断是否需要 tool calling（搜索）
-  const shouldUseTools = resolveSearchMode(searchMode, selectedModel);
+  // 按搜索模式和模型能力选择工具集
+  const toolNames = resolveToolNames(searchMode, selectedModel);
+  const shouldUseTools = toolNames.length > 0;
   if (searchMode === "on" && !selectedModel.supportsToolUse) {
     response.status(400).json({ error: "当前模型不支持联网搜索，请切换到支持的模型。" });
     return;
@@ -1512,9 +1543,9 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
     logStream("start-sent", { sessionHash, modelAlias: selectedModel.alias });
 
     const tools = shouldUseTools
-      ? getToolDefinitions()
+      ? getToolDefinitions(toolNames)
       : undefined;
-    const toolContext = shouldUseTools
+    const toolContext = toolNames.includes("web_search")
       ? await getSearchToolContext(request.user.id, searchEngine)
       : undefined;
 
@@ -1527,13 +1558,19 @@ app.post("/api/blocks/reply/stream", authenticateToken, validateBody(blockReplyS
       onChunk: async (event) => {
         // 处理工具事件
         if (event?.type === "tool_start") {
-          streamSession.pushEvent({ type: "tool_start", toolName: event.toolName, arguments: event.arguments });
+          streamSession.pushEvent({
+            type: "tool_start",
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            arguments: event.arguments,
+          });
           logStream("tool-start", { toolName: event.toolName });
           return;
         }
         if (event?.type === "tool_result") {
           streamSession.pushEvent({
             type: "tool_result",
+            toolCallId: event.toolCallId,
             toolName: event.toolName,
             engine: event.engine,
             sources: event.sources,
@@ -1784,8 +1821,9 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(
       return;
     }
 
-    // 判断是否需要 tool calling（搜索）
-    const shouldUseTools = resolveSearchMode(searchMode, selectedModel);
+    // 按搜索模式和模型能力选择工具集
+    const toolNames = resolveToolNames(searchMode, selectedModel);
+    const shouldUseTools = toolNames.length > 0;
     if (searchMode === "on" && !selectedModel.supportsToolUse) {
       response.status(400).json({ error: "当前模型不支持联网搜索，请切换到支持的模型。" });
       return;
@@ -1819,9 +1857,9 @@ app.post("/api/blocks/:blockSHA1/regenerate", authenticateToken, validateParams(
     }
 
     const tools = shouldUseTools
-      ? getToolDefinitions()
+      ? getToolDefinitions(toolNames)
       : undefined;
-    const toolContext = shouldUseTools
+    const toolContext = toolNames.includes("web_search")
       ? await getSearchToolContext(request.user.id, searchEngine)
       : undefined;
 
