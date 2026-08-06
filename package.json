@@ -50,7 +50,7 @@
     "pdf-parse": "^2.4.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.1",
+    "react-router-dom": "^7.18.2",
     "sharp": "^0.35.3",
     "sql.js": "^1.14.1",
     "ws": "^8.21.1",
@@ -64,9 +64,9 @@
     "@vitejs/plugin-react": "^4.7.0",
     "concurrently": "^9.2.4",
     "cross-env": "^7.0.3",
-    "electron": "^35.7.5",
-    "electron-builder": "^25.1.8",
-    "vite": "^5.4.21",
+    "electron": "^39.8.10",
+    "electron-builder": "^26.15.3",
+    "vite": "^7.3.6",
     "vitest": "^4.1.10"
   },
   "build": {
